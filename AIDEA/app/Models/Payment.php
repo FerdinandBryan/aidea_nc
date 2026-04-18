@@ -1,0 +1,26 @@
+<?php
+// ══════════════════════════════════════════════════
+//  app/Models/Payment.php
+// ══════════════════════════════════════════════════
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Payment extends Model
+{
+    protected $fillable = [
+        'ref',
+        'gcash_ref',
+        'service',
+        'service_id',
+        'student',
+        'student_id',
+        'date',
+        'date_iso',
+        'amount',
+        'method',
+        'status',
+        'proof_image',
+    ];
+}

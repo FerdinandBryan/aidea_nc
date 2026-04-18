@@ -1,0 +1,294 @@
+/* ══════════════════════════════════════════════════
+   AIDEA — login.js
+   Authenticates against POST /api/login (Laravel).
+   Stores token + user object in localStorage so
+   all other pages can read the session.
+══════════════════════════════════════════════════ */
+
+const API_BASE = 'http://127.0.0.1:8000/api';
+
+document.addEventListener('DOMContentLoaded', () => {
+
+    /* ── GUARD: only run login logic on the login page ── */
+    const isLoginPage = document.getElementById('loginForm') !== null;
+    if (!isLoginPage) return;
+
+    /* ── If already logged in, redirect away ───── */
+    const existingToken = localStorage.getItem('auth_token');
+    const existingUser = safeParseUser();
+    if (existingToken && existingUser) {
+        redirectByRole(existingUser.role);
+        return;
+    }
+
+    /* ── STATE ──────────────────────────────────── */
+    let currentRole = 'student';
+
+    /* ── ROLE TABS ──────────────────────────────── */
+    document.querySelectorAll('.role-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentRole = tab.dataset.role;
+            switchRole(currentRole);
+        });
+    });
+
+    function switchRole(role) {
+        document.getElementById('fieldStudent').style.display = 'none';
+        document.getElementById('fieldAdmin').style.display = 'none';
+        document.getElementById('passwordGroup').style.display = 'block';
+
+        if (role === 'student') {
+            document.getElementById('fieldStudent').style.display = 'block';
+        } else {
+            document.getElementById('fieldAdmin').style.display = 'block';
+        }
+        clearErrors();
+    }
+
+    /* ── TOGGLE PASSWORD VISIBILITY ─────────────── */
+    document.getElementById('togglePass')?.addEventListener('click', () => {
+        const input = document.getElementById('loginPassword');
+        const eyeShow = document.getElementById('eyeIconShow');
+        const eyeHide = document.getElementById('eyeIconHide');
+        if (input.type === 'password') {
+            input.type = 'text';
+            eyeShow.style.display = 'none';
+            eyeHide.style.display = 'inline';
+        } else {
+            input.type = 'password';
+            eyeShow.style.display = 'inline';
+            eyeHide.style.display = 'none';
+        }
+    });
+
+    /* ── REMEMBER ME — restore saved student number ── */
+    const savedNum = localStorage.getItem('aidea_remember_num');
+    if (savedNum) {
+        document.getElementById('studentNumber').value = savedNum;
+        document.getElementById('rememberMe').checked = true;
+    }
+
+    /* ── FORM SUBMIT ────────────────────────────── */
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!validateForm()) return;
+
+        setLoading(true);
+
+        /* Build payload based on role */
+        const payload = currentRole === 'student'
+            ? {
+                role: 'student',
+                student_number: document.getElementById('studentNumber').value.trim(),
+                password: document.getElementById('loginPassword').value,
+            }
+            : {
+                role: 'admin',
+                email: document.getElementById('adminEmail').value.trim(),
+                password: document.getElementById('loginPassword').value,
+            };
+
+        try {
+            const res = await fetch(`${API_BASE}/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const data = await res.json();
+            setLoading(false);
+
+            if (data.success) {
+                /* ── Save session to localStorage ── */
+                localStorage.setItem('auth_token', data.token);
+                localStorage.setItem('aidea_user', JSON.stringify(data.user));
+
+                /* ── Remember me ── */
+                if (currentRole === 'student' && document.getElementById('rememberMe').checked) {
+                    localStorage.setItem('aidea_remember_num', payload.student_number);
+                } else {
+                    localStorage.removeItem('aidea_remember_num');
+                }
+
+                showToast('Login successful! Redirecting…', 'success');
+                setTimeout(() => redirectByRole(data.role), 1200);
+            } else {
+                showToast(data.message || 'Invalid credentials.', 'error');
+            }
+
+        } catch (err) {
+            setLoading(false);
+            console.error(err);
+            showToast('Server error. Make sure Laravel is running.', 'error');
+        }
+    });
+
+    /* ── REDIRECT BY ROLE ───────────────────────── */
+    function redirectByRole(role) {
+        if (role === 'admin') {
+            window.location.href = '../../admin/dashboard/dashboard.html';
+        } else {
+            window.location.href = '../dashboard/dashboard.html';
+        }
+    }
+
+    /* ── VALIDATION ─────────────────────────────── */
+    function validateForm() {
+        clearErrors();
+        let valid = true;
+
+        if (currentRole === 'student') {
+            const num = document.getElementById('studentNumber').value.trim();
+            if (!num) {
+                showFieldError('errStudentNum', 'Student number is required');
+                document.getElementById('studentNumber').classList.add('error');
+                valid = false;
+            } else if (!/^\d{4}-\d{4}$/.test(num)) {
+                showFieldError('errStudentNum', 'Format must be YYYY-XXXX (e.g. 2023-0101)');
+                document.getElementById('studentNumber').classList.add('error');
+                valid = false;
+            }
+        } else {
+            const email = document.getElementById('adminEmail').value.trim();
+            if (!email || !email.includes('@')) {
+                showFieldError('errAdminEmail', 'Valid email is required');
+                document.getElementById('adminEmail').classList.add('error');
+                valid = false;
+            }
+        }
+
+        const pass = document.getElementById('loginPassword').value;
+        if (!pass) {
+            showFieldError('errPassword', 'Password is required');
+            document.getElementById('loginPassword').classList.add('error');
+            valid = false;
+        } else if (pass.length < 6) {
+            showFieldError('errPassword', 'Password must be at least 6 characters');
+            document.getElementById('loginPassword').classList.add('error');
+            valid = false;
+        }
+
+        return valid;
+    }
+
+    function clearErrors() {
+        document.querySelectorAll('.field-error').forEach(el => el.textContent = '');
+        document.querySelectorAll('input.error').forEach(el => el.classList.remove('error'));
+    }
+
+    function showFieldError(id, msg) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = msg;
+    }
+
+    /* ── LOADING STATE ──────────────────────────── */
+    function setLoading(on) {
+        const btn = document.getElementById('loginBtn');
+        const text = document.getElementById('loginBtnText');
+        const spinner = document.getElementById('loginBtnSpinner');
+        btn.disabled = on;
+        text.style.display = on ? 'none' : 'inline';
+        spinner.style.display = on ? 'inline-block' : 'none';
+    }
+
+    /* ── TOAST ──────────────────────────────────── */
+    function showToast(msg, type = 'info') {
+        const wrap = document.getElementById('toastWrap');
+        const t = document.createElement('div');
+        t.className = `toast ${type}`;
+        t.textContent = msg;
+        wrap.appendChild(t);
+        setTimeout(() => t.remove(), 3500);
+    }
+
+    /* ── HELPERS ────────────────────────────────── */
+    function safeParseUser() {
+        try { return JSON.parse(localStorage.getItem('aidea_user')); }
+        catch { return null; }
+    }
+
+});
+
+/* ══════════════════════════════════════════════════
+   SESSION HELPERS — import in any other page:
+
+   Usage (top of any admin/student JS file):
+   ─────────────────────────────────────────
+   const session = AideaSession.require('admin');
+   // session.token  → Bearer token for API calls
+   // session.user   → { id, full_name, email, role, course, ... }
+
+══════════════════════════════════════════════════ */
+window.AideaSession = {
+
+    /** Get current user object or null */
+    getUser() {
+        try { return JSON.parse(localStorage.getItem('aidea_user')); }
+        catch { return null; }
+    },
+
+    /** Get current token or null */
+    getToken() {
+        return localStorage.getItem('auth_token') || null;
+    },
+
+    /**
+     * Call at the top of every protected page.
+     * @param {string} requiredRole  'admin' | 'student' | null (any)
+     * @returns {{ user, token }} or redirects to login.
+     */
+    require(requiredRole = null) {
+        const token = this.getToken();
+        const user = this.getUser();
+
+        if (!token || !user) {
+            window.location.href = this._loginPath();
+            return null;
+        }
+
+        if (requiredRole && user.role !== requiredRole) {
+            /* Wrong role — send them to their correct dashboard */
+            this._redirectByRole(user.role);
+            return null;
+        }
+
+        return { token, user };
+    },
+
+    /** Clear session and go to login */
+    logout() {
+        /* Fire-and-forget — revoke token on server */
+        const token = this.getToken();
+        if (token) {
+            fetch('http://127.0.0.1:8000/api/logout', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json',
+                },
+            }).catch(() => { });
+        }
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('aidea_user');
+        window.location.href = this._loginPath();
+    },
+
+    _loginPath() {
+        /* Works regardless of how deep the current page is */
+        const depth = window.location.pathname.split('/').filter(Boolean).length;
+        return '../'.repeat(Math.max(depth - 1, 1)) + 'login/login.html';
+    },
+
+    _redirectByRole(role) {
+        if (role === 'admin') {
+            window.location.href = '../../admin/dashboard/dashboard.html';
+        } else {
+            window.location.href = '../dashboard/dashboard.html';
+        }
+    },
+};

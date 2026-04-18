@@ -1,0 +1,83 @@
+<?php
+
+// app/Http/Controllers/PaymentController.php
+
+namespace App\Http\Controllers;
+
+use App\Models\Payment;
+use Illuminate\Http\Request;
+
+class PaymentController extends Controller
+{
+    /* ─────────────────────────────────────────────────
+       GET /api/payments
+       Returns all payments (admin) OR filtered by
+       ?student=<name> (student side).
+    ───────────────────────────────────────────────── */
+    public function index(Request $request)
+    {
+        $query = Payment::latest();
+
+        if ($request->filled('student')) {
+            $query->where('student', $request->student);
+        }
+
+        return response()->json($query->get());
+    }
+
+    /* ─────────────────────────────────────────────────
+       POST /api/payments
+       Student submits a new payment with proof image.
+    ───────────────────────────────────────────────── */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'gcash_ref' => 'required|string|min:6',
+            'service' => 'required|string',
+            'service_id' => 'nullable|integer',
+            'student' => 'required|string',
+            'student_id' => 'nullable|string',
+            'date' => 'nullable|string',
+            'date_iso' => 'nullable|date',
+            'amount' => 'required|numeric|min:0',
+            'method' => 'nullable|string',
+            'proof_image' => 'required|string',   // base64 data URI
+        ]);
+
+        // Auto-generate a unique reference number
+        $validated['ref'] = 'TXN-' . now()->format('Ymd') . '-' . strtoupper(substr(uniqid(), -6));
+        $validated['status'] = 'Pending';
+
+        $payment = Payment::create($validated);
+
+        return response()->json($payment, 201);
+    }
+
+    /* ─────────────────────────────────────────────────
+       PATCH /api/payments/{id}/approve
+       Admin approves → status becomes 'Paid'
+    ───────────────────────────────────────────────── */
+    public function approve(Payment $payment)
+    {
+        $payment->update(['status' => 'Paid']);
+        return response()->json($payment);
+    }
+
+    /* ─────────────────────────────────────────────────
+       PATCH /api/payments/{id}/reject
+       Admin rejects → status becomes 'Rejected'
+    ───────────────────────────────────────────────── */
+    public function reject(Payment $payment)
+    {
+        $payment->update(['status' => 'Rejected']);
+        return response()->json($payment);
+    }
+
+    /* ─────────────────────────────────────────────────
+       GET /api/payments/{id}  (optional — for receipt)
+    ───────────────────────────────────────────────── */
+    public function show(Payment $payment)
+    {
+        return response()->json($payment);
+    }
+}
