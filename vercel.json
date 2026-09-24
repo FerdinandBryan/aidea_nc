@@ -1,5 +1,5 @@
 {
   "buildCommand": "mkdir -p public && cp -r user admin public/",
   "outputDirectory": "public",
-  "rewrites": [{ "source": "/", "destination": "/user/landing/index.html" }]
+  "redirects": [{ "source": "/", "destination": "/user/landing/index.html", "permanent": false }]
 }
