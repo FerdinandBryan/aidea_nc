@@ -17,7 +17,7 @@
 // Nothing about the questions themselves is hardcoded here — add, remove, or
 // retype an item in the admin panel and the student form reflects it immediately.
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = 'https://aideanc-production.up.railway.app/api';
 const LOGIN_URL = '../login/login.html';
 const THEME_KEY = 'aidea_user_theme';
 

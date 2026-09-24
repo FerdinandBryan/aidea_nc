@@ -2,8 +2,8 @@
 // Same shell behavior as dashboard.js / avail-services.js (session, theme,
 // drawer, profile menu, sign-out modal) plus the feedback form + history.
 
-const API_BASE = 'http://127.0.0.1:8000/api';
-const FB_API = 'http://127.0.0.1:8000/api/student';
+const API_BASE = 'https://aideanc-production.up.railway.app/api';
+const FB_API = 'https://aideanc-production.up.railway.app/api/student';
 const LOGIN_URL = '../login/login.html';
 const THEME_KEY = 'aidea_user_theme';
 

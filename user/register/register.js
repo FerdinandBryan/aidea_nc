@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
 
     const $ = id => document.getElementById(id);
-    const API = 'http://127.0.0.1:8000/api';
+    const API = 'https://aideanc-production.up.railway.app/api';
 
     /* ── THEME (shares the 'aidea_theme' key with the admin dashboard) ── */
     const root = document.documentElement;

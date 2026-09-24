@@ -2,7 +2,7 @@
 // Shares the theme / drawer / sign-out UI wiring with dashboard.js so both
 // pages behave identically.
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = 'https://aideanc-production.up.railway.app/api';
 const LOGIN_URL = '../../user/login/login.html';
 
 // ── Session / API helpers ───────────────────────────────────────────────────

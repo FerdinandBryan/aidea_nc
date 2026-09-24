@@ -2,7 +2,7 @@
 // Same session/theme/drawer/sign-out pattern as dashboard.js, plus the
 // satisfaction-report widgets (stats, rating breakdown, service chart, reviews).
 
-const ADMIN_API = 'http://127.0.0.1:8000/api';
+const ADMIN_API = 'https://aideanc-production.up.railway.app/api';
 const LOGIN_URL = '../../user/login/login.html';
 
 // ── Session helpers ────────────────────────────────────────────────────────

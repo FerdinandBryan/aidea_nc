@@ -2,7 +2,7 @@
 // Depends on login.js (AideaSession), same as before.
 
 const THEME_KEY = 'aidea_user_theme'; // shared with the student dashboard
-const SUBMIT_URL = 'http://127.0.0.1:8000/api/thesis/submit';
+const SUBMIT_URL = 'https://aideanc-production.up.railway.app/api/thesis/submit';
 const MAX_SIZE = 20 * 1024 * 1024;
 const ALLOWED_EXTS = ['.pdf', '.docx'];
 

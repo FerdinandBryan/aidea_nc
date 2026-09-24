@@ -1,7 +1,7 @@
 // thesis-review.js — Statistician / Grammarian reviewer interface
 // Same session/theme/drawer conventions as dashboard.js, plus the review workflow.
 
-const ADMIN_API = 'http://127.0.0.1:8000/api';
+const ADMIN_API = 'https://aideanc-production.up.railway.app/api';
 const LOGIN_URL = '../../user/login/login.html';
 
 // ── Session helpers ────────────────────────────────────────────────────────

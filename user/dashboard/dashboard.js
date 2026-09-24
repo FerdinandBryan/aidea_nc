@@ -1,7 +1,7 @@
 // dashboard.js — Student side
 // Self-contained: reads the session from localStorage and calls the Laravel API.
 
-const DASH_API = 'http://127.0.0.1:8000/api';
+const DASH_API = 'https://aideanc-production.up.railway.app/api';
 const LOGIN_URL = '../login/login.html';
 const THEME_KEY = 'aidea_user_theme'; // student-side preference (admin uses its own key)
 

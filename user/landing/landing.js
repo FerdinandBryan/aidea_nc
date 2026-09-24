@@ -13,7 +13,7 @@
    breaking the page â€” check the console for what failed.
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = 'https://aideanc-production.up.railway.app/api';
 
 /* â”€â”€ Navigation: redirect to real pages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function openModal(id) {

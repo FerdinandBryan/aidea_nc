@@ -5,7 +5,7 @@
    all other pages can read the session.
 ══════════════════════════════════════════════════ */
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = 'https://aideanc-production.up.railway.app/api';
 
 /* ── Roles that get routed to the thesis reviewer page
       instead of the normal dashboard. Reviewer accounts
@@ -256,7 +256,7 @@ window.AideaSession = {
         /* Fire-and-forget — revoke token on server */
         const token = this.getToken();
         if (token) {
-            fetch('http://127.0.0.1:8000/api/logout', {
+            fetch('https://aideanc-production.up.railway.app/api/logout', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,

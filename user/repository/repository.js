@@ -2,7 +2,7 @@
 // Self-contained (like dashboard.js): reads the session from localStorage.
 // Papers come from the admin's approved-thesis store in localStorage ('aidea_repository').
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = 'https://aideanc-production.up.railway.app/api';
 const LOGIN_URL = '../login/login.html';
 const THEME_KEY = 'aidea_user_theme'; // shared with the other student pages
 const REPO_KEY = 'aidea_repository';

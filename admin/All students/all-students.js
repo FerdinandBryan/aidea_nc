@@ -1,7 +1,7 @@
 // all-students.js — Admin side
 // Uses the same session, theme, drawer and sign-out behaviour as dashboard.js.
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = 'https://aideanc-production.up.railway.app/api';
 const LOGIN_URL = '../../user/login/login.html';
 const PAGE_SIZE = 6;
 
