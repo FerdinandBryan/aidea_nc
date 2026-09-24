@@ -1,6 +1,7 @@
 // Services_pricing.js — AIDEA Admin | Laravel API + Universal Code Detection + Icon Picker
 
 const API_BASE = 'http://127.0.0.1:8000/api';
+const LOGIN_URL = '../../user/login/login.html';
 
 let services = [];
 let priceHistory = [];
@@ -50,7 +51,7 @@ function toggleIconPicker() {
     const grid = document.getElementById('iconPickerGrid');
     const toggleBtn = document.getElementById('iconPickerToggleBtn');
     if (grid) grid.style.display = iconPickerOpen ? 'grid' : 'none';
-    if (toggleBtn) toggleBtn.textContent = iconPickerOpen ? '▲ Hide Icons' : '▼ Pick Icon';
+    if (toggleBtn) toggleBtn.textContent = iconPickerOpen ? 'Hide icons' : 'Pick icon';
 }
 
 function selectIcon(icon) {
@@ -313,17 +314,32 @@ async function apiFetch(path, options = {}) {
     return res.json();
 }
 
+function escHtml(str) {
+    return String(str ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 // ══════════════════════════════════════════
 //  FETCH SERVICES FROM DB
 // ══════════════════════════════════════════
 
 async function loadServices() {
+    const grid = document.getElementById('servicesGrid');
     try {
         services = await apiFetch('/services');
         renderServices();
     } catch (err) {
         console.error('Failed to load services:', err);
-        showToast('❌ Failed to load services.', 'error');
+        showToast('Failed to load services.', 'error');
+        if (grid) {
+            grid.setAttribute('aria-busy', 'false');
+            grid.innerHTML = `
+                <div class="services-empty">
+                    <strong>Couldn't connect to the server</strong>
+                    <div>Make sure the API is running, then refresh.</div>
+                </div>`;
+        }
     }
 }
 
@@ -331,48 +347,71 @@ async function loadServices() {
 //  RENDER SERVICES GRID
 // ══════════════════════════════════════════
 
+// Label shown to students: "Preferred statistician (Optional)"
+function itemLabel(item) {
+    return escHtml(item.text) + (item.optional ? ' (Optional)' : '');
+}
+
+// Small type/choices hint for the admin card preview, e.g. "Text" or "Checkbox: Yes / No"
+function describeResearchItem(item) {
+    let text = ITEM_TYPE_META[item.type].label;
+    if (item.type === 'checkbox' && item.options && item.options.length) {
+        text += ': ' + item.options.map(o => escHtml(o.label) + (o.subtitle ? ' ▸ ' + escHtml(o.subtitle) : '')).join(' / ');
+    }
+    return text;
+}
+
 function renderServices() {
     const grid = document.getElementById('servicesGrid');
+    grid.setAttribute('aria-busy', 'false');
+
     if (!services.length) {
         grid.innerHTML = `
-            <div style="grid-column:1/-1;text-align:center;padding:48px;color:#8b90a7;">
-                <div style="font-size:3rem;margin-bottom:12px;">⚙️</div>
-                <div style="font-weight:600;">No services yet.</div>
-                <div style="font-size:13px;margin-top:4px;">Click "+ Add Service" to get started.</div>
+            <div class="services-empty">
+                <strong>No services yet</strong>
+                <div>Click "Add service" to get started.</div>
             </div>`;
         return;
     }
 
-    grid.innerHTML = services.map((s, i) => `
-        <div class="service-card ${s.cls || 'analysis'}" style="animation-delay:${i * 0.08}s">
+    grid.innerHTML = services.map((s, i) => {
+        const items = parseResearchItems(s.research_requirement_text);
+        return `
+        <div class="service-card ${s.active ? '' : 'disabled'}" style="animation-delay:${i * 0.06}s">
             <span class="svc-icon">${s.icon && s.icon !== 'undefined' ? s.icon : '🛠️'}</span>
-            <div class="svc-name">${s.name}</div>
-            <div class="svc-desc">${s.description || ''}</div>
-            <div class="svc-price">₱ ${parseFloat(s.price).toLocaleString()} <span>/ session</span></div>
+            <div class="svc-name">${escHtml(s.name)}</div>
+            <div class="svc-desc">${escHtml(s.description || '')}</div>
+            <div class="svc-price">₱ ${parseFloat(s.price).toLocaleString()}</div>
+
+            ${s.requires_research_info ? `
+                <div class="research-badge">Requires research info form</div>
+                ${items.length ? `<ul class="research-items-preview">${items.map(item => `<li>${itemLabel(item)} <span style="opacity:.75;">(${describeResearchItem(item)})</span></li>`).join('')}</ul>` : ''}
+            ` : ''}
 
             <!-- GCash Info Badge -->
             <div class="gcash-badge">
                 <span class="gcash-tag">GCash</span>
-                <span class="gcash-num">${s.gcash_number || '—'}</span>
+                <span class="gcash-num">${escHtml(s.gcash_number || '—')}</span>
                 ${s.gcash_qr
-            ? `<img src="${s.gcash_qr}" alt="Code" class="gcash-qr-thumb"
+                ? `<img src="${s.gcash_qr}" alt="Code" class="gcash-qr-thumb"
                            onclick="previewQR(${s.id})" title="Click to preview"/>
                        ${s.is_qr_valid
-                ? `<span style="font-size:.7rem;color:#00aa5a;font-weight:700;">✔ ${s.code_format ? getFormatLabel(s.code_format) : 'Code Valid'}</span>`
-                : `<span style="font-size:.7rem;color:#e67e22;font-weight:700;">⚠ Not a scannable code</span>`
-            }`
-            : `<span class="qr-missing">No Code</span>`
-        }
+                    ? `<span class="qr-status-ok">${s.code_format ? getFormatLabel(s.code_format) : 'Code valid'}</span>`
+                    : `<span class="qr-status-warn">Not a scannable code</span>`
+                }`
+                : `<span class="qr-missing">No code on file</span>`
+            }
             </div>
 
             <div class="svc-actions">
-                <button class="btn-edit"   onclick="openEdit(${s.id})">✏️ Edit</button>
-                <button class="btn-toggle" onclick="toggleService(${s.id})">
-                    ${s.active ? '🔴 Disable' : '🟢 Enable'}
+                <button class="btn-edit" type="button" onclick="openEdit(${s.id})">Edit</button>
+                <button class="btn-toggle" type="button" onclick="toggleService(${s.id})">
+                    ${s.active ? 'Disable' : 'Enable'}
                 </button>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 // ══════════════════════════════════════════
@@ -385,17 +424,17 @@ function renderHistory() {
             const up = h.newPrice > h.oldPrice;
             return `
                 <tr>
-                    <td><strong>${h.service}</strong></td>
+                    <td><strong>${escHtml(h.service)}</strong></td>
                     <td>₱ ${parseFloat(h.oldPrice).toLocaleString()}</td>
                     <td class="${up ? 'price-up' : 'price-down'}">
                         ₱ ${parseFloat(h.newPrice).toLocaleString()} ${up ? '▲' : '▼'}
                     </td>
-                    <td>${h.by}</td>
+                    <td>${escHtml(h.by)}</td>
                     <td>${new Date(h.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                 </tr>
             `;
         }).join('')
-        : `<tr><td colspan="5" style="text-align:center;padding:24px;color:#8b90a7;">No price history yet.</td></tr>`;
+        : `<tr><td colspan="5" class="table-empty">No price history yet.</td></tr>`;
 }
 
 // ══════════════════════════════════════════
@@ -416,6 +455,16 @@ function openEdit(id) {
     document.getElementById('editPrice').value = s.price;
     document.getElementById('editDesc').value = s.description || '';
     document.getElementById('editGcashNumber').value = s.gcash_number || '';
+    document.getElementById('editRequiresResearch').checked = !!s.requires_research_info;
+    researchItems = parseResearchItems(s.research_requirement_text);
+    // If the requirement is on but no items were saved yet, seed with the defaults
+    // so the admin has something to edit right away instead of a blank list.
+    if (s.requires_research_info && researchItems.length === 0) {
+        researchItems = cloneDefaultResearchItems();
+    }
+    renderResearchItems();
+    syncResearchTextarea();
+    document.getElementById('researchTextWrap').style.display = s.requires_research_info ? 'block' : 'none';
     document.getElementById('iconDisplay').textContent = selectedIcon;
     document.getElementById('editReason').value = '';
     document.getElementById('reasonGroup').style.display = 'none';
@@ -457,6 +506,11 @@ function openAdd() {
     document.getElementById('editPrice').value = '';
     document.getElementById('editDesc').value = '';
     document.getElementById('editGcashNumber').value = '';
+    document.getElementById('editRequiresResearch').checked = false;
+    researchItems = cloneDefaultResearchItems();
+    renderResearchItems();
+    syncResearchTextarea();
+    document.getElementById('researchTextWrap').style.display = 'none';
     document.getElementById('iconDisplay').textContent = selectedIcon;
     buildIconPicker();
     collapseIconPicker();
@@ -469,7 +523,7 @@ function collapseIconPicker() {
     const grid = document.getElementById('iconPickerGrid');
     const toggleBtn = document.getElementById('iconPickerToggleBtn');
     if (grid) grid.style.display = 'none';
-    if (toggleBtn) toggleBtn.textContent = '▼ Pick Icon';
+    if (toggleBtn) toggleBtn.textContent = 'Pick icon';
 }
 
 // ══════════════════════════════════════════
@@ -488,17 +542,17 @@ function setQRPreview(src, isValid = false, format = null) {
         if (statusEl) {
             if (isValid) {
                 const label = getFormatLabel(format);
-                statusEl.textContent = `✔ ${label} detected`;
-                statusEl.style.color = '#00aa5a';
+                statusEl.textContent = `${label} detected`;
+                statusEl.className = 'qr-status-ok';
             } else {
-                statusEl.textContent = '⚠ No scannable code found in image';
-                statusEl.style.color = '#e67e22';
+                statusEl.textContent = 'No scannable code found in image';
+                statusEl.className = 'qr-status-warn';
             }
         }
     } else {
         preview.style.display = 'none';
         placeholder.style.display = 'flex';
-        if (statusEl) statusEl.textContent = '';
+        if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
     }
 }
 
@@ -512,20 +566,20 @@ async function handleQRUpload(input) {
 
     // ── Basic file validation ──────────────
     if (!file.type.startsWith('image/')) {
-        showToast('❌ Please upload a valid image file (PNG, JPG, etc.).', 'error');
+        showToast('Please upload a valid image file (PNG, JPG, etc.).', 'error');
         input.value = '';
         return;
     }
     if (file.size > 2 * 1024 * 1024) {
-        showToast('❌ Image must be under 2 MB.', 'error');
+        showToast('Image must be under 2 MB.', 'error');
         input.value = '';
         return;
     }
 
     const statusEl = document.getElementById('qrValidStatus');
     if (statusEl) {
-        statusEl.textContent = '🔍 Scanning for scannable code…';
-        statusEl.style.color = '#8b90a7';
+        statusEl.textContent = 'Scanning for scannable code…';
+        statusEl.className = '';
     }
 
     // ── Read file as base64 ────────────────
@@ -552,10 +606,10 @@ async function handleQRUpload(input) {
         input.value = '';
         setQRPreview(null, false, null);
         if (statusEl) {
-            statusEl.textContent = '🚫 Screenshots are not allowed. Please upload a real GCash QR or barcode image.';
-            statusEl.style.color = '#ef4444';
+            statusEl.textContent = 'Screenshots are not allowed. Please upload a real GCash QR or barcode image.';
+            statusEl.className = 'qr-status-warn';
         }
-        showToast('🚫 Screenshots are not accepted. Upload a direct code photo.', 'error');
+        showToast('Screenshots are not accepted. Upload a direct code photo.', 'error');
 
     } else if (!result.isCode) {
         // ❌ No scannable code found
@@ -563,10 +617,10 @@ async function handleQRUpload(input) {
         input.value = '';
         setQRPreview(null, false, null);
         if (statusEl) {
-            statusEl.textContent = '❌ No scannable code detected. Please upload an image containing a QR code, barcode, or similar.';
-            statusEl.style.color = '#ef4444';
+            statusEl.textContent = 'No scannable code detected. Please upload an image containing a QR code, barcode, or similar.';
+            statusEl.className = 'qr-status-warn';
         }
-        showToast('❌ No scannable code found. Only QR codes, barcodes, and similar codes are accepted.', 'error');
+        showToast('No scannable code found. Only QR codes, barcodes, and similar codes are accepted.', 'error');
 
     } else {
         // ✅ Code accepted
@@ -574,7 +628,7 @@ async function handleQRUpload(input) {
         // Store detected format so we can send it to the server
         pendingCodeFormat = result.format;
         setQRPreview(pendingQRB64, true, result.format);
-        showToast(`✅ ${getFormatLabel(result.format)} detected!`);
+        showToast(`${getFormatLabel(result.format)} detected.`);
     }
 }
 
@@ -619,10 +673,24 @@ async function saveEdit() {
     const newPrice = parseFloat(document.getElementById('editPrice').value);
     const desc = document.getElementById('editDesc').value.trim();
     const gcashNum = document.getElementById('editGcashNumber').value.trim();
+    const requiresResearch = document.getElementById('editRequiresResearch').checked;
+    syncResearchTextarea();
+    const researchText = document.getElementById('editResearchRequirementText').value.trim();
 
     if (!name) return alert('Service name is required.');
     if (isNaN(newPrice)) return alert('Please enter a valid price.');
     if (!desc) return alert('Description is required.');
+
+    // Checkbox items need at least one labelled checkbox
+    if (requiresResearch) {
+        const badCb = researchItems.find(
+            i => i.type === 'checkbox' && i.text.trim() &&
+                !(i.options || []).some(o => o.label && o.label.trim())
+        );
+        if (badCb) {
+            return alert(`"${badCb.text}" is a checkbox item and needs at least 1 checkbox label.`);
+        }
+    }
 
     const saveBtn = document.getElementById('saveBtn');
     saveBtn.disabled = true;
@@ -650,6 +718,8 @@ async function saveEdit() {
             price: newPrice,
             icon: selectedIcon,
             gcash_number: gcashNum || null,
+            requires_research_info: requiresResearch,
+            research_requirement_text: requiresResearch ? (researchText || null) : null,
             ...(gcashQR !== undefined && { gcash_qr: gcashQR }),
             ...(isQrValid !== undefined && { is_qr_valid: isQrValid }),
             ...(codeFormat !== undefined && { code_format: codeFormat }),
@@ -662,7 +732,7 @@ async function saveEdit() {
                 method: 'POST',
                 body: JSON.stringify(payload),
             });
-            showToast('✅ Service added!');
+            showToast('Service added.');
 
         } else {
             const existing = services.find(s => s.id === editingId);
@@ -671,8 +741,6 @@ async function saveEdit() {
             // ✅ Fixed: compare as floats
             if (existing && newPrice !== oldPrice) {
                 const reason = document.getElementById('editReason').value.trim() || 'Manual price update';
-
-                console.log('💾 Saving audit entry:', { service: existing.name, oldPrice, newPrice, reason });
 
                 await saveAuditEntry({
                     service: existing.name,
@@ -687,7 +755,7 @@ async function saveEdit() {
                     service: existing.name,
                     oldPrice,
                     newPrice,
-                    by: 'Admin',
+                    by: 'ROMAILYN FLORES',
                     date: new Date().toISOString().split('T')[0],
                 });
                 savePriceHistory();
@@ -698,7 +766,7 @@ async function saveEdit() {
                 method: 'PUT',
                 body: JSON.stringify(payload),
             });
-            showToast('✅ Service updated!');
+            showToast('Service updated.');
         }
 
         closeModal();
@@ -709,20 +777,27 @@ async function saveEdit() {
         alert('Failed to save. Please try again.');
     } finally {
         saveBtn.disabled = false;
-        saveBtn.textContent = 'Save Changes';
+        saveBtn.textContent = 'Save';
     }
 }
 
-// ✅ Fixed saveAuditEntry with console logs
+// ── Audit log helpers ──────────────────────────────────────
+function formatNow() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+        `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 async function saveAuditEntry(entry) {
     try {
         const result = await apiFetch('/price-audit-logs', {
             method: 'POST',
             body: JSON.stringify(entry),
         });
-        console.log('✅ Audit entry saved to DB:', result);
+        console.log('Audit entry saved:', result);
     } catch (err) {
-        console.error('❌ Failed to save audit log entry:', err);
+        console.error('Failed to save audit log entry:', err);
     }
 }
 
@@ -736,7 +811,7 @@ async function toggleService(id) {
         await loadServices();
     } catch (err) {
         console.error(err);
-        showToast('❌ Failed to toggle service.', 'error');
+        showToast('Failed to toggle service.', 'error');
     }
 }
 
@@ -745,49 +820,379 @@ async function toggleService(id) {
 // ══════════════════════════════════════════
 
 function showToast(msg, type = 'success') {
-    const colors = { success: '#22c55e', error: '#ef4444', warning: '#f59e0b' };
     let t = document.getElementById('adminToast');
     if (!t) {
         t = document.createElement('div');
         t.id = 'adminToast';
-        t.style.cssText = `
-            position:fixed;bottom:2rem;right:2rem;
-            padding:.8rem 1.4rem;border-radius:10px;
-            font-size:.85rem;font-weight:700;color:#fff;
-            box-shadow:0 4px 20px rgba(0,0,0,.2);z-index:9999;
-            transform:translateY(20px);opacity:0;transition:all .3s;
-            pointer-events:none;
-        `;
+        t.className = 'toast';
         document.body.appendChild(t);
     }
     t.textContent = msg;
-    t.style.background = colors[type] || colors.success;
-    t.style.transform = 'translateY(0)';
-    t.style.opacity = '1';
+    t.className = `toast toast-${type} toast-show`;
     clearTimeout(t._timeout);
-    t._timeout = setTimeout(() => {
-        t.style.transform = 'translateY(20px)';
-        t.style.opacity = '0';
-    }, 3500);
+    t._timeout = setTimeout(() => t.classList.remove('toast-show'), 3500);
 }
 
-// ── Audit log helpers ──────────────────────────────────────
-function formatNow() {
-    const d = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
-        `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+// ══════════════════════════════════════════
+//  RESEARCH REQUIREMENT ITEM LIST EDITOR
+//  Each item: { text, type, optional, options }
+//    type     : 'text' | 'file' | 'image' | 'checkbox'
+//    optional : true → student may skip this item
+//    options  : for 'checkbox' items: [{ label, subtitle }]. A ticked box with a
+//               subtitle shows a nested input for the student.
+// ══════════════════════════════════════════
+
+const DEFAULT_RESEARCH_ITEMS = [
+    { text: 'Research title', type: 'text', optional: false, options: [] },
+    { text: 'Researcher/s', type: 'text', optional: false, options: [] },
+    { text: 'Program', type: 'text', optional: false, options: [] },
+    { text: 'Adviser', type: 'text', optional: false, options: [] },
+    { text: 'Type of research', type: 'text', optional: false, options: [] },
+    { text: 'Facebook contact', type: 'text', optional: false, options: [] },
+    { text: 'Preferred statistician', type: 'text', optional: true, options: [] },
+    { text: 'Upload research paper (PDF, DOC, or DOCX — max 20 MB)', type: 'file', optional: false, options: [] },
+];
+
+// What each item's answer type means and how it's shown to students.
+const ITEM_TYPE_META = {
+    text: { label: 'Text' },           // student types an answer
+    file: { label: 'File' },           // student uploads a document (PDF/DOC/etc.)
+    image: { label: 'Image' },         // student uploads a photo/image
+    checkbox: { label: 'Checkbox' },   // student ticks one or more choices; a ticked choice can reveal a nested sub-title field
+};
+
+function cloneDefaultResearchItems() {
+    return DEFAULT_RESEARCH_ITEMS.map(item => ({ ...item, options: [...item.options] }));
 }
 
-async function saveAuditEntry(entry) {
+let researchItems = [];
+
+// Checkbox choices are { label, subtitle }. Older data may hold plain strings.
+function normalizeOptions(opts) {
+    if (!Array.isArray(opts)) return [];
+    return opts
+        .map(o => {
+            if (typeof o === 'string') return { label: o, subtitle: '' };
+            if (o && typeof o === 'object') return { label: String(o.label || ''), subtitle: String(o.subtitle || '') };
+            return null;
+        })
+        .filter(o => o && o.label);
+}
+
+// Accepts the new { text, type, optional, options } format, the older
+// { text, type } format, and legacy plain-string / newline-separated data.
+// (Old 'radio' items are converted to 'checkbox'.)
+function parseResearchItems(raw) {
+    if (!raw) return [];
+    let parsed;
     try {
-        await apiFetch('/price-audit-logs', {
-            method: 'POST',
-            body: JSON.stringify(entry),
-        });
-    } catch (err) {
-        console.error('Failed to save audit log entry:', err);
+        parsed = JSON.parse(raw);
+    } catch {
+        return raw.split('\n').map(s => s.trim()).filter(Boolean)
+            .map(text => ({ text, type: 'text', optional: false, options: [] }));
     }
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+        .map(item => {
+            if (typeof item === 'string') {
+                return { text: item, type: 'text', optional: false, options: [] };
+            }
+            if (item && typeof item === 'object') {
+                const type = item.type === 'radio' ? 'checkbox' : item.type;
+                return {
+                    text: item.text || '',
+                    type: ITEM_TYPE_META[type] ? type : 'text',
+                    optional: !!item.optional,
+                    options: normalizeOptions(item.options),
+                };
+            }
+            return null;
+        })
+        .filter(item => item && item.text);
+}
+
+function renderResearchItems() {
+    const list = document.getElementById('researchItemsList');
+    if (!list) return;
+
+    list.innerHTML = researchItems.map((item, i) => `
+        <div class="research-item-block">
+            <div class="research-item-row">
+                <select class="research-item-type" data-idx="${i}" title="What should the student provide for this item?">
+                    ${Object.entries(ITEM_TYPE_META).map(([val, m]) =>
+        `<option value="${val}" ${item.type === val ? 'selected' : ''}>${m.label}</option>`
+    ).join('')}
+                </select>
+                <input type="text" class="form-control research-item-input" data-idx="${i}"
+                    value="${escHtml(item.text)}" placeholder="Item label…" />
+                <button type="button" class="research-item-remove" data-idx="${i}">✕</button>
+            </div>
+            ${item.type === 'checkbox' ? `
+                <div class="research-choices">
+                    ${(item.options || []).map((o, j) => `
+                        <div class="research-choice-row">
+                            <input type="text" class="form-control research-choice-label" data-idx="${i}" data-opt="${j}"
+                                value="${escHtml(o.label)}" placeholder="Checkbox label…" />
+                            <input type="text" class="form-control research-choice-sub" data-idx="${i}" data-opt="${j}"
+                                value="${escHtml(o.subtitle)}" placeholder="Sub-title (shown when ticked) — optional" />
+                            <button type="button" class="research-item-remove research-choice-remove" data-idx="${i}" data-opt="${j}">✕</button>
+                        </div>
+                    `).join('')}
+                    <button type="button" class="btn-add-item research-choice-add" data-idx="${i}">Add checkbox</button>
+                </div>
+            ` : ''}
+            <label class="research-item-optional">
+                <input type="checkbox" class="research-item-optional-cb" data-idx="${i}" ${item.optional ? 'checked' : ''} />
+                Optional
+            </label>
+        </div>
+    `).join('') || `<div class="research-items-empty">No items yet — click "Add item" below.</div>`;
+
+    list.querySelectorAll('.research-item-input').forEach(input => {
+        input.addEventListener('input', function () {
+            researchItems[parseInt(this.dataset.idx, 10)].text = this.value;
+            syncResearchTextarea();
+        });
+    });
+    list.querySelectorAll('.research-item-type').forEach(select => {
+        select.addEventListener('change', function () {
+            const it = researchItems[parseInt(this.dataset.idx, 10)];
+            it.type = this.value;
+            // Give new checkbox items a starter choice
+            if (it.type === 'checkbox' && !(it.options && it.options.length)) {
+                it.options = [{ label: '', subtitle: '' }];
+            }
+            renderResearchItems(); // re-render to show/hide the choices editor
+            syncResearchTextarea();
+        });
+    });
+    list.querySelectorAll('.research-choice-label').forEach(input => {
+        input.addEventListener('input', function () {
+            researchItems[+this.dataset.idx].options[+this.dataset.opt].label = this.value;
+            syncResearchTextarea();
+        });
+    });
+    list.querySelectorAll('.research-choice-sub').forEach(input => {
+        input.addEventListener('input', function () {
+            researchItems[+this.dataset.idx].options[+this.dataset.opt].subtitle = this.value;
+            syncResearchTextarea();
+        });
+    });
+    list.querySelectorAll('.research-choice-remove').forEach(btn => {
+        btn.addEventListener('click', function () {
+            researchItems[+this.dataset.idx].options.splice(+this.dataset.opt, 1);
+            renderResearchItems();
+            syncResearchTextarea();
+        });
+    });
+    list.querySelectorAll('.research-choice-add').forEach(btn => {
+        btn.addEventListener('click', function () {
+            researchItems[+this.dataset.idx].options.push({ label: '', subtitle: '' });
+            renderResearchItems();
+            syncResearchTextarea();
+            const labels = document.querySelectorAll(`.research-choice-label[data-idx="${this.dataset.idx}"]`);
+            if (labels.length) labels[labels.length - 1].focus();
+        });
+    });
+    list.querySelectorAll('.research-item-optional-cb').forEach(cb => {
+        cb.addEventListener('change', function () {
+            researchItems[parseInt(this.dataset.idx, 10)].optional = this.checked;
+            syncResearchTextarea();
+        });
+    });
+    list.querySelectorAll('.research-item-remove:not(.research-choice-remove)').forEach(btn => {
+        btn.addEventListener('click', function () {
+            researchItems.splice(parseInt(this.dataset.idx, 10), 1);
+            renderResearchItems();
+            syncResearchTextarea();
+        });
+    });
+}
+
+function addResearchItem(value = '', type = 'text') {
+    const t = ITEM_TYPE_META[type] ? type : 'text';
+    researchItems.push({
+        text: value,
+        type: t,
+        optional: false,
+        options: t === 'checkbox' ? [{ label: '', subtitle: '' }] : [],
+    });
+    renderResearchItems();
+    syncResearchTextarea();
+    const list = document.getElementById('researchItemsList');
+    const inputs = list?.querySelectorAll('.research-item-input');
+    if (inputs && inputs.length) inputs[inputs.length - 1].focus();
+}
+
+function syncResearchTextarea() {
+    const ta = document.getElementById('editResearchRequirementText');
+    if (!ta) return;
+    const clean = researchItems
+        .filter(i => i.text && i.text.trim())
+        .map(i => ({
+            text: i.text.trim(),
+            type: i.type,
+            optional: !!i.optional,
+            ...(i.type === 'checkbox' ? {
+                options: (i.options || [])
+                    .filter(o => o.label && o.label.trim())
+                    .map(o => ({ label: o.label.trim(), subtitle: (o.subtitle || '').trim() })),
+            } : {}),
+        }));
+    ta.value = JSON.stringify(clean);
+}
+
+/* ══════════════════════════════════════════════════
+   Shared chrome: theme, mobile drawer, profile menu,
+   sign-out modal — mirrors dashboard.js so every admin
+   page behaves identically.
+══════════════════════════════════════════════════ */
+
+function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function currentTheme() {
+    return document.documentElement.getAttribute('data-theme') || 'light';
+}
+
+function applyTheme(theme, persist) {
+    document.documentElement.setAttribute('data-theme', theme);
+    if (persist) {
+        try { localStorage.setItem('aidea_theme', theme); } catch { }
+    }
+    const btn = document.getElementById('themeBtn');
+    if (btn) {
+        const next = theme === 'dark' ? 'light' : 'dark';
+        btn.setAttribute('aria-label', `Switch to ${next} mode`);
+    }
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', theme === 'dark' ? '#050a17' : '#0a1a3f');
+}
+
+function initTheme() {
+    applyTheme(currentTheme(), false);
+
+    document.getElementById('themeBtn')?.addEventListener('click', () => {
+        applyTheme(currentTheme() === 'dark' ? 'light' : 'dark', true);
+    });
+
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = e => {
+        let saved = null;
+        try { saved = localStorage.getItem('aidea_theme'); } catch { }
+        if (!saved) applyTheme(e.matches ? 'dark' : 'light', false);
+    };
+    mq.addEventListener ? mq.addEventListener('change', onChange) : mq.addListener?.(onChange);
+}
+
+function initDrawer() {
+    const sidebar = document.getElementById('sidebar');
+    const scrim = document.getElementById('scrim');
+    const btn = document.getElementById('menuBtn');
+    if (!sidebar || !scrim || !btn) return;
+
+    const open = () => {
+        sidebar.classList.add('open');
+        scrim.hidden = false;
+        document.body.classList.add('no-scroll');
+        btn.setAttribute('aria-expanded', 'true');
+    };
+    const close = () => {
+        sidebar.classList.remove('open');
+        scrim.hidden = true;
+        document.body.classList.remove('no-scroll');
+        btn.setAttribute('aria-expanded', 'false');
+    };
+
+    btn.addEventListener('click', () => sidebar.classList.contains('open') ? close() : open());
+    scrim.addEventListener('click', close);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+    sidebar.querySelectorAll('a').forEach(a => a.addEventListener('click', close));
+    window.matchMedia('(min-width: 1025px)').addEventListener?.('change', e => { if (e.matches) close(); });
+}
+
+function initProfileMenu() {
+    const btn = document.getElementById('profileBtn');
+    const menu = document.getElementById('profileMenu');
+    if (!btn || !menu) return;
+
+    const setOpen = open => {
+        menu.hidden = !open;
+        btn.setAttribute('aria-expanded', String(open));
+    };
+
+    btn.addEventListener('click', e => {
+        e.stopPropagation();
+        setOpen(menu.hidden);
+    });
+
+    document.addEventListener('click', e => {
+        if (!menu.hidden && !menu.contains(e.target)) setOpen(false);
+    });
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && !menu.hidden) {
+            setOpen(false);
+            btn.focus();
+        }
+    });
+}
+
+function performSignOut() {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+        fetch(`${API_BASE}/logout`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+        }).catch(() => { });
+    }
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('aidea_user');
+    window.location.href = LOGIN_URL;
+}
+
+function initSignOutModal() {
+    const modal = document.getElementById('signOutModal');
+    const trigger = document.getElementById('signOutBtn');
+    const cancel = document.getElementById('signOutCancel');
+    const confirmBtn = document.getElementById('signOutConfirm');
+    const profileBtn = document.getElementById('profileBtn');
+    const profileMenu = document.getElementById('profileMenu');
+    if (!modal || !trigger || !cancel || !confirmBtn) return;
+
+    const open = () => {
+        if (profileMenu) profileMenu.hidden = true;
+        profileBtn?.setAttribute('aria-expanded', 'false');
+
+        modal.hidden = false;
+        document.body.classList.add('no-scroll');
+        cancel.focus();
+    };
+
+    const close = () => {
+        modal.hidden = true;
+        if (!document.getElementById('sidebar')?.classList.contains('open')) {
+            document.body.classList.remove('no-scroll');
+        }
+        profileBtn?.focus();
+    };
+
+    trigger.addEventListener('click', open);
+    cancel.addEventListener('click', close);
+    confirmBtn.addEventListener('click', performSignOut);
+
+    modal.addEventListener('click', e => { if (e.target === modal) close(); });
+
+    document.addEventListener('keydown', e => {
+        if (modal.hidden) return;
+        if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+        if (e.key === 'Tab') {
+            const first = cancel, last = confirmBtn;
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+    });
 }
 
 // ══════════════════════════════════════════
@@ -795,6 +1200,11 @@ async function saveAuditEntry(entry) {
 // ══════════════════════════════════════════
 
 document.addEventListener('DOMContentLoaded', async () => {
+    initTheme();
+    initDrawer();
+    initProfileMenu();
+    initSignOutModal();
+
     loadZXing().catch(() => console.warn('ZXing pre-load failed'));
     loadPriceHistory(); // ← load saved history first
     await loadServices();
@@ -807,9 +1217,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('homeBtn').addEventListener('click', () =>
         location.href = '../dashboard/dashboard.html'
     );
-    document.getElementById('signOutBtn').addEventListener('click', () => {
-        if (confirm('Sign out?')) window.location.href = '../../login/login.html';
-    });
 
     document.getElementById('modalOverlay').addEventListener('click', e => {
         if (e.target === e.currentTarget) closeModal();
@@ -822,4 +1229,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     document.getElementById('removeQRBtn')?.addEventListener('click', removeQR);
     document.getElementById('iconPickerToggleBtn')?.addEventListener('click', toggleIconPicker);
+    document.getElementById('addResearchItemBtn')?.addEventListener('click', () => addResearchItem(''));
+    document.getElementById('editRequiresResearch')?.addEventListener('change', function () {
+        const wrap = document.getElementById('researchTextWrap');
+        wrap.style.display = this.checked ? 'block' : 'none';
+        // Seed with the default items on first-time enable so there's
+        // something editable right away instead of an empty list.
+        if (this.checked && researchItems.length === 0) {
+            researchItems = cloneDefaultResearchItems();
+            renderResearchItems();
+            syncResearchTextarea();
+        }
+    });
 });

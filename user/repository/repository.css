@@ -396,3 +396,357 @@ body {
 .btn-read:hover {
     background: #e0b015
 }
+
+/* ══════════════════════════════════════════
+   ADD THESE TO YOUR EXISTING repository.css
+══════════════════════════════════════════ */
+
+.repo-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.repo-year-badge {
+    font-size: 11px;
+    color: #888;
+}
+
+.repo-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.repo-added {
+    font-size: 11px;
+    color: #666;
+}
+
+.btn-read {
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: #6366f1;
+    color: #fff;
+    border: none;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-read:hover {
+    background: #4f52c9;
+}
+
+/* ══════════════════════════════════════════
+   ADD THESE TO YOUR EXISTING repository.css
+══════════════════════════════════════════ */
+
+.repo-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.repo-year-badge {
+    font-size: 11px;
+    color: #888;
+}
+
+.repo-adviser {
+    font-size: 12px;
+    color: #888;
+    margin: 0 0 6px;
+}
+
+.repo-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    gap: 8px;
+}
+
+.repo-added {
+    font-size: 11px;
+    color: #666;
+    flex-shrink: 0;
+}
+
+/* Primary "Read Paper" — links to actual file */
+.btn-read {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: #6366f1;
+    color: #fff;
+    border: none;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.2s;
+    white-space: nowrap;
+}
+
+.btn-read:hover {
+    background: #4f52c9;
+}
+
+/* Secondary "Details" button */
+.btn-read-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ccc;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.btn-read-secondary:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+}
+
+/* Disabled state when no file is attached */
+.btn-read-disabled {
+    background: rgba(255, 255, 255, 0.04);
+    color: #555;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    cursor: not-allowed;
+}
+
+/* ==========================================================================
+   AIDEA Student — Repository
+   Page-specific styles only. The shell, toolbar/search, buttons, modal and dark
+   mode come from ../dashboard/dashboard.css, loaded first in the HTML.
+   ========================================================================== */
+
+.filter-select {
+    height: 40px;
+    padding: 0 12px;
+    font: inherit;
+    font-size: 13.5px;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color .15s, box-shadow .15s;
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.result-count {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+/* ── Grid ── */
+.repo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+    gap: 16px;
+}
+
+.repo-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    padding: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    transition: border-color .15s;
+}
+
+.repo-card:hover {
+    border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+}
+
+.repo-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.repo-course {
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--blue-soft);
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.repo-year {
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.repo-title {
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: -.005em;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.repo-people {
+    color: var(--muted);
+    font-size: 12.5px;
+    overflow-wrap: anywhere;
+}
+
+.repo-people strong {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.repo-abstract {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.repo-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: auto;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+}
+
+.repo-added {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.repo-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn-sm {
+    height: 34px;
+    padding: 0 13px;
+    font-size: 12.5px;
+    border-radius: 9px;
+}
+
+.btn-disabled {
+    display: inline-flex;
+    align-items: center;
+    height: 34px;
+    padding: 0 13px;
+    border-radius: 9px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: not-allowed;
+}
+
+.repo-empty {
+    grid-column: 1 / -1;
+    padding: 56px 16px;
+    text-align: center;
+}
+
+.repo-empty strong {
+    display: block;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.repo-empty p {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 13.5px;
+}
+
+/* ── Details modal ── */
+.abstract-block {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.abstract-block h4 {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.abstract-block p {
+    font-size: 14px;
+    line-height: 1.75;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+.modal-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 22px;
+}
+
+.modal-foot .btn-primary,
+.modal-foot .btn-secondary {
+    text-decoration: none;
+    white-space: nowrap;
+    justify-content: center;
+}
+
+@media (max-width: 720px) {
+    .toolbar .filter-select {
+        flex: 1 1 140px;
+    }
+
+    .repo-actions {
+        width: 100%;
+    }
+
+    .repo-actions>* {
+        flex: 1;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 420px) {
+    .modal-foot>* {
+        flex: 1;
+        justify-content: center;
+    }
+}

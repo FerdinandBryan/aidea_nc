@@ -1,72 +1,125 @@
 <?php
+
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Service;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\ValidationException;
 
 class ServiceController extends Controller
 {
-    public function index()
+    // GET /api/services
+    public function index(): JsonResponse
     {
-        return response()->json(Service::all());
+        $services = Service::orderBy('id')->get();
+
+        return response()->json($services);
     }
 
-    public function show($id)
+    // GET /api/services/{id}
+    public function show(Service $service): JsonResponse
     {
-        $service = Service::findOrFail($id);
         return response()->json($service);
     }
 
-    public function store(Request $request)
+    // POST /api/services
+    public function store(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name'         => 'required|string|max:255',
-            'description'  => 'nullable|string',
-            'price'        => 'required|numeric|min:0',
-            'icon'         => 'nullable|string',
-            'cls'          => 'nullable|string',
-            'active'       => 'nullable|boolean',
-            'gcash_number' => 'nullable|string|max:11',
-            'gcash_qr'     => 'nullable|string',
-            'is_qr_valid'  => 'nullable|boolean',
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'description' => 'required|string',
+                'price' => 'required|numeric|min:0',
+                'icon' => 'nullable|string|max:10',
+                'cls' => 'nullable|string|max:50',
+                'active' => 'nullable|boolean',
+                'gcash_number' => 'nullable|string|size:11|regex:/^09[0-9]{9}$/',
+                'gcash_qr' => [
+                    'nullable',
+                    'string',
+                    function ($attr, $value, $fail) {
+                        if ($value && !str_starts_with($value, 'data:image/')) {
+                            $fail('The GCash QR must be a valid base64 image string.');
+                        }
+                    }
+                ],
+                'is_qr_valid' => 'nullable|boolean',
+                'requires_research_info' => 'nullable|boolean',
+                'research_requirement_text' => 'nullable|string|max:2000',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json(['errors' => $e->errors()], 422);
+        }
+
+        $service = Service::create([
+            'name' => $validated['name'],
+            'description' => $validated['description'],
+            'price' => $validated['price'],
+            'icon' => $validated['icon'] ?? '🛠️',
+            'cls' => $validated['cls'] ?? 'analysis',
+            'active' => $validated['active'] ?? true,
+            'gcash_number' => $validated['gcash_number'] ?? null,
+            'gcash_qr' => $validated['gcash_qr'] ?? null,
+            'is_qr_valid' => $validated['is_qr_valid'] ?? false,
+            'requires_research_info' => $validated['requires_research_info'] ?? false,
+            'research_requirement_text' => $validated['research_requirement_text'] ?? null,
         ]);
 
-        $service = Service::create($validated);
         return response()->json($service, 201);
     }
 
-    public function update(Request $request, $id)
+    // PUT /api/services/{id}
+    public function update(Request $request, Service $service): JsonResponse
     {
-        $service = Service::findOrFail($id);
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'description' => 'required|string',
+                'price' => 'required|numeric|min:0',
+                'icon' => 'nullable|string|max:10',
+                'cls' => 'nullable|string|max:50',
+                'gcash_number' => 'nullable|string|size:11|regex:/^09[0-9]{9}$/',
+                'gcash_qr' => [
+                    'nullable',
+                    'string',
+                    function ($attr, $value, $fail) {
+                        if ($value && $value !== '__REMOVE__' && !str_starts_with($value, 'data:image/')) {
+                            $fail('The GCash QR must be a valid base64 image string.');
+                        }
+                    }
+                ],
+                'is_qr_valid' => 'nullable|boolean',
+                'requires_research_info' => 'nullable|boolean',
+                'research_requirement_text' => 'nullable|string|max:2000',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json(['errors' => $e->errors()], 422);
+        }
 
-        $validated = $request->validate([
-            'name'         => 'sometimes|string|max:255',
-            'description'  => 'nullable|string',
-            'price'        => 'sometimes|numeric|min:0',
-            'icon'         => 'nullable|string',
-            'cls'          => 'nullable|string',
-            'active'       => 'nullable|boolean',
-            'gcash_number' => 'nullable|string|max:11',
-            'gcash_qr'     => 'nullable|string',
-            'is_qr_valid'  => 'nullable|boolean',
-        ]);
+        if (isset($validated['gcash_qr']) && $validated['gcash_qr'] === '__REMOVE__') {
+            $validated['gcash_qr'] = null;
+            $validated['is_qr_valid'] = false;
+        }
 
         $service->update($validated);
+
         return response()->json($service);
     }
 
-    public function toggle($id)
+    // PATCH /api/services/{id}/toggle
+    public function toggle(Service $service): JsonResponse
     {
-        $service = Service::findOrFail($id);
-        $service->active = !$service->active;
-        $service->save();
+        $service->update(['active' => !$service->active]);
+
         return response()->json($service);
     }
 
-    public function destroy($id)
+    // DELETE /api/services/{id}
+    public function destroy(Service $service): JsonResponse
     {
-        $service = Service::findOrFail($id);
         $service->delete();
-        return response()->json(['message' => 'Deleted successfully']);
+
+        return response()->json(['message' => 'Service deleted successfully.']);
     }
 }

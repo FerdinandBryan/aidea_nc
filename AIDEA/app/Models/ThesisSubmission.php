@@ -21,6 +21,11 @@ class ThesisSubmission extends Model
         'file_type',
         'status',
         'remarks',
+        'visible_in_repo',
+    ];
+
+    protected $casts = [
+        'visible_in_repo' => 'boolean',
     ];
 
     public function user()

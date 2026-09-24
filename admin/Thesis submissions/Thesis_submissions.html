@@ -3,99 +3,190 @@
 
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a1a3f" />
     <title>Thesis Submissions — AIDEA Admin</title>
+
+    <!-- Apply saved / system theme BEFORE paint (same key as the dashboard: aidea_theme) -->
+    <script>
+        (function () {
+            var t = null;
+            try { t = localStorage.getItem('aidea_theme'); } catch (e) { }
+            if (t !== 'light' && t !== 'dark') {
+                t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet" />
     <link rel="stylesheet" href="Thesis_submissions.css" />
-    <link rel="stylesheet" href="repository.css">
 </head>
 
 <body>
-    <aside class="sidebar">
-        <div class="sidebar-brand">
-            <div class="brand-icon">AI</div>
-            <div>
-                <div class="brand-name">AIDEA Admin</div>
-                <div class="brand-sub">Norzagaray College</div>
-            </div>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+        <a class="sidebar-brand" href="../dashboard/dashboard.html" aria-label="AIDEA Admin home">
+            <span class="brand-mark" aria-hidden="true">
+                <svg viewBox="0 0 32 32" width="32" height="32" fill="none">
+                    <rect width="32" height="32" rx="9" fill="#FFC72C" />
+                    <path d="M9 22.5 16 8l7 14.5" stroke="#0a1a3f" stroke-width="2.6" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                    <path d="M11.8 18h8.4" stroke="#0a1a3f" stroke-width="2.6" stroke-linecap="round" />
+                    <circle cx="16" cy="8" r="1.9" fill="#2563eb" />
+                </svg>
+            </span>
+            <span class="brand-text">
+                <span class="brand-name">AIDEA Admin</span>
+                <span class="brand-sub">Norzagaray College</span>
+            </span>
+        </a>
+
+        <div class="sidebar-scroll">
+            <p class="nav-heading">Overview</p>
+            <nav class="nav-group">
+                <a href="../dashboard/dashboard.html">Dashboard</a>
+                <a href="../Report generator/Report_generator.html">Report Generator</a>
+            </nav>
+
+            <p class="nav-heading">Management</p>
+            <nav class="nav-group">
+                <a href="../All students/all-students.html">All Students</a>
+                <a href="../Thesis submissions/Thesis_submissions.html" class="active" aria-current="page">Thesis
+                    Submissions</a>
+                <a href="../File transfer/file_transfer.html">File Transfer</a>
+                <a href="../Payments/payment.html">Payments</a>
+                <a href="../Receipts/Receipts.html">Receipts</a>
+                <a href="../Services pricing/Services_pricing.html">Services &amp; Pricing</a>
+            </nav>
+
+            <p class="nav-heading">Quality</p>
+            <nav class="nav-group">
+                <a href="../Satisfaction reports/Satisfaction_reports.html">Satisfaction Reports</a>
+                <a href="../Price audit log/Price_audit_log.html">Price Audit Log</a>
+                <a href="../formatting/formatting.html">Format Templates</a>
+            </nav>
+
+            <p class="nav-heading">Account</p>
+            <nav class="nav-group">
+                <a href="../Manage account/manage_account.html">Manage Account</a>
+            </nav>
         </div>
-        <div class="sidebar-section-label">OVERVIEW</div>
-        <nav class="sidebar-nav">
-            <a href="../All students/all-students.html"><span>📊</span> Dashboard</a>
-            <a href="../statistic/statistic.html"><span>📈</span> Statistics</a>
-            <a href="../Report generator/Report_generator.html"><span>📄</span> Report Generator</a>
-        </nav>
-        <div class="sidebar-section-label">MANAGEMENT</div>
-        <nav class="sidebar-nav">
-            <a href="../All students/all-students.html"><span>👥</span> All Students</a>
-            <a href="../Thesis submissions/Thesis_submissions.html" class="active"><span>📝</span> Thesis
-                Submissions</a>
-            <a href="../Payments/payment.html"><span>💳</span> Payments</a>
-            <a href="../Receipts/Receipts.html"><span>🧾</span> Receipts</a>
-            <a href="../Services pricing/Services_pricing.html"><span>⚙️</span> Services &amp; Pricing</a>
-            <a href="../Events/events.html"><span>📅</span> Events</a>
-        </nav>
-        <div class="sidebar-section-label">QUALITY</div>
-        <nav class="sidebar-nav">
-            <a href="../Satisfaction reports/Satisfaction_reports.html"><span>⭐</span> Satisfaction Reports</a>
-            <a href="../Price audit log/Price_audit_log.html"><span>🔍</span> Price Audit Log</a>
-            <a href="../formatting/formatting.html" class="active"><span>📐</span> Format Templates</a>
-        </nav>
+
+        <!-- Profile: click to reveal the Sign out menu -->
         <div class="sidebar-footer">
-            <div class="footer-avatar">AD</div>
-            <div>
-                <div class="footer-name">Admin</div>
-                <div class="footer-role">ADMINISTRATOR</div>
+            <div class="profile-menu" id="profileMenu" role="menu" aria-label="Account" hidden>
+                <button class="profile-menu-item" id="signOutBtn" type="button" role="menuitem">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <path d="M16 17l5-5-5-5M21 12H9" />
+                    </svg>
+                    Sign out
+                </button>
             </div>
+
+            <button class="profile-btn" id="profileBtn" type="button" aria-haspopup="menu" aria-expanded="false"
+                aria-controls="profileMenu">
+                <div class="footer-avatar" aria-hidden="true">AD</div>
+                <div class="footer-info">
+                    <div class="footer-name">Admin</div>
+                    <div class="footer-role">Administrator</div>
+                </div>
+                <svg class="profile-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    aria-hidden="true">
+                    <path d="M6 15l6-6 6 6" />
+                </svg>
+            </button>
         </div>
     </aside>
 
+    <div class="scrim" id="scrim" hidden></div>
+
+    <!-- MAIN -->
     <div class="main">
         <header class="topbar">
             <div class="topbar-left">
-                <h1>Thesis Submissions <span class="badge-admin">ADMIN</span></h1>
-                <p>Norzagaray College — AIDEA Control Panel</p>
+                <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="Open menu"
+                    aria-controls="sidebar" aria-expanded="false">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round">
+                        <path d="M4 7h16M4 12h16M4 17h10" />
+                    </svg>
+                </button>
+                <div class="page-title">
+                    <h1>Thesis Submissions <span class="badge-admin">Admin</span></h1>
+                    <p>Norzagaray College — AIDEA Control Panel</p>
+                </div>
             </div>
             <div class="topbar-right">
-                <button class="btn-home" id="homeBtn">— Home</button>
-                <button class="btn-signout" id="signOutBtn">Sign Out</button>
+                <button class="icon-btn" id="themeBtn" type="button" aria-label="Switch to dark mode"
+                    title="Toggle theme">
+                    <svg class="i-moon" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" />
+                    </svg>
+                    <svg class="i-sun" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round">
+                        <circle cx="12" cy="12" r="4" />
+                        <path
+                            d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+                    </svg>
+                </button>
             </div>
         </header>
 
-        <div class="content">
-            <div class="stat-row">
-                <div class="mini-stat"><span>📝</span>
-                    <div><strong>89</strong>
-                        <p>Total Submitted</p>
-                    </div>
-                </div>
-                <div class="mini-stat"><span>✅</span>
-                    <div><strong>74</strong>
-                        <p>Approved</p>
-                    </div>
-                </div>
-                <div class="mini-stat"><span>⏳</span>
-                    <div><strong>10</strong>
-                        <p>Pending Review</p>
-                    </div>
-                </div>
-                <div class="mini-stat"><span>❌</span>
-                    <div><strong>5</strong>
-                        <p>Rejected</p>
-                    </div>
+        <main class="content">
+
+            <div class="page-head">
+                <div>
+                    <h2>Submissions</h2>
+                    <p>Review thesis submissions and manage the public repository.</p>
                 </div>
             </div>
+
+            <!-- STATS -->
+            <section class="stat-grid" aria-label="Submission figures">
+                <article class="stat stat-blue">
+                    <div class="stat-label">Total submitted</div>
+                    <div class="stat-value" id="statTotal">—</div>
+                </article>
+                <article class="stat stat-yellow">
+                    <div class="stat-label">Approved</div>
+                    <div class="stat-value" id="statApproved">—</div>
+                </article>
+                <article class="stat stat-blue">
+                    <div class="stat-label">Pending review</div>
+                    <div class="stat-value" id="statPending">—</div>
+                </article>
+                <article class="stat stat-yellow">
+                    <div class="stat-label">Rejected</div>
+                    <div class="stat-value" id="statRejected">—</div>
+                </article>
+            </section>
+
+            <!-- TOOLBAR -->
             <div class="toolbar">
-                <input type="text" class="search-input" id="searchInput" placeholder="🔍  Search thesis…" />
-                <select class="filter-select" id="filterStatus">
-                    <option value="">All Status</option>
+                <input type="text" class="form-control search-input" id="searchInput"
+                    placeholder="Search by student or title" />
+                <select class="form-control filter-select" id="filterStatus" aria-label="Filter by status">
+                    <option value="">All status</option>
                     <option value="Approved">Approved</option>
                     <option value="Pending">Pending</option>
                     <option value="Rejected">Rejected</option>
                 </select>
-                <button class="btn-view-repo" id="viewRepoBtn">📚 View Repository <span
-                        id="repoBadgeCount"></span></button>
+                <button class="btn-view-repo" id="viewRepoBtn" type="button">
+                    Repository <span class="repo-count" id="repoBadgeCount" hidden>0</span>
+                </button>
             </div>
-            <div class="card">
+
+            <!-- TABLE -->
+            <section class="panel">
                 <div class="table-wrap">
                     <table>
                         <thead>
@@ -109,110 +200,124 @@
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="thesisBody"></tbody>
+                        <tbody id="thesisBody">
+                            <tr>
+                                <td colspan="7" class="empty">Loading…</td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
-            </div>
-        </div>
+            </section>
+
+        </main>
     </div>
 
     <!-- VIEW MODAL -->
-    <div class="modal-overlay" id="viewModal">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3 id="viewModalTitle">Thesis Details</h3>
-                <button class="modal-close" onclick="closeModal('viewModal')">✕</button>
+    <div class="modal-backdrop" id="viewModal" hidden>
+        <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="viewModalTitle">
+            <div class="modal-head">
+                <h3 class="modal-title" id="viewModalTitle">Thesis details</h3>
+                <button class="modal-x" type="button" data-close="viewModal" aria-label="Close">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round">
+                        <path d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                </button>
             </div>
             <div class="modal-body">
-                <div class="modal-field"><span class="modal-label">Student</span><span class="modal-value"
+                <div class="detail-row"><span class="detail-label">Student</span><span class="detail-value"
                         id="viewStudent"></span></div>
-                <div class="modal-field"><span class="modal-label">Course</span><span class="modal-value"
+                <div class="detail-row"><span class="detail-label">Course</span><span class="detail-value"
                         id="viewCourse"></span></div>
-                <div class="modal-field"><span class="modal-label">Service</span><span class="modal-value"
+                <div class="detail-row"><span class="detail-label">Service</span><span class="detail-value"
                         id="viewService"></span></div>
-                <div class="modal-field"><span class="modal-label">Submitted</span><span class="modal-value"
+                <div class="detail-row"><span class="detail-label">Submitted</span><span class="detail-value"
                         id="viewDate"></span></div>
-                <div class="modal-field"><span class="modal-label">Status</span><span class="modal-value"
+                <div class="detail-row"><span class="detail-label">Status</span><span class="detail-value"
                         id="viewStatus"></span></div>
-                <div class="modal-field col"><span class="modal-label">Abstract</span>
-                    <p class="modal-abstract" id="viewAbstract"></p>
+                <div class="detail-col"><span class="detail-label">Abstract</span>
+                    <p class="detail-abstract" id="viewAbstract"></p>
                 </div>
-                <div class="modal-field col">
-                    <span class="modal-label">Submitted File</span>
+                <div class="detail-col">
+                    <span class="detail-label">Submitted file</span>
                     <div id="viewFileSection"></div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn-modal-close" onclick="closeModal('viewModal')">Close</button>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" type="button" data-close="viewModal">Close</button>
             </div>
         </div>
     </div>
 
     <!-- REVIEW MODAL -->
-    <div class="modal-overlay" id="reviewModal">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3>Review Thesis</h3>
-                <button class="modal-close" onclick="closeModal('reviewModal')">✕</button>
+    <div class="modal-backdrop" id="reviewModal" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="reviewModalTitle">
+            <div class="modal-head">
+                <h3 class="modal-title" id="reviewModalTitle">Review thesis</h3>
+                <button class="modal-x" type="button" data-close="reviewModal" aria-label="Close">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round">
+                        <path d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                </button>
             </div>
             <div class="modal-body">
-                <div class="modal-field"><span class="modal-label">Title</span><span class="modal-value"
+                <div class="detail-row"><span class="detail-label">Title</span><span class="detail-value"
                         id="reviewTitle"></span></div>
-                <div class="modal-field"><span class="modal-label">Student</span><span class="modal-value"
+                <div class="detail-row"><span class="detail-label">Student</span><span class="detail-value"
                         id="reviewStudent"></span></div>
-                <div class="modal-field"><span class="modal-label">Current Status</span><span class="modal-value"
+                <div class="detail-row"><span class="detail-label">Current status</span><span class="detail-value"
                         id="reviewCurrentStatus"></span></div>
-                <div class="modal-field col">
-                    <span class="modal-label">Set Status</span>
+                <div class="detail-col">
+                    <span class="detail-label">Set status</span>
                     <div class="status-options">
-                        <button class="btn-status approved" onclick="setStatus('Approved')">✔ Approve</button>
-                        <button class="btn-status pending" onclick="setStatus('Pending')">⏳ Pending</button>
-                        <button class="btn-status rejected" onclick="setStatus('Rejected')">✕ Reject</button>
+                        <button class="btn-status approved" type="button" data-status="Approved">Approve</button>
+                        <button class="btn-status pending" type="button" data-status="Pending">Mark pending</button>
+                        <button class="btn-status rejected" type="button" data-status="Rejected">Reject</button>
                     </div>
                 </div>
-                <div class="modal-field col">
-                    <span class="modal-label">Remarks</span>
-                    <textarea id="reviewRemarks" placeholder="Add review comments or feedback..." rows="4"></textarea>
+                <div class="detail-col">
+                    <label class="detail-label" for="reviewRemarks">Remarks</label>
+                    <textarea class="form-control" id="reviewRemarks" rows="4"
+                        placeholder="Add review comments or feedback"></textarea>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn-modal-close" onclick="closeModal('reviewModal')">Cancel</button>
-                <button class="btn-modal-submit" onclick="submitReview()">Submit Review</button>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" type="button" data-close="reviewModal">Cancel</button>
+                <button class="modal-btn modal-btn-primary" type="button" id="submitReviewBtn">Submit review</button>
             </div>
         </div>
     </div>
 
     <!-- REPOSITORY MODAL -->
-    <div class="modal-overlay" id="repoModal">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3>📚 Thesis Repository</h3>
-                <button class="modal-close" onclick="closeModal('repoModal')">✕</button>
+    <div class="modal-backdrop" id="repoModal" hidden>
+        <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="repoModalTitle">
+            <div class="modal-head">
+                <h3 class="modal-title" id="repoModalTitle">Thesis repository</h3>
+                <button class="modal-x" type="button" data-close="repoModal" aria-label="Close">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round">
+                        <path d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                </button>
             </div>
             <div class="modal-body">
-
-                <!-- ✅ Search bar -->
                 <div class="repo-search-wrap">
-                    <input type="text" id="repoSearchInput" class="repo-search-input"
-                        placeholder="🔍  Search by title, author, course…"
-                        onkeydown="if(event.key==='Enter') searchRepo()"
-                        oninput="if(this.value==='') clearRepoSearch()" />
-                    <button class="btn-repo-search" onclick="searchRepo()">Search</button>
-                    <button class="btn-repo-clear" onclick="clearRepoSearch()" title="Clear search">✕</button>
+                    <input type="text" id="repoSearchInput" class="form-control"
+                        placeholder="Search by title, author or course" />
+                    <button class="btn-secondary" id="repoSearchBtn" type="button">Search</button>
+                    <button class="btn-secondary" id="repoClearBtn" type="button">Clear</button>
                 </div>
-
-                <div class="repo-modal-count" id="repoModalCount"></div>
+                <p class="repo-modal-count" id="repoModalCount"></p>
                 <div id="repoModalList"></div>
             </div>
-            <div class="modal-footer">
-                <button class="btn-modal-close" onclick="closeModal('repoModal')">Close</button>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" type="button" data-close="repoModal">Close</button>
             </div>
         </div>
     </div>
-    
-    <script src="Thesis_Formatting_plagiarism.js"></script>
-    <script src="Thesis_submissions.js" defer></script>
-    <script src="../formatting/thesis_validator.js"></script>
+
+    <script src="Thesis_submissions.js?v=3"></script>
 </body>
 
 </html>

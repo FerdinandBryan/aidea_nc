@@ -1,153 +1,90 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    let currentStep = 1;
+    const $ = id => document.getElementById(id);
+    const API = 'http://127.0.0.1:8000/api';
 
-    /* ── STEP NAVIGATION ── */
-    function goToStep(step) {
-        document.querySelectorAll('.form-step').forEach(s => s.style.display = 'none');
-        document.getElementById(`step${step}`).style.display = 'block';
+    /* ── THEME (shares the 'aidea_theme' key with the admin dashboard) ── */
+    const root = document.documentElement;
 
-        for (let i = 1; i <= 3; i++) {
-            const progStep = document.getElementById(`progStep${i}`);
-            const progLine = document.getElementById(`progLine${i}`);
-            progStep.classList.remove('active', 'done');
-            if (progLine) progLine.classList.remove('done');
-
-            if (i < step) {
-                progStep.classList.add('done');
-                progStep.querySelector('.prog-dot').textContent = '✓';
-                if (progLine) progLine.classList.add('done');
-            } else if (i === step) {
-                progStep.classList.add('active');
-                progStep.querySelector('.prog-dot').textContent = i;
-            } else {
-                progStep.querySelector('.prog-dot').textContent = i;
-            }
-        }
-
-        currentStep = step;
-        document.querySelector('.auth-right').scrollTop = 0;
+    function applyTheme(theme, persist) {
+        root.setAttribute('data-theme', theme);
+        if (persist) { try { localStorage.setItem('aidea_theme', theme); } catch { } }
+        $('themeBtn')?.setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`);
     }
 
-    /* ── STEP 1 NEXT ── */
-    document.getElementById('nextStep1')?.addEventListener('click', () => {
-        if (validateStep1()) goToStep(2);
+    applyTheme(root.getAttribute('data-theme') || 'light', false);
+    $('themeBtn')?.addEventListener('click', () => {
+        applyTheme(root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark', true);
     });
 
-    /* ── STEP 2 NAV ── */
-    document.getElementById('backStep2')?.addEventListener('click', () => goToStep(1));
-    document.getElementById('nextStep2')?.addEventListener('click', () => {
-        if (validateStep2()) goToStep(3);
-    });
-
-    /* ── STEP 3 BACK ── */
-    document.getElementById('backStep3')?.addEventListener('click', () => goToStep(2));
-
-    /* ── TOGGLE PASSWORD VISIBILITY (SVG eye icons) ── */
-    document.getElementById('togglePass1')?.addEventListener('click', () => {
-        togglePassSVG('regPassword', 'eyeShow1', 'eyeHide1');
-    });
-    document.getElementById('togglePass2')?.addEventListener('click', () => {
-        togglePassSVG('regConfirmPass', 'eyeShow2', 'eyeHide2');
-    });
-
-    function togglePassSVG(inputId, showId, hideId) {
-        const input = document.getElementById(inputId);
-        const eyeShow = document.getElementById(showId);
-        const eyeHide = document.getElementById(hideId);
-
-        if (input.type === 'password') {
-            input.type = 'text';
-            eyeShow.style.display = 'none';
-            eyeHide.style.display = 'inline';
-        } else {
-            input.type = 'password';
-            eyeShow.style.display = 'inline';
-            eyeHide.style.display = 'none';
-        }
-    }
-
-    /* ── PHONE NUMBER: digits only, max 11 ── */
-    document.getElementById('contactNum')?.addEventListener('input', (e) => {
-        // Strip non-digits
-        e.target.value = e.target.value.replace(/\D/g, '').slice(0, 11);
+    /* ── SHOW / HIDE PASSWORD ── */
+    document.querySelectorAll('.toggle-pass').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const input = $(btn.dataset.target);
+            const show = input.type === 'password';
+            input.type = show ? 'text' : 'password';
+            btn.classList.toggle('shown', show);
+            btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+        });
     });
 
     /* ── PASSWORD STRENGTH ── */
-    document.getElementById('regPassword')?.addEventListener('input', (e) => {
-        const val = e.target.value;
-        updateStrengthUI(checkStrength(val));
-        updateHints(val);
-    });
+    const rules = {
+        hint8char: p => p.length >= 8,
+        hintUpper: p => /[A-Z]/.test(p),
+        hintNum: p => /[0-9]/.test(p),
+        hintSpecial: p => /[!@#$%^&*]/.test(p),
+    };
+
+    const levels = [
+        { pct: '15%', color: '#ef4444', text: 'Very weak' },
+        { pct: '35%', color: '#f97316', text: 'Weak' },
+        { pct: '60%', color: '#f5b301', text: 'Fair' },
+        { pct: '80%', color: '#22c55e', text: 'Strong' },
+        { pct: '100%', color: '#16a34a', text: 'Very strong' },
+    ];
 
     function checkStrength(pass) {
-        let score = 0;
-        if (pass.length >= 8) score++;
-        if (/[A-Z]/.test(pass)) score++;
-        if (/[0-9]/.test(pass)) score++;
-        if (/[!@#$%^&*]/.test(pass)) score++;
-        return score;
+        return Object.values(rules).filter(test => test(pass)).length;
     }
 
-    function updateStrengthUI(score) {
-        const bar = document.getElementById('strengthFill');
-        const label = document.getElementById('strengthLabel');
-        const wrap = document.getElementById('passStrength');
-        wrap.style.display = 'flex';
+    function updateStrength(pass) {
+        // only show the strength box while the person is typing a password
+        $('strengthBox').hidden = pass.length === 0;
 
-        const levels = [
-            { pct: '15%', color: '#ef4444', text: 'Very Weak' },
-            { pct: '35%', color: '#f97316', text: 'Weak' },
-            { pct: '60%', color: '#f59e0b', text: 'Fair' },
-            { pct: '80%', color: '#22c55e', text: 'Strong' },
-            { pct: '100%', color: '#16a34a', text: 'Very Strong' },
-        ];
-        const lvl = levels[Math.max(0, score - 1)] || levels[0];
-        bar.style.width = score === 0 ? '0%' : lvl.pct;
-        bar.style.background = lvl.color;
-        label.textContent = score === 0 ? '' : lvl.text;
-        label.style.color = lvl.color;
+        const score = checkStrength(pass);
+        const lvl = levels[Math.max(0, score - 1)];
+        const fill = $('strengthFill');
+        const label = $('strengthLabel');
+
+        fill.style.width = score === 0 ? '0' : lvl.pct;
+        fill.style.background = lvl.color;
+        label.textContent = score === 0 ? 'Very weak' : lvl.text;
+        label.style.color = score === 0 ? '' : lvl.color;
+
+        Object.entries(rules).forEach(([id, test]) => $(id)?.classList.toggle('met', test(pass)));
     }
 
-    function updateHints(pass) {
-        const hints = [
-            { id: 'hint8char', test: pass.length >= 8, text: '✓ At least 8 characters', fail: '○ At least 8 characters' },
-            { id: 'hintUpper', test: /[A-Z]/.test(pass), text: '✓ One uppercase letter', fail: '○ One uppercase letter' },
-            { id: 'hintNum', test: /[0-9]/.test(pass), text: '✓ One number', fail: '○ One number' },
-            { id: 'hintSpecial', test: /[!@#$%^&*]/.test(pass), text: '✓ One special character (!@#$)', fail: '○ One special character (!@#$)' },
-        ];
-        hints.forEach(h => {
-            const el = document.getElementById(h.id);
-            if (!el) return;
-            el.textContent = h.test ? h.text : h.fail;
-            el.classList.toggle('met', h.test);
-        });
-    }
+    $('regPassword')?.addEventListener('input', e => updateStrength(e.target.value));
 
     /* ── FORM SUBMIT ── */
-    document.getElementById('registerForm')?.addEventListener('submit', async (e) => {
+    $('registerForm')?.addEventListener('submit', async e => {
         e.preventDefault();
-        if (!validateStep3()) return;
+        if (!validateForm()) return;
 
         setLoading(true);
 
         const payload = {
-            first_name: document.getElementById('firstName').value.trim(),
-            last_name: document.getElementById('lastName').value.trim(),
-            email: document.getElementById('regEmail').value.trim(),
-            contact_num: document.getElementById('contactNum').value.trim(),
-            address: document.getElementById('address').value.trim(),
-            student_number: document.getElementById('studentNum').value.trim(),
-            course: document.getElementById('course').value,
-            year_level: document.getElementById('yearLevel').value,
-            section: document.getElementById('section').value.trim(),
-            adviser: document.getElementById('adviser').value.trim(),
-            password: document.getElementById('regPassword').value,
-            password_confirmation: document.getElementById('regConfirmPass').value,
+            fname: $('fname').value.trim(),
+            lname: $('lname').value.trim(),
+            mi: $('mi').value.trim() || null,
+            email: $('regEmail').value.trim(),
+            password: $('regPassword').value,
+            password_confirmation: $('regConfirmPass').value,
         };
 
         try {
-            const res = await fetch('http://127.0.0.1:8000/api/register', {
+            const res = await fetch(`${API}/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                 body: JSON.stringify(payload),
@@ -157,131 +94,126 @@ document.addEventListener('DOMContentLoaded', () => {
             setLoading(false);
 
             if (data.success) {
-                document.getElementById('successOverlay').style.display = 'flex';
+                $('successOverlay').hidden = false;
+                document.querySelector('#successOverlay .btn-submit')?.focus();
             } else {
-                const errors = data.errors || {};
-                const firstError = Object.values(errors)[0];
-                if (firstError) showToast(firstError[0], 'error');
-                else showToast(data.message || 'Registration failed.', 'error');
+                const firstError = Object.values(data.errors || {})[0];
+                showToast(firstError ? firstError[0] : (data.message || 'Registration failed.'), 'error');
             }
-        } catch (err) {
+        } catch {
             setLoading(false);
-            showToast('Server error. Please try again.', 'error');
+            showToast('Couldn’t reach the server. Check your connection and try again.', 'error');
         }
     });
 
     /* ── VALIDATION ── */
-    function validateStep1() {
-        clearErrors(['errFirstName', 'errLastName', 'errEmail', 'errContactNum']);
+    const errorFields = { errFname: 'fname', errLname: 'lname', errEmail: 'regEmail', errPassword: 'regPassword', errConfirmPass: 'regConfirmPass' };
+
+    function validateForm() {
+        Object.keys(errorFields).concat('errTerms').forEach(id => showErr(id, ''));
+
+        const fname = $('fname').value.trim();
+        const lname = $('lname').value.trim();
+        const email = $('regEmail').value.trim();
+        const pass = $('regPassword').value;
+        const confirm = $('regConfirmPass').value;
         let valid = true;
+        const fail = (id, msg) => { showErr(id, msg); valid = false; };
 
-        const first = document.getElementById('firstName').value.trim();
-        const last = document.getElementById('lastName').value.trim();
-        const email = document.getElementById('regEmail').value.trim();
-        const contact = document.getElementById('contactNum').value.trim();
+        if (!fname) fail('errFname', 'Enter your first name');
+        if (!lname) fail('errLname', 'Enter your last name');
 
-        if (!first) { showErr('errFirstName', 'First name is required'); valid = false; }
-        if (!last) { showErr('errLastName', 'Last name is required'); valid = false; }
+        if (!email) fail('errEmail', 'Enter your email address');
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail('errEmail', 'Enter a valid email address');
 
-        if (!email) {
-            showErr('errEmail', 'Email is required'); valid = false;
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            showErr('errEmail', 'Enter a valid email address'); valid = false;
-        }
+        if (!pass) fail('errPassword', 'Enter a password');
+        else if (pass.length < 8) fail('errPassword', 'Use at least 8 characters');
+        else if (checkStrength(pass) < 2) fail('errPassword', 'Too weak. Add an uppercase letter, number, or symbol');
 
-        // Contact number: optional but if filled, must be exactly 11 digits
-        if (contact && !/^\d{11}$/.test(contact)) {
-            showErr('errContactNum', 'Contact number must be exactly 11 digits (e.g. 09123456789)');
-            valid = false;
-        }
+        if (!confirm) fail('errConfirmPass', 'Confirm your password');
+        else if (pass !== confirm) fail('errConfirmPass', 'Passwords don’t match');
 
-        return valid;
-    }
+        if (!$('agreeTerms').checked) fail('errTerms', 'Agree to the terms to continue');
 
-    function validateStep2() {
-        clearErrors(['errStudentNum', 'errCourse', 'errYear', 'errSection']);
-        let valid = true;
-
-        const num = document.getElementById('studentNum').value.trim();
-        const course = document.getElementById('course').value;
-        const year = document.getElementById('yearLevel').value;
-        const section = document.getElementById('section').value.trim();
-
-        if (!num) {
-            showErr('errStudentNum', 'Student number is required'); valid = false;
-        } else if (!/^\d{4}-\d{4}$/.test(num)) {
-            showErr('errStudentNum', 'Format must be YYYY-XXXX (e.g. 2023-0101)'); valid = false;
-        }
-        if (!course) { showErr('errCourse', 'Please select a course'); valid = false; }
-        if (!year) { showErr('errYear', 'Please select year level'); valid = false; }
-        if (!section) { showErr('errSection', 'Section is required'); valid = false; }
-
-        return valid;
-    }
-
-    function validateStep3() {
-        clearErrors(['errPassword', 'errConfirmPass', 'errTerms']);
-        let valid = true;
-
-        const pass = document.getElementById('regPassword').value;
-        const confirm = document.getElementById('regConfirmPass').value;
-        const terms = document.getElementById('agreeTerms').checked;
-
-        if (!pass) {
-            showErr('errPassword', 'Password is required'); valid = false;
-        } else if (pass.length < 8) {
-            showErr('errPassword', 'Password must be at least 8 characters'); valid = false;
-        } else if (checkStrength(pass) < 2) {
-            showErr('errPassword', 'Password is too weak. Add uppercase, numbers, or symbols'); valid = false;
-        }
-
-        if (!confirm) {
-            showErr('errConfirmPass', 'Please confirm your password'); valid = false;
-        } else if (pass !== confirm) {
-            showErr('errConfirmPass', 'Passwords do not match'); valid = false;
-        }
-
-        if (!terms) {
-            showErr('errTerms', 'You must agree to the terms to continue'); valid = false;
-        }
-
+        document.querySelector('input.error')?.focus();
         return valid;
     }
 
     function showErr(id, msg) {
-        const el = document.getElementById(id);
+        const el = $(id);
         if (el) el.textContent = msg;
+        const input = $(errorFields[id]);
+        if (input) input.classList.toggle('error', !!msg);
     }
 
-    function clearErrors(ids) {
-        ids.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = '';
+    // clear a field's error as soon as the person edits it
+    Object.entries(errorFields).forEach(([errId, inputId]) => {
+        $(inputId)?.addEventListener('input', () => showErr(errId, ''));
+    });
+    $('agreeTerms')?.addEventListener('change', () => showErr('errTerms', ''));
+
+    /* ── TERMS / PRIVACY MODAL ── */
+    const legal = $('legalModal');
+    let legalTrigger = null;
+
+    function showTab(name) {
+        ['terms', 'privacy'].forEach(t => {
+            const on = t === name;
+            $('panel' + (t === 'terms' ? 'Terms' : 'Privacy')).hidden = !on;
+            const tab = $('tab' + (t === 'terms' ? 'Terms' : 'Privacy'));
+            tab.setAttribute('aria-selected', String(on));
+            tab.tabIndex = on ? 0 : -1;
         });
+        $('legalBody').scrollTop = 0;
     }
+
+    function openLegal(tab, trigger) {
+        legalTrigger = trigger || null;
+        showTab(tab);
+        legal.hidden = false;
+        document.body.classList.add('no-scroll');
+        $('legalAgree').focus();
+    }
+
+    function closeLegal() {
+        legal.hidden = true;
+        document.body.classList.remove('no-scroll');
+        legalTrigger?.focus();
+    }
+
+    document.querySelectorAll('[data-legal]').forEach(a => {
+        a.addEventListener('click', e => { e.preventDefault(); openLegal(a.dataset.legal, a); });
+    });
+    document.querySelectorAll('.legal-tabs [data-tab]').forEach(t => {
+        t.addEventListener('click', () => showTab(t.dataset.tab));
+    });
+    $('legalClose')?.addEventListener('click', closeLegal);
+    $('legalCancel')?.addEventListener('click', closeLegal);
+    $('legalAgree')?.addEventListener('click', () => {
+        $('agreeTerms').checked = true;
+        showErr('errTerms', '');
+        closeLegal();
+    });
+    legal?.addEventListener('click', e => { if (e.target === legal) closeLegal(); });
+    document.addEventListener('keydown', e => {
+        if (!legal.hidden && e.key === 'Escape') closeLegal();
+    });
 
     /* ── LOADING ── */
     function setLoading(on) {
-        const btn = document.getElementById('registerBtn');
-        const text = document.getElementById('regBtnText');
-        const spinner = document.getElementById('regBtnSpinner');
-        btn.disabled = on;
-        text.style.display = on ? 'none' : 'inline';
-        spinner.style.display = on ? 'inline-block' : 'none';
+        $('registerBtn').disabled = on;
+        $('regBtnText').textContent = on ? 'Creating account…' : 'Create account';
+        $('regBtnSpinner').hidden = !on;
     }
 
     /* ── TOAST ── */
     function showToast(msg, type = 'info') {
-        const wrap = document.getElementById('toastWrap');
+        const wrap = $('toastWrap');
         if (!wrap) return;
         const t = document.createElement('div');
         t.className = `toast ${type}`;
         t.textContent = msg;
         wrap.appendChild(t);
-        setTimeout(() => t.remove(), 3500);
+        setTimeout(() => t.remove(), 4000);
     }
-
-    /* ── HELPERS ── */
-    function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
-
 });

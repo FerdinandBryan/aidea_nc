@@ -1,7 +1,7 @@
 <?php
-// ══════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 //  app/Models/Payment.php
-// ══════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 namespace App\Models;
 
@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 class Payment extends Model
 {
     protected $fillable = [
+        'user_id',
         'ref',
         'gcash_ref',
         'service',
@@ -22,5 +23,14 @@ class Payment extends Model
         'method',
         'status',
         'proof_image',
+        'research_items',
+        'certificate_url',
+        'certificate_name',
+        'certificate_type',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

@@ -1,1 +1,1 @@
-<?php foreach (glob("config/*.php") as $f) { echo $f . "\n"; $r = include $f; if (!is_array($r)) { echo "  ^^^ BROKEN - not returning array\n"; } else { echo "  OK\n"; } }
+<?php $theses = App\Models\ThesisSubmission::with('user')->get(); foreach($theses as $t) { echo $t->id . ' => ' . ($t->user ? $t->user->name : 'NULL USER') . PHP_EOL; }

@@ -5,22 +5,26 @@
 namespace App\Models;
 
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class User extends Authenticatable
+
+class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasApiTokens;
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
-        'student_number',
-        'full_name',
+        'fname',
+        'lname',
+        'mi',
         'email',
         'password_hash',
-        'role',          // 'student' | 'admin'
-        'course',
-        'year_level',
-        'section',
         'is_verified',
+        'is_admin',
+        'email_verified_at',
+        'role',
     ];
 
     protected $hidden = [
@@ -29,7 +33,8 @@ class User extends Authenticatable
 
     protected $casts = [
         'is_verified' => 'boolean',
-        'year_level' => 'integer',
+        'is_admin' => 'boolean',
+        'email_verified_at' => 'datetime',
     ];
 
     /*

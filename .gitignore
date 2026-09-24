@@ -1,0 +1,11 @@
+.env
+/vendor
+/node_modules
+*.bak
+*.bak[0-9]
+*.bak_*
+*.garbled.bak
+public-admin-backup-*/
+payment_model_dump.txt
+served_copy.txt
+tinker_mail_test.php

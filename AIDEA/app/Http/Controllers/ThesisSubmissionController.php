@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Storage;
 
 class ThesisSubmissionController extends Controller
 {
-    /* ── STUDENT: submit a thesis ── */
+    /* â”€â”€ STUDENT: submit a thesis â”€â”€ */
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -36,8 +36,8 @@ class ThesisSubmissionController extends Controller
             'authors' => $validated['authors'] ?? null,
             'file_path' => $path,
             'original_filename' => $file->getClientOriginalName(),
-            'file_size' => $file->getSize(),        // ← add this
-            'file_type' => $file->getMimeType(),    // ← add this
+            'file_size' => $file->getSize(),        // â† add this
+            'file_type' => $file->getMimeType(),    // â† add this
             'status' => 'pending',
         ]);
 
@@ -48,7 +48,8 @@ class ThesisSubmissionController extends Controller
         ], 201);
     }
 
-    /* ── ADMIN: view ALL submissions ── */
+    /* â”€â”€ ADMIN: view ALL submissions â”€â”€ */
+    /* â”€â”€ ADMIN: view ALL submissions â”€â”€ */
     public function adminList()
     {
         $theses = ThesisSubmission::with('user')->latest()->get();
@@ -58,7 +59,11 @@ class ThesisSubmissionController extends Controller
                 return [
                     'id' => $t->id,
                     'user_id' => $t->user_id,
-                    'user' => $t->user,
+                    'student_name' => $t->authors,
+                    'user' => $t->user ? [
+                        'id' => $t->user->id,
+                        'name' => (trim((string) $t->user->full_name) !== '' ? $t->user->full_name : (trim(($t->user->fname ?? '') . ' ' . ($t->user->lname ?? '')) ?: ($t->user->name ?? $t->user->email ?? null))),
+                    ] : null,
                     'title' => $t->title,
                     'course' => $t->course,
                     'academic_year' => $t->academic_year,
@@ -67,13 +72,13 @@ class ThesisSubmissionController extends Controller
                     'submission_type' => $t->submission_type,
                     'authors' => $t->authors,
                     'status' => $t->status,
+                    'visible_in_repo' => (bool) $t->visible_in_repo,
                     'remarks' => $t->remarks,
                     'created_at' => $t->created_at,
                     'file_path' => $t->file_path,
                     'original_filename' => $t->original_filename,
                     'file_size' => $t->file_size,
                     'file_type' => $t->file_type,
-                    // ✅ Direct public URL — no auth needed
                     'file_url' => $t->file_path
                         ? asset('storage/' . $t->file_path)
                         : null,
@@ -82,7 +87,42 @@ class ThesisSubmissionController extends Controller
         ]);
     }
 
-    /* ── STUDENT: view own submissions ── */
+    /* â”€â”€ PUBLIC: approved theses for landing page â”€â”€ */
+    public function publicApproved()
+    {
+        $theses = ThesisSubmission::with('user')
+            ->where('status', 'approved')
+            ->where('visible_in_repo', true)
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'data' => $theses->map(function ($t) {
+                return [
+                    'title' => $t->title,
+                    'author' => $t->user->full_name ?? $t->authors ?? 'N/A',
+                    'course' => $t->course,
+                    'academic_year' => $t->academic_year,
+                    'abstract' => $t->abstract,
+                    'status' => $t->status,
+                ];
+            })
+        ]);
+    }
+
+    /* -- ADMIN: toggle repository visibility (independent of approval status) -- */
+    public function toggleRepoVisibility($id)
+    {
+        $thesis = ThesisSubmission::findOrFail($id);
+        $thesis->update(['visible_in_repo' => !$thesis->visible_in_repo]);
+
+        return response()->json([
+            'message' => 'Repository visibility updated.',
+            'data' => $thesis->fresh(),
+        ]);
+    }
+
+    /* â”€â”€ STUDENT: view own submissions â”€â”€ */
     public function index()
     {
         $theses = ThesisSubmission::with('user')
@@ -93,7 +133,7 @@ class ThesisSubmissionController extends Controller
         return response()->json(['data' => $theses]);
     }
 
-    /* ── ADMIN: approve / reject ── */
+    /* â”€â”€ ADMIN: approve / reject â”€â”€ */
     public function review(Request $request, $id)
     {
         $request->validate([
@@ -114,18 +154,24 @@ class ThesisSubmissionController extends Controller
         ]);
     }
 
-    /* ── SERVE FILE (view/download) ── */
+    /* â”€â”€ SERVE FILE (view/download) â”€â”€ */
     public function serveFile($id)
     {
-        $thesis = ThesisSubmission::findOrFail($id);
+        $thesis = \App\Models\ThesisSubmission::findOrFail($id);
 
-        if (!$thesis->file_path || !Storage::disk('public')->exists($thesis->file_path)) {
-            return response()->json(['message' => 'File not found.'], 404);
+        $path = storage_path('app/public/' . $thesis->file_path);
+
+        if (!file_exists($path)) {
+            return response()->json(['error' => 'File not found'], 404);
         }
 
-        return Storage::disk('public')->download(
-            $thesis->file_path,
-            $thesis->original_filename ?? basename($thesis->file_path)
-        );
+        return response()->file($path, [
+            'Access-Control-Allow-Origin' => '*',
+            'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+            'Access-Control-Allow-Headers' => 'Authorization, Content-Type',
+            'Content-Type' => mime_content_type($path),
+        ]);
     }
+
+
 }

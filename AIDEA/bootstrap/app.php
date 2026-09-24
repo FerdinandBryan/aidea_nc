@@ -14,6 +14,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->prepend(HandleCors::class);
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\EnsureAdmin::class,
+            'reviewer' => \App\Http\Middleware\EnsureReviewer::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

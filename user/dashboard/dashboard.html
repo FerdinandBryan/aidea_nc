@@ -3,178 +3,224 @@
 
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AIDEA – Dashboard</title>
-    <link rel="stylesheet" href="dashboard.css" />
-    <link
-        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap"
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a1a3f" />
+    <title>Dashboard — AIDEA</title>
+
+    <!-- Apply saved / system theme BEFORE paint (student side keeps its own preference) -->
+    <script>
+        (function () {
+            var t = null;
+            try { t = localStorage.getItem('aidea_user_theme'); } catch (e) { }
+            if (t !== 'light' && t !== 'dark') {
+                t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
         rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="dashboard.css" />
 </head>
 
 <body>
 
     <!-- SIDEBAR -->
-    <aside class="sidebar">
-        <div class="sidebar-brand">
-            <div class="brand-icon">AI</div>
-            <div class="brand-text">
+    <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+        <a class="sidebar-brand" href="../dashboard/dashboard.html" aria-label="AIDEA home">
+            <span class="brand-mark" aria-hidden="true">
+                <svg viewBox="0 0 32 32" width="32" height="32" fill="none">
+                    <rect width="32" height="32" rx="9" fill="#FFC72C" />
+                    <path d="M9 22.5 16 8l7 14.5" stroke="#0a1a3f" stroke-width="2.6" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                    <path d="M11.8 18h8.4" stroke="#0a1a3f" stroke-width="2.6" stroke-linecap="round" />
+                    <circle cx="16" cy="8" r="1.9" fill="#2563eb" />
+                </svg>
+            </span>
+            <span class="brand-text">
                 <span class="brand-name">AIDEA</span>
                 <span class="brand-sub">Norzagaray College</span>
-            </div>
+            </span>
+        </a>
+
+        <div class="sidebar-scroll">
+            <p class="nav-heading">Overview</p>
+            <nav class="nav-group">
+                <a href="../dashboard/dashboard.html" class="active" aria-current="page">Dashboard</a>
+            </nav>
+
+            <p class="nav-heading">Main</p>
+            <nav class="nav-group">
+                <a href="../submit thesis/submit-thesis.html">Submit Thesis</a>
+                <a href="../my submission/my-submissions.html">My Submissions</a>
+            </nav>
+
+            <p class="nav-heading">Services</p>
+            <nav class="nav-group">
+                <a href="../repository/repository.html">Repository</a>
+                <a href="../avail services/avail-services.html">Avail Services</a>
+                <a href="../payments reciepts/payments-reciepts.html">Payments &amp; Receipts</a>
+            </nav>
+
+            <p class="nav-heading">Feedback</p>
+            <nav class="nav-group">
+                <a href="../feedback/my-feedback.html">My Feedback</a>
+            </nav>
         </div>
 
-        <nav class="sidebar-nav">
-            <p class="nav-label">MAIN</p>
-            <a href="../dashboard/dashboard.html" class="nav-item active">
-                <i class="fa-solid fa-house"></i> Dashboard
-            </a>
-            <a href="../profile/my-profile.html" class="nav-item">
-                <i class="fa-solid fa-user"></i> My Profile
-            </a>
-            <a href="../submit thesis/submit-thesis.html" class="nav-item">
-                <i class="fa-solid fa-file-arrow-up"></i> Submit Thesis
-            </a>
-            <a href="../my submission/my-submissions.html" class="nav-item">
-                <i class="fa-solid fa-file-lines"></i> My Submissions
-            </a>
-
-            <p class="nav-label">SERVICES</p>
-            <a href="../repository/repository.html" class="nav-item">
-                <i class="fa-solid fa-database"></i> Repository
-            </a>
-            <a href="../avail services/avail-services.html" class="nav-item">
-                <i class="fa-solid fa-wrench"></i> Avail Services
-            </a>
-            <a href="../payments reciepts/payments-reciepts.html" class="nav-item">
-                <i class="fa-solid fa-credit-card"></i> Payments & Receipts
-            </a>
-            <p class="nav-label">EVENTS</p>
-            <a href="../events dashboard/events-dashboard.html" class="nav-item">
-                <i class="fa-solid fa-calendar-days"></i> Events Dashboard
-            </a>
-            <a href="../feedback/my-feedback.html" class="nav-item">
-                <i class="fa-solid fa-star"></i> My Feedback
-            </a>
-        </nav>
-
-        <div class="sidebar-user" onclick="window.location.href='../profile/my-profile.html'" style="cursor:pointer;">
-            <div class="user-avatar">JD</div>
-            <div class="user-info">
-                <span class="user-name">Juan Dela Cruz</span>
-                <span class="user-role">BSIT Student</span>
+        <!-- Profile: click to reveal My Profile / Sign out -->
+        <div class="sidebar-footer">
+            <div class="profile-menu" id="profileMenu" role="menu" aria-label="Account" hidden>
+                <a class="profile-menu-item" href="../profile/my-profile.html" role="menuitem">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="8" r="4" />
+                        <path d="M4 21a8 8 0 0 1 16 0" />
+                    </svg>
+                    My profile
+                </a>
+                <button class="profile-menu-item danger" id="signOutBtn" type="button" role="menuitem">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <path d="M16 17l5-5-5-5M21 12H9" />
+                    </svg>
+                    Sign out
+                </button>
             </div>
+
+            <button class="profile-btn" id="profileBtn" type="button" aria-haspopup="menu" aria-expanded="false"
+                aria-controls="profileMenu">
+                <div class="footer-avatar" aria-hidden="true">ST</div>
+                <div class="footer-info">
+                    <div class="footer-name">Student</div>
+                    <div class="footer-role">Student</div>
+                </div>
+                <svg class="profile-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    aria-hidden="true">
+                    <path d="M6 15l6-6 6 6" />
+                </svg>
+            </button>
         </div>
     </aside>
 
-    <!-- MAIN CONTENT -->
+    <div class="scrim" id="scrim" hidden></div>
+
+    <!-- MAIN -->
     <div class="main">
-        <!-- TOPBAR -->
         <header class="topbar">
             <div class="topbar-left">
-                <h2 class="page-title">Dashboard</h2>
-                <p class="page-sub">Welcome back, Juan!</p>
+                <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="Open menu"
+                    aria-controls="sidebar" aria-expanded="false">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round">
+                        <path d="M4 7h16M4 12h16M4 17h10" />
+                    </svg>
+                </button>
+                <div class="page-title">
+                    <h1>Dashboard <span class="badge-role">Student</span></h1>
+                    <p>Norzagaray College — AIDEA Student Portal</p>
+                </div>
             </div>
             <div class="topbar-right">
-                <span class="status-badge"><span class="dot"></span> Online</span>
-                <button class="btn-signout" onclick="handleSignOut()">Sign Out</button>
+                <span class="status-chip">Online</span>
+                <button class="icon-btn" id="themeBtn" type="button" aria-label="Switch to dark mode"
+                    title="Toggle theme">
+                    <svg class="i-moon" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" />
+                    </svg>
+                    <svg class="i-sun" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round">
+                        <circle cx="12" cy="12" r="4" />
+                        <path
+                            d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+                    </svg>
+                </button>
             </div>
         </header>
 
-        <!-- STAT CARDS -->
-        <section class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon blue"><i class="fa-solid fa-file-lines"></i></div>
-                <div class="stat-value" id="stat-submissions">2</div>
-                <div class="stat-label">Submissions</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
-                <div class="stat-value" id="stat-approved">1</div>
-                <div class="stat-label">Approved</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon gold"><i class="fa-solid fa-credit-card"></i></div>
-                <div class="stat-value" id="stat-paid">₱850</div>
-                <div class="stat-label">Total Paid</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon amber"><i class="fa-solid fa-star"></i></div>
-                <div class="stat-value" id="stat-rating">4.8</div>
-                <div class="stat-label">My Rating Given</div>
-            </div>
-        </section>
+        <main class="content">
 
-        <!-- BOTTOM GRID -->
-        <div class="bottom-grid">
-            <!-- RECENT SUBMISSIONS TABLE -->
-            <div class="card table-card">
-                <div class="card-header">
-                    <h3>Recent Thesis Submissions</h3>
-                    <a href="../my submission/my-submissions.html" class="btn-new">+ New</a>
+            <div class="page-head">
+                <div>
+                    <h2 id="welcome">Welcome back</h2>
+                    <p id="todayLabel">&nbsp;</p>
                 </div>
-                <table class="thesis-table">
-                    <thead>
-                        <tr>
-                            <th>Title</th>
-                            <th>Submitted</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="thesis-tbody">
-                        <tr>
-                            <td>Impact of Social Media on Academic Performance of NC Students</td>
-                            <td>Jan 2025</td>
-                            <td><span class="badge badge-approved">✔ Approved</span></td>
-                            <td><button class="btn-action" onclick="viewThesis(1)">View</button></td>
-                        </tr>
-                        <tr>
-                            <td>AI Integration in Local Government Services in Norzagaray</td>
-                            <td>Mar 2025</td>
-                            <td><span class="badge badge-review">⏳ Under Review</span></td>
-                            <td><button class="btn-action" onclick="viewThesis(2)">View</button></td>
-                        </tr>
-                    </tbody>
-                </table>
+                <a class="btn-primary" href="../submit thesis/submit-thesis.html">Submit a thesis</a>
             </div>
 
-            <!-- RIGHT PANEL -->
-            <div class="right-panel">
-                <!-- UPCOMING EVENTS -->
-                <div class="card events-card">
-                    <div class="card-header">
-                        <h3>📅 Upcoming Events</h3>
+            <!-- STATS -->
+            <section class="stat-grid">
+                <div class="stat stat-blue">
+                    <div class="stat-label">Submissions</div>
+                    <div class="stat-value" id="stat-submissions">—</div>
+                </div>
+                <div class="stat stat-yellow">
+                    <div class="stat-label">Approved</div>
+                    <div class="stat-value" id="stat-approved">—</div>
+                </div>
+                <div class="stat stat-yellow">
+                    <div class="stat-label">Rating given</div>
+                    <div class="stat-value" id="stat-rating">—</div>
+                </div>
+            </section>
+
+            <div class="bottom-grid">
+                <!-- RECENT SUBMISSIONS -->
+                <section class="panel">
+                    <div class="panel-head">
+                        <h3 class="panel-title">Recent thesis submissions</h3>
+                        <a class="panel-link" href="../my submission/my-submissions.html">View all</a>
                     </div>
-                    <div class="event-list" id="event-list">
-                        <div class="event-item">
-                            <div class="event-date"><span class="month">APR</span><span class="day">15</span></div>
-                            <div class="event-info">
-                                <p class="event-title">Thesis Defense Schedule</p>
-                                <p class="event-loc"><i class="fa-solid fa-location-dot"></i> AVR Hall, 8:00 AM</p>
-                            </div>
-                        </div>
-                        <div class="event-item">
-                            <div class="event-date"><span class="month">APR</span><span class="day">22</span></div>
-                            <div class="event-info">
-                                <p class="event-title">Research Writing Workshop</p>
-                                <p class="event-loc"><i class="fa-solid fa-location-dot"></i> Library, 1:00 PM</p>
-                            </div>
-                        </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Submitted</th>
+                                    <th>Status</th>
+                                    <th><span class="sr-only">Actions</span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="thesis-tbody">
+                                <tr>
+                                    <td colspan="4" class="empty">Loading…</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
-                </div>
+                </section>
 
-                <!-- QUICK ACTION -->
-                <div class="card quick-action-card">
-                    <p class="qa-label">QUICK ACTION</p>
-                    <h3 class="qa-title">Ready to submit?</h3>
-                    <a href="../submit thesis/submit-thesis.html" class="btn-submit-full">📄 Submit Thesis</a>
-                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- SIGN OUT CONFIRMATION MODAL -->
+    <div class="modal-backdrop" id="signOutModal" hidden>
+        <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="signOutTitle"
+            aria-describedby="signOutDesc">
+            <div class="modal-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <path d="M16 17l5-5-5-5M21 12H9" />
+                </svg>
+            </div>
+            <h3 class="modal-title" id="signOutTitle">Sign out?</h3>
+            <p class="modal-text" id="signOutDesc">You will need to log in again to access your account.</p>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" id="signOutCancel" type="button">Cancel</button>
+                <button class="modal-btn modal-btn-danger" id="signOutConfirm" type="button">Sign out</button>
             </div>
         </div>
     </div>
 
-    <SCript src="../login/login.js"></SCript>
     <script src="dashboard.js"></script>
 </body>
 

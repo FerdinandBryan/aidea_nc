@@ -1,0 +1,89 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Feedback;
+use Illuminate\Http\Request;
+
+class FeedbackController extends Controller
+{
+    // GET /api/admin/feedbacks
+    public function index(Request $request)
+    {
+        $query = Feedback::with('user')->orderByDesc('created_at');
+
+        if ($request->filled('type'))      $query->where('feedback_type', $request->type);
+        if ($request->filled('rating'))    $query->where('rating', $request->rating);
+        if ($request->filled('recommend')) $query->where('recommend', $request->recommend);
+        if ($request->filled('search')) {
+            $query->where(fn ($q) =>
+                $q->where('comment',    'like', "%{$request->search}%")
+                  ->orWhere('reference','like', "%{$request->search}%")
+            );
+        }
+
+        $feedbacks = $query->paginate(15)->through(fn ($f) => $this->format($f));
+
+        $all   = Feedback::all();
+        $total = $all->count();
+
+        return response()->json([
+            'feedbacks'      => $feedbacks,
+            'total_count'    => Feedback::count(),
+            'average_rating' => round((float) Feedback::avg('rating'), 1),
+            'unread_count'   => Feedback::unread()->count(),
+            'breakdown'      => $all->groupBy('rating')->map->count()->sortKeysDesc(),
+            'per_type'       => $all->groupBy('feedback_type')->map(fn ($g) => [
+                'count'          => $g->count(),
+                'average_rating' => round((float) Feedback::avg('rating'), 1),
+            ]),
+        ]);
+    }
+
+    // GET /api/admin/feedbacks/stats
+    public function stats()
+    {
+        $all   = Feedback::all();
+        $total = $all->count();
+
+        return response()->json([
+            'total_count'    => Feedback::count(),
+            'average_rating' => round((float) Feedback::avg('rating'), 1),
+            'breakdown'      => $all->groupBy('rating')->map->count()->sortKeysDesc(),
+            'per_type'       => $all->groupBy('feedback_type')
+                                    ->map(fn ($g) => round($g->avg('rating'), 1)),
+        ]);
+    }
+
+    // PATCH /api/admin/feedbacks/{feedback}/read
+    public function markRead(Feedback $feedback)
+    {
+        $feedback->update(['is_read' => true]);
+        return response()->json(['message' => 'Marked as read.']);
+    }
+
+    // DELETE /api/admin/feedbacks/{feedback}
+    public function destroy(Feedback $feedback)
+    {
+        $feedback->delete();
+        return response()->json(['message' => 'Feedback deleted.']);
+    }
+
+    private function format(Feedback $f): array
+    {
+        return [
+            'id'            => $f->id,
+            'feedback_type' => $f->feedback_type,
+            'reference'     => $f->reference,
+            'rating'        => $f->rating,
+            'star_string'   => $f->star_string,
+            'comment'       => $f->comment,
+            'recommend'     => $f->recommend,
+            'is_read'       => $f->is_read,
+            'date'          => $f->created_at->format('M d, Y'),
+            'student_name'  => trim(($f->user?->fname ?? '') . ' ' . ($f->user?->lname ?? '')) ?: 'Unknown',
+            'student_email' => $f->user?->email ?? '-',
+        ];
+    }
+}
