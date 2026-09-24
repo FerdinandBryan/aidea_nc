@@ -7,7 +7,7 @@
     // Same-origin when served by `php artisan serve` (port 8000); otherwise talk to localhost:8000.
     // Override by setting window.API_BASE before this script loads.
     const API_BASE = window.API_BASE ||
-        ((location.protocol.indexOf('http') === 0 && location.port === '8000') ? '' : 'http://localhost:8000');
+        ((location.protocol.indexOf('http') === 0 && location.port === '8000') ? '' : 'https://aideanc-production.up.railway.app');
     const LOGIN_URL = '../../user/login/login.html';
     const HISTORY_KEY = 'aidea_report_history';
     const MANUAL_TOKEN_KEY = 'aidea_report_token';
