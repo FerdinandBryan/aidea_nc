@@ -20,5 +20,14 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->render(function (\Symfony\Component\Mailer\Exception\TransportExceptionInterface $e, $request) {
+            if ($request->is('api/*')) {
+                \Illuminate\Support\Facades\Log::error('Mail transport failed: ' . $e->getMessage());
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'We could not send the email right now. Please try again later.',
+                ], 503);
+            }
+        });
     })->create();
