@@ -1,21 +1,21 @@
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   AIDEA â€“ Landing Page
+﻿/* 
+   AIDEA “ Landing Page
    Pulls live data from the same Laravel API as the admin
    panel. These calls are made WITHOUT an auth token (the
    visitor isn't logged in), so the backend must expose
    these routes outside the `auth:sanctum` group:
-     GET /api/services                â†’ public, active services + prices
-     GET /api/thesis/list?status=Approved  â†’ public repository listing
-     GET /api/public/stats            â†’ { total_thesis, total_students,
+     GET /api/services                ’ public, active services + prices
+     GET /api/thesis/list?status=Approved  ’ public repository listing
+     GET /api/public/stats            ’ { total_thesis, total_students,
                                            total_validations, avg_rating }
    If any call fails (404 / CORS / not public yet), the
    section falls back to a safe placeholder instead of
    breaking the page â€” check the console for what failed.
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+ */
 
 const API_BASE = 'https://aideanc-production.up.railway.app/api';
 
-/* â”€â”€ Navigation: redirect to real pages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â”€â”€ Navigation: redirect to real pages  */
 function openModal(id) {
     if (id === 'loginModal') {
         window.location.href = '../login/login.html';
@@ -36,7 +36,7 @@ if (heroBg) {
     }, { passive: true });
 }
 
-/* â”€â”€ Smooth scroll helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â”€â”€ Smooth scroll helper  */
 function scrollTo(id) {
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -54,7 +54,7 @@ function peso(n) {
 
 async function apiGet(path) {
     const res = await fetch(`${API_BASE}${path}`, {
-        headers: { Accept: 'application/json' }, // no Authorization â€” public visitor
+        headers: { Accept: 'application/json' }, // no Authorization ” public visitor
     });
     if (!res.ok) throw new Error(`${path} â†’ ${res.status}`);
     return res.json();
@@ -62,9 +62,9 @@ async function apiGet(path) {
 
 const asList = raw => Array.isArray(raw) ? raw : (raw?.data ?? []);
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* 
    STATS COUNTER ANIMATION
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+ */
 function animateCounter(id, target, decimals = 0, suffix = '') {
     const el = document.getElementById(id);
     if (!el) return;
@@ -131,9 +131,9 @@ async function loadStats() {
     if (statRatingEl) statRatingEl.textContent = statsTarget.statRating.toFixed(1) + ' / 5';
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   SERVICES â€” GET /api/services
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+/* 
+   SERVICES GET /api/services
+ */
 function renderServices(list, gridId) {
     const grid = document.getElementById(gridId);
     if (!grid) return;
@@ -166,9 +166,9 @@ async function loadServices() {
     }
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   THESIS REPOSITORY â€” GET /api/thesis/list
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+/* 
+   THESIS REPOSITORY GET /api/thesis/list
+ */
 let allTheses = [];
 let approvedTheses = [];
 let filteredThesis = [];
@@ -186,7 +186,7 @@ function renderRepo(list) {
       <div class="repo-title">${escHtml(t.title)}</div>
       <div class="repo-author">by ${escHtml(t.author)}</div>
       <p class="repo-abstract">${escHtml(t.abstract)}</p>
-      <button class="btn btn-secondary btn-sm" onclick="window.location.href='../login/login.html'" style="margin-top:.9rem;">View full paper â†’</button>
+      <button class="btn btn-secondary btn-sm" onclick="window.location.href='../login/login.html'" style="margin-top:.9rem;">View full paper’</button>
     </div>
   `).join('');
 }
@@ -218,9 +218,9 @@ async function loadRepository() {
             })
             .map(t => ({
                 title: t.title,
-                author: t.author ?? t.user?.name ?? t.student_name ?? 'â€”',
+                author: t.author ?? t.user?.name ?? t.student_name ?? '”',
                 year: t.academic_year ?? (t.created_at ? new Date(t.created_at).getFullYear() : ''),
-                course: t.course ?? 'â€”',
+                course: t.course ?? '”',
                 abstract: t.abstract ?? '',
             }));
         filteredThesis = [...approvedTheses];
@@ -231,9 +231,9 @@ async function loadRepository() {
     }
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* 
    ACTIVE NAV LINK ON SCROLL
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+ */
 const sections = document.querySelectorAll('section[id]');
 const navLinks = document.querySelectorAll('.nav-links a');
 
@@ -247,13 +247,13 @@ window.addEventListener('scroll', () => {
     });
 }, { passive: true });
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* 
    BOOT
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+ */
 (async function init() {
-    await loadRepository();   // populate approvedTheses/allTheses firstâ€¦
+    await loadRepository();   // populate approvedTheses/allTheses first
     await Promise.all([
         loadServices(),
-        loadStats(),          // â€¦so the stats fallback has real numbers to use
+        loadStats(),          // so the stats fallback has real numbers to use
     ]);
 })();
