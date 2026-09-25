@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    const API_BASE = 'http://127.0.0.1:8000/api';
+    const API_BASE = 'https://aideanc-production.up.railway.app/api';
+    const THEME_KEY = 'aidea_user_theme';
 
     /* ── STATE ── */
     let submittedEmail = '';
@@ -40,6 +41,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const savePasswordBtn       = document.getElementById('savePasswordBtn');
     const savePasswordBtnText   = document.getElementById('savePasswordBtnText');
     const savePasswordBtnSpinner= document.getElementById('savePasswordBtnSpinner');
+
+    /* ════════════════════════════════════
+       THEME (light / dark) — same pattern as dashboard.js
+    ════════════════════════════════════ */
+    const currentTheme = () => document.documentElement.getAttribute('data-theme') || 'light';
+
+    function applyTheme(theme, persist) {
+        document.documentElement.setAttribute('data-theme', theme);
+        if (persist) { try { localStorage.setItem(THEME_KEY, theme); } catch { } }
+        document.getElementById('themeBtn')
+            ?.setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`);
+        document.querySelector('meta[name="theme-color"]')
+            ?.setAttribute('content', theme === 'dark' ? '#050a17' : '#0a1a3f');
+    }
+
+    function initTheme() {
+        applyTheme(currentTheme(), false);
+        document.getElementById('themeBtn')?.addEventListener('click', () => {
+            applyTheme(currentTheme() === 'dark' ? 'light' : 'dark', true);
+        });
+
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        mq.addEventListener?.('change', e => {
+            let saved = null;
+            try { saved = localStorage.getItem(THEME_KEY); } catch { }
+            if (!saved) applyTheme(e.matches ? 'dark' : 'light', false);
+        });
+    }
+    initTheme();
 
     /* ════════════════════════════════════
        STEP 1 — SEND CODE
