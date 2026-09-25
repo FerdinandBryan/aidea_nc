@@ -1,21 +1,21 @@
-﻿/* 
-   AIDEA “ Landing Page
+/* 
+   AIDEA � Landing Page
    Pulls live data from the same Laravel API as the admin
    panel. These calls are made WITHOUT an auth token (the
    visitor isn't logged in), so the backend must expose
    these routes outside the `auth:sanctum` group:
-     GET /api/services                ’ public, active services + prices
-     GET /api/thesis/list?status=Approved  ’ public repository listing
-     GET /api/public/stats            ’ { total_thesis, total_students,
+     GET /api/services                � public, active services + prices
+     GET /api/thesis/list?status=Approved  � public repository listing
+     GET /api/public/stats            � { total_thesis, total_students,
                                            total_validations, avg_rating }
    If any call fails (404 / CORS / not public yet), the
    section falls back to a safe placeholder instead of
-   breaking the page â€” check the console for what failed.
+   breaking the page — check the console for what failed.
  */
 
 const API_BASE = 'https://aideanc-production.up.railway.app/api';
 
-/* â”€â”€ Navigation: redirect to real pages  */
+/* ── Navigation: redirect to real pages  */
 function openModal(id) {
     if (id === 'loginModal') {
         window.location.href = '../login/login.html';
@@ -36,7 +36,7 @@ if (heroBg) {
     }, { passive: true });
 }
 
-/* â”€â”€ Smooth scroll helper  */
+/* ── Smooth scroll helper  */
 function scrollTo(id) {
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -49,14 +49,14 @@ function escHtml(str) {
 }
 
 function peso(n) {
-    return 'â‚±' + Number(n || 0).toLocaleString('en-PH');
+    return '₱' + Number(n || 0).toLocaleString('en-PH');
 }
 
 async function apiGet(path) {
     const res = await fetch(`${API_BASE}${path}`, {
-        headers: { Accept: 'application/json' }, // no Authorization ” public visitor
+        headers: { Accept: 'application/json' }, // no Authorization � public visitor
     });
-    if (!res.ok) throw new Error(`${path} â†’ ${res.status}`);
+    if (!res.ok) throw new Error(`${path} → ${res.status}`);
     return res.json();
 }
 
@@ -152,8 +152,8 @@ function renderServices(list, gridId) {
 async function loadServices() {
     const freeGrid = document.getElementById('freeServicesGrid');
     const paidGrid = document.getElementById('paidServicesGrid');
-    if (freeGrid) freeGrid.innerHTML = `<p style="color:var(--muted);font-size:.88rem;">Loadingâ€¦</p>`;
-    if (paidGrid) paidGrid.innerHTML = `<p style="color:var(--muted);font-size:.88rem;">Loadingâ€¦</p>`;
+    if (freeGrid) freeGrid.innerHTML = `<p style="color:var(--muted);font-size:.88rem;">Loading…</p>`;
+    if (paidGrid) paidGrid.innerHTML = `<p style="color:var(--muted);font-size:.88rem;">Loading…</p>`;
 
     try {
         const services = asList(await apiGet('/services')).filter(s => s.active !== false);
@@ -182,11 +182,11 @@ function renderRepo(list) {
     }
     grid.innerHTML = list.map(t => `
     <div class="repo-card">
-      <div class="repo-meta">${escHtml(t.course)} Â· ${escHtml(t.year)}</div>
+      <div class="repo-meta">${escHtml(t.course)} · ${escHtml(t.year)}</div>
       <div class="repo-title">${escHtml(t.title)}</div>
       <div class="repo-author">by ${escHtml(t.author)}</div>
       <p class="repo-abstract">${escHtml(t.abstract)}</p>
-      <button class="btn btn-secondary btn-sm" onclick="window.location.href='../login/login.html'" style="margin-top:.9rem;">View full paper’</button>
+      <button class="btn btn-secondary btn-sm" onclick="window.location.href='../login/login.html'" style="margin-top:.9rem;">View full paper�</button>
     </div>
   `).join('');
 }
@@ -204,7 +204,7 @@ function filterRepo() {
 
 async function loadRepository() {
     const grid = document.getElementById('repoGrid');
-    if (grid) grid.innerHTML = '<p style="color:var(--muted);text-align:center;grid-column:1/-1;padding:2rem 0;">Loadingâ€¦</p>';
+    if (grid) grid.innerHTML = '<p style="color:var(--muted);text-align:center;grid-column:1/-1;padding:2rem 0;">Loading…</p>';
 
     try {
         // Ask the API to only send approved records if it supports the
@@ -218,9 +218,9 @@ async function loadRepository() {
             })
             .map(t => ({
                 title: t.title,
-                author: t.author ?? t.user?.name ?? t.student_name ?? '”',
+                author: t.author ?? t.user?.name ?? t.student_name ?? '�',
                 year: t.academic_year ?? (t.created_at ? new Date(t.created_at).getFullYear() : ''),
-                course: t.course ?? '”',
+                course: t.course ?? '�',
                 abstract: t.abstract ?? '',
             }));
         filteredThesis = [...approvedTheses];

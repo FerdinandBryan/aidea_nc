@@ -1,9 +1,9 @@
-// payments-reciepts.js â€” Student side
+// payments-reciepts.js — Student side
 // Same shell behavior as dashboard.js / avail-services.js (session, theme,
 // drawer, profile menu, sign-out modal) plus:
 //   - Payment history table, read from GET /api/payments?student=<name>
 //     (Status: Pending | Paid | Rejected)
-//   - "My certificates & files" â€” whatever the admin has sent for a
+//   - "My certificates & files" — whatever the admin has sent for a
 //     completed payment, read from GET /api/certificates -> { <payment_id>:
 //     { url, name, type } }. type is 'certificate' or 'files'; older
 //     records without a type are treated as a certificate.
@@ -13,9 +13,9 @@ const API_BASE = 'https://aideanc-production.up.railway.app/api';
 const LOGIN_URL = '../login/login.html';
 const THEME_KEY = 'aidea_user_theme';
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════════
    SESSION
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════════ */
 const getToken = () => localStorage.getItem('auth_token') || null;
 
 function getUser() {
@@ -67,9 +67,9 @@ function renderUserIdentity(user) {
     if (q('.footer-role')) q('.footer-role').textContent = course;
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════════
    THEME (light / dark)
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════════ */
 const currentTheme = () => document.documentElement.getAttribute('data-theme') || 'light';
 
 function applyTheme(theme, persist) {
@@ -95,9 +95,9 @@ function initTheme() {
     });
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════════
    MOBILE DRAWER
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════════ */
 function initDrawer() {
     const sidebar = document.getElementById('sidebar');
     const scrim = document.getElementById('scrim');
@@ -120,9 +120,9 @@ function initDrawer() {
     window.matchMedia('(min-width: 1025px)').addEventListener?.('change', e => { if (e.matches) close(); });
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════════
    PROFILE MENU + SIGN-OUT MODAL
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════════ */
 function initProfileMenu() {
     const btn = document.getElementById('profileBtn');
     const menu = document.getElementById('profileMenu');
@@ -184,9 +184,9 @@ function initSignOutModal() {
     });
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════════
    PAYMENTS
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════════ */
 let payments = [];
 let searchTerm = '';
 let statusFilter = '';
@@ -204,7 +204,7 @@ async function getPayments() {
 }
 
 function peso(n) {
-    return 'â‚± ' + Number(n || 0).toLocaleString();
+    return '₱ ' + Number(n || 0).toLocaleString();
 }
 
 function badgeHtml(status) {
@@ -254,7 +254,7 @@ function renderPayments() {
             <tr>
                 <td data-label="Reference #"><span class="ref-num">${escHtml(p.ref || p.id)}</span></td>
                 <td data-label="Service">${escHtml(p.service)}</td>
-                <td data-label="Date">${escHtml(p.date || p.date_iso || p.dateISO || 'â€”')}</td>
+                <td data-label="Date">${escHtml(p.date || p.date_iso || p.dateISO || '—')}</td>
                 <td data-label="Amount">${peso(p.amount)}</td>
                 <td data-label="Method">${escHtml(p.method)}</td>
                 <td data-label="Status">${badgeHtml(p.status)}</td>
@@ -271,20 +271,20 @@ function renderPayments() {
     window.filteredPayments = filtered;
 }
 
-/* â”€â”€ Receipt modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Receipt modal ────────────────────────────────── */
 function openReceipt(i) {
     const p = (window.filteredPayments || payments)[i];
     if (!p || p.status !== 'Paid') return;
 
-    const gcashRef = p.gcash_ref || p.gcashRef || 'â€”';
-    const studentId = p.student_id || p.studentId || 'â€”';
+    const gcashRef = p.gcash_ref || p.gcashRef || '—';
+    const studentId = p.student_id || p.studentId || '—';
 
     document.getElementById('rRefNum').textContent = String(p.ref || p.id);
     document.getElementById('receiptBody').innerHTML = `
         <div class="r-row"><span class="r-label">Student</span><span class="r-value">${escHtml(p.student || currentStudentName())}</span></div>
         <div class="r-row"><span class="r-label">Student ID</span><span class="r-value">${escHtml(studentId)}</span></div>
         <div class="r-row"><span class="r-label">Service</span><span class="r-value">${escHtml(p.service)}</span></div>
-        <div class="r-row"><span class="r-label">Date</span><span class="r-value">${escHtml(p.date || p.date_iso || p.dateISO || 'â€”')}</span></div>
+        <div class="r-row"><span class="r-label">Date</span><span class="r-value">${escHtml(p.date || p.date_iso || p.dateISO || '—')}</span></div>
         <div class="r-row"><span class="r-label">GCash ref #</span><span class="r-value">${escHtml(gcashRef)}</span></div>
         <div class="r-row"><span class="r-label">Method</span><span class="r-value">${escHtml(p.method)}</span></div>
         <div class="r-row"><span class="r-label">Status</span><span class="r-value">${badgeHtml(p.status)}</span></div>
@@ -319,7 +319,7 @@ function initReceiptModal() {
     });
 }
 
-/* â”€â”€ Search / filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Search / filter ─────────────────────────────── */
 function initPaymentFilters() {
     document.getElementById('paySearch')?.addEventListener('input', e => {
         searchTerm = e.target.value;
@@ -331,12 +331,12 @@ function initPaymentFilters() {
     });
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════════
    CERTIFICATES & FILES
    GET /api/certificates -> { "<payment_id>": { url, name, type } }
    type: 'certificate' | 'files' (older records without a type are
    treated as a certificate for backward compatibility).
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════════ */
 let certItems = [];
 
 function certNo(id) { return 'RCP-' + String(id).padStart(4, '0'); }
@@ -345,7 +345,7 @@ function certKind(c) { return c.type === 'files' ? 'Files' : 'Certificate'; }
 
 function certDate(p) {
     const raw = p.date_iso || p.dateISO || p.date || null;
-    if (!raw) return 'â€”';
+    if (!raw) return '—';
     const d = new Date(raw);
     return isNaN(d) ? raw : d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
 }
@@ -380,10 +380,10 @@ function renderCertificates() {
             <div class="rc-service">${escHtml(p.service)}</div>
             ${certPreview(p)}
             <div class="rc-meta">
-                <span>GCash: ${escHtml(p.gcash_ref || p.gcashRef || 'â€”')}</span>
+                <span>GCash: ${escHtml(p.gcash_ref || p.gcashRef || '—')}</span>
                 <span>${certDate(p)}</span>
             </div>
-            <div class="rc-meta"><span>Ref: ${escHtml(p.ref || 'â€”')} Â· ${escHtml(p.method || 'GCash')}</span></div>
+            <div class="rc-meta"><span>Ref: ${escHtml(p.ref || '—')} · ${escHtml(p.method || 'GCash')}</span></div>
             <div class="rc-actions">
                 <button class="btn-receipt" type="button" data-view="${p.id}">View</button>
                 <button class="btn-receipt" type="button" data-dl="${p.id}">Download</button>
@@ -423,7 +423,7 @@ function viewCert(id) {
             <div class="cert-viewer-head">
                 <div>
                     <h3>${escHtml(certKind(c))}</h3>
-                    <p>${escHtml(p.service)} Â· ${certNo(p.id)}</p>
+                    <p>${escHtml(p.service)} · ${certNo(p.id)}</p>
                 </div>
                 <button class="modal-x" data-close="1" aria-label="Close" type="button">
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
@@ -476,9 +476,9 @@ async function loadCertificates() {
     renderCertificates();
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════════
    BOOT
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════════ */
 async function loadPayments() {
     try {
         payments = await getPayments();
