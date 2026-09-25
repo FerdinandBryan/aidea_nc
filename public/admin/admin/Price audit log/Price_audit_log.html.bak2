@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Price Audit Log — AIDEA Admin</title>
+    <link rel="stylesheet" href="Price_audit_log.css" />
+</head>
+
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-icon">AI</div>
+            <div>
+                <div class="brand-name">AIDEA Admin</div>
+                <div class="brand-sub">Norzagaray College</div>
+            </div>
+        </div>
+        <div class="sidebar-section-label">OVERVIEW</div>
+        <nav class="sidebar-nav">
+            <a href="../dashboard/dashboard.html"><span>📊</span> Dashboard</a>
+            <a href="../statistic/statistic.html"><span>📈</span> Statistics</a>
+            <a href="../Report generator/Report_generator.html"><span>📄</span> Report Generator</a>
+        </nav>
+        <div class="sidebar-section-label">MANAGEMENT</div>
+        <nav class="sidebar-nav">
+            <a href="../All students/all-students.html"><span>👥</span> All Students</a>
+            <a href="../Thesis submissions/Thesis_submissions.html"><span>📝</span> Thesis Submissions</a>
+            <a href="../Payments/payment.html"><span>💳</span> Payments</a>
+            <a href="../Receipts/Receipts.html"><span>🧾</span> Receipts</a>
+            <a href="../Services pricing/Services_pricing.html"><span>⚙️</span> Services &amp; Pricing</a>
+            <a href="../Events/events.html"><span>📅</span> Events</a>
+        </nav>
+        <div class="sidebar-section-label">QUALITY</div>
+        <nav class="sidebar-nav">
+            <a href="../Satisfaction reports/Satisfaction_reports.html"><span>⭐</span> Satisfaction Reports</a>
+            <a href="../Price audit log/Price_audit_log.html" class="active"><span>🔍</span> Price Audit Log</a>
+            <a href="../formatting/formatting.html" class="active"><span>📐</span> Format Templates</a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="footer-avatar">AD</div>
+            <div>
+                <div class="footer-name">Admin</div>
+                <div class="footer-role">ADMINISTRATOR</div>
+            </div>
+        </div>
+    </aside>
+    <div class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <h1>Price Audit Log <span class="badge-admin">ADMIN</span></h1>
+                <p>Norzagaray College — AIDEA Control Panel</p>
+            </div>
+            <div class="topbar-right"><button class="btn-home" id="homeBtn">— Home</button><button class="btn-signout"
+                    id="signOutBtn">Sign Out</button></div>
+        </header>
+        <div class="content">
+            <div class="toolbar">
+                <input type="text" class="search-input" id="searchInput" placeholder="🔍  Search audit log…" />
+                <select class="filter-select" id="filterService">
+                    <option value="">All Services</option>
+                    <option value="Data Analysis">Data Analysis</option>
+                    <option value="Statistician">Statistician</option>
+                    <option value="Grammarian">Grammarian</option>
+                </select>
+            </div>
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Log ID</th>
+                                <th>Service</th>
+                                <th>Old Price</th>
+                                <th>New Price</th>
+                                <th>Change</th>
+                                <th>Changed By</th>
+                                <th>Reason</th>
+                                <th>Date &amp; Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="auditBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="Price_audit_log.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AIDEA – Events Dashboard</title>
+    <link rel="stylesheet" href="events-dashboard.css" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+
+<body>
+    <div class="layout">
+
+        <!-- ═══ Sidebar (same as Avail Services) ═══════════ -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon">AI</div>
+                <div class="logo-text">
+                    <h2>AIDEA</h2>
+                    <p>Norzagaray College</p>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="../dashboard/dashboard.html" class="nav-item nav-item-top">
+                    <i class="fa-solid fa-house nav-icon"></i> Dashboard
+                </a>
+
+                <div class="nav-group">
+                    <button type="button" class="nav-group-toggle" data-group="main">
+                        <span class="nav-label">MAIN</span>
+                        <i class="fa-solid fa-chevron-down nav-group-caret"></i>
+                    </button>
+                    <div class="nav-group-items">
+                        <a href="../submit thesis/submit-thesis.html" class="nav-item">
+                            <i class="fa-solid fa-file-arrow-up nav-icon"></i> Submit Thesis</a>
+                        <a href="../my submission/my-submissions.html" class="nav-item">
+                            <i class="fa-solid fa-file-lines nav-icon"></i> My Submissions</a>
+                    </div>
+                </div>
+
+                <div class="nav-group">
+                    <button type="button" class="nav-group-toggle" data-group="services">
+                        <span class="nav-label">SERVICES</span>
+                        <i class="fa-solid fa-chevron-down nav-group-caret"></i>
+                    </button>
+                    <div class="nav-group-items">
+                        <a href="../repository/repository.html" class="nav-item">
+                            <i class="fa-solid fa-database nav-icon"></i> Repository</a>
+                        <a href="../avail services/avail-services.html" class="nav-item">
+                            <i class="fa-solid fa-wrench nav-icon"></i> Avail Services</a>
+                        <a href="../payments reciepts/payments-reciepts.html" class="nav-item">
+                            <i class="fa-solid fa-credit-card nav-icon"></i> Payments & Receipts</a>
+                    </div>
+                </div>
+
+                <div class="nav-group">
+                    <button type="button" class="nav-group-toggle" data-group="events">
+                        <span class="nav-label">EVENTS</span>
+                        <i class="fa-solid fa-chevron-down nav-group-caret"></i>
+                    </button>
+                    <div class="nav-group-items">
+                        <a href="../events dashboard/events-dashboard.html" class="nav-item active">
+                            <i class="fa-solid fa-calendar-days nav-icon"></i> Events Dashboard</a>
+                        <a href="../feedback/my-feedback.html" class="nav-item">
+                            <i class="fa-solid fa-star nav-icon"></i> My Feedback</a>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer" id="sidebarUser">
+                <div class="user-card">
+                    <div class="user-avatar">JD</div>
+                    <div class="user-info">
+                        <h4>Juan Dela Cruz</h4>
+                        <p>BSIT STUDENT</p>
+                    </div>
+                    <i class="fa-solid fa-chevron-up sidebar-user-caret"></i>
+                </div>
+                <div class="user-dropdown" id="userDropdown">
+                    <a href="../profile/my-profile.html" class="user-dropdown-item">
+                        <i class="fa-solid fa-user"></i> My Profile
+                    </a>
+                    <button type="button" class="user-dropdown-item danger" id="dropdownSignOutBtn">
+                        <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="topbar">
+                <div>
+                    <h1>Events Dashboard</h1>
+                    <p class="subtitle">Stay updated on upcoming college events and schedules</p>
+                </div>
+                <div class="topbar-right">
+                    <span class="status-badge"><span class="dot"></span> Online</span>
+                </div>
+            </div>
+
+            <!-- Filter -->
+            <div class="event-filters">
+                <button class="filter-btn active" data-filter="all">All Events</button>
+                <button class="filter-btn" data-filter="Upcoming">Upcoming</button>
+                <button class="filter-btn" data-filter="Today">Today</button>
+                <button class="filter-btn" data-filter="Past">Past</button>
+                <input type="text" id="eventSearch" placeholder="Search events..." class="event-search" />
+            </div>
+
+            <div class="events-layout">
+                <!-- Events List -->
+                <div class="events-list" id="eventsList"></div>
+
+                <!-- Mini Calendar Sidebar -->
+                <div class="cal-sidebar">
+                    <div class="mini-cal-card">
+                        <div class="mini-cal-header">
+                            <button id="prevMonth">‹</button>
+                            <span id="calMonthLabel"></span>
+                            <button id="nextMonth">›</button>
+                        </div>
+                        <div class="mini-cal-days">
+                            <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+                        </div>
+                        <div class="mini-cal-grid" id="calGrid"></div>
+                    </div>
+                    <div class="legend-card">
+                        <h4>Legend</h4>
+                        <div class="legend-item"><span class="leg-dot upcoming"></span> Upcoming</div>
+                        <div class="legend-item"><span class="leg-dot today-dot"></span> Today</div>
+                        <div class="legend-item"><span class="leg-dot past-dot"></span> Past</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ═══ Sign Out Confirmation Modal ═══════════════════ -->
+    <div class="signout-modal-overlay" id="signoutModalOverlay">
+        <div class="signout-modal-box">
+            <div class="signout-modal-icon"><i class="fa-solid fa-right-from-bracket"></i></div>
+            <h3 class="signout-modal-title">Sign Out</h3>
+            <p class="signout-modal-text">Are you sure you want to sign out of your account?</p>
+            <div class="signout-modal-actions">
+                <button type="button" class="btn-modal-cancel" id="signoutCancelBtn">Cancel</button>
+                <button type="button" class="btn-modal-confirm" id="signoutConfirmBtn">Sign Out</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="events-dashboard.js"></script>
+</body>
+
+</html>

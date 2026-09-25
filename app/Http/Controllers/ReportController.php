@@ -1,0 +1,131 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Feedback;
+use App\Models\Payment;
+use App\Models\ThesisSubmission;
+use App\Models\User;
+use Illuminate\Http\Request;
+
+class ReportController extends Controller
+{
+    /**
+     * GET /api/reports?type=revenue&from=2026-09-01&to=2026-09-30
+     * Returns { "data": [ ...rows... ] } - the report page turns this into PDF / CSV / Excel.
+     */
+    public function generate(Request $request)
+    {
+        $user = $request->user();
+        if (!$user || !$user->is_admin) {
+            return response()->json(['error' => 'Admins only.'], 403);
+        }
+
+        $v = $request->validate([
+            'type' => 'required|in:revenue,thesis,enrollment,service_usage,satisfaction',
+            'from' => 'required|date',
+            'to'   => 'required|date|after_or_equal:from',
+        ]);
+
+        $from = $v['from'];
+        $to   = $v['to'];
+
+        switch ($v['type']) {
+            case 'revenue':      return response()->json(['data' => $this->revenue($from, $to)]);
+            case 'thesis':       return response()->json(['data' => $this->thesis($from, $to)]);
+            case 'enrollment':   return response()->json(['data' => $this->enrollment($from, $to)]);
+            case 'service_usage':return response()->json(['data' => $this->serviceUsage($from, $to)]);
+            case 'satisfaction': return response()->json(['data' => $this->satisfaction($from, $to)]);
+        }
+    }
+
+    /** Only APPROVED ('Paid') payments count as revenue. */
+    private function revenue($from, $to)
+    {
+        return Payment::where('status', 'Paid')
+            ->whereDate('created_at', '>=', $from)
+            ->whereDate('created_at', '<=', $to)
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn ($p) => [
+                'date'       => $p->created_at->format('Y-m-d'),
+                'receipt_no' => $p->ref,
+                'student'    => $p->student,
+                'service'    => $p->service,
+                'amount'     => (float) $p->amount,
+            ])->values();
+    }
+
+    private function thesis($from, $to)
+    {
+        return ThesisSubmission::with('user')
+            ->whereDate('created_at', '>=', $from)
+            ->whereDate('created_at', '<=', $to)
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn ($t) => [
+                'id'      => 'THS-' . str_pad($t->id, 4, '0', STR_PAD_LEFT),
+                'student' => $t->user ? $t->user->full_name : ($t->authors ?: '-'),
+                'title'   => $t->title,
+                'course'  => $t->course,
+                'status'  => ucfirst($t->status),   // stored lowercase in DB
+                'date'    => $t->created_at->format('Y-m-d'),
+            ])->values();
+    }
+
+    /** Students who registered in the date range. */
+    private function enrollment($from, $to)
+    {
+        return User::where('is_admin', 0)
+            ->whereDate('created_at', '>=', $from)
+            ->whereDate('created_at', '<=', $to)
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn ($u) => [
+                'student_id' => 'STU-' . str_pad($u->id, 4, '0', STR_PAD_LEFT),
+                'name'       => trim($u->fname . ' ' . ($u->mi ? $u->mi . '. ' : '') . $u->lname),
+                'email'      => $u->email,
+                'status'     => $u->is_verified ? 'Verified' : 'Pending Approval',
+                'date'       => $u->created_at->format('Y-m-d'),
+            ])->values();
+    }
+
+    /** One row per service: requests, approved payments, revenue. */
+    private function serviceUsage($from, $to)
+    {
+        return Payment::whereDate('created_at', '>=', $from)
+            ->whereDate('created_at', '<=', $to)
+            ->get()
+            ->groupBy('service')
+            ->map(function ($group, $service) {
+                $paid = $group->where('status', 'Paid');
+                return [
+                    'service'   => $service,
+                    'requests'  => $group->count(),
+                    'completed' => $paid->count(),
+                    'revenue'   => (float) $paid->sum('amount'),
+                ];
+            })
+            ->sortByDesc('requests')
+            ->values();
+    }
+
+    /** One row per feedback entry in the date range. */
+    private function satisfaction($from, $to)
+    {
+        return Feedback::with('user')
+            ->whereDate('created_at', '>=', $from)
+            ->whereDate('created_at', '<=', $to)
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn ($f) => [
+                'date'      => $f->created_at->format('Y-m-d'),
+                'student'   => trim(($f->user?->fname ?? '') . ' ' . ($f->user?->lname ?? '')) ?: 'Unknown',
+                'type'      => $f->feedback_type,
+                'reference' => $f->reference ?: '-',
+                'rating'    => (int) $f->rating,
+                'recommend' => $f->recommend ? ucfirst($f->recommend) : '-',
+                'comment'   => $f->comment,
+            ])->values();
+    }
+}

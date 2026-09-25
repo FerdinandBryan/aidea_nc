@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Satisfaction Reports - AIDEA Admin</title>
+    <link rel="stylesheet" href="Satisfaction_reports.css" />
+</head>
+
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-icon">AI</div>
+            <div>
+                <div class="brand-name">AIDEA Admin</div>
+                <div class="brand-sub">Norzagaray College</div>
+            </div>
+        </div>
+        <div class="sidebar-section-label">OVERVIEW</div>
+        <nav class="sidebar-nav">
+            <a href="../dashboard/dashboard.html"><span>&#128202;</span> Dashboard</a>
+            <a href="../statistic/statistic.html"><span>&#128200;</span> Statistics</a>
+            <a href="../Report generator/Report_generator.html"><span>&#128196;</span> Report Generator</a>
+        </nav>
+        <div class="sidebar-section-label">MANAGEMENT</div>
+        <nav class="sidebar-nav">
+            <a href="../All students/all-students.html"><span>&#128101;</span> All Students</a>
+            <a href="../Thesis submissions/Thesis_submissions.html"><span>&#128221;</span> Thesis Submissions</a>
+            <a href="../Payments/payment.html"><span>&#128179;</span> Payments</a>
+            <a href="../Receipts/Receipts.html"><span>&#129534;</span> Receipts</a>
+            <a href="../Services pricing/Services_pricing.html"><span>&#9881;</span> Services &amp; Pricing</a>
+            <a href="../Events/events.html"><span>&#128197;</span> Events</a>
+        </nav>
+        <div class="sidebar-section-label">QUALITY</div>
+        <nav class="sidebar-nav">
+            <a href="../Satisfaction reports/Satisfaction_reports.html" class="active">
+                <span>&#11088;</span> Satisfaction Reports
+                <span id="unreadBadge" style="background:#ef4444;color:#fff;padding:1px 7px;border-radius:12px;font-size:11px;margin-left:4px;display:none;"></span>
+            </a>
+            <a href="../Price audit log/Price_audit_log.html"><span>&#128269;</span> Price Audit Log</a>
+            <a href="../formatting/formatting.html"><span>&#128208;</span> Format Templates</a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="footer-avatar">AD</div>
+            <div>
+                <div class="footer-name">Admin</div>
+                <div class="footer-role">ADMINISTRATOR</div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <h1>Satisfaction Reports <span class="badge-admin">ADMIN</span></h1>
+                <p>Norzagaray College - AIDEA Control Panel</p>
+            </div>
+            <div class="topbar-right">
+                <button class="btn-home" id="homeBtn">Home</button>
+                <button class="btn-signout" id="signOutBtn">Sign Out</button>
+            </div>
+        </header>
+
+        <div class="content">
+            <div class="top-row">
+                <!-- Overall Score -->
+                <div class="score-card">
+                    <div class="score-big" id="avgScore">--</div>
+                    <div class="stars" id="avgStars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+                    <div class="score-label">Overall Average Rating</div>
+                    <div class="score-sub" id="totalCount">Loading...</div>
+                </div>
+
+                <!-- Rating Breakdown -->
+                <div class="breakdown-card card">
+                    <div class="card-title">Rating Breakdown</div>
+                    <div id="ratingBars"><p style="color:#9ca3af;font-size:13px;">Loading...</p></div>
+                </div>
+
+                <!-- Per-type chart -->
+                <div class="card">
+                    <div class="card-title">Per Service / Type Rating</div>
+                    <canvas id="serviceRatingChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Reviews -->
+            <div class="card reviews-card">
+                <div class="card-title">Recent Reviews</div>
+                <div id="reviewsList"><p style="color:#9ca3af;padding:16px 0;">Loading reviews...</p></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="Satisfaction_reports.js"></script>
+</body>
+
+</html>

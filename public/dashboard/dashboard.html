@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AIDEA – Dashboard</title>
+    <link rel="stylesheet" href="dashboard.css" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+
+<body>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-icon">AI</div>
+            <div class="brand-text">
+                <span class="brand-name">AIDEA</span>
+                <span class="brand-sub">Norzagaray College</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <p class="nav-label">MAIN</p>
+            <a href="../dashboard/dashboard.html" class="nav-item active">
+                <i class="fa-solid fa-house"></i> Dashboard
+            </a>
+            <a href="../profile/my-profile.html" class="nav-item">
+                <i class="fa-solid fa-user"></i> My Profile
+            </a>
+            <a href="../submit thesis/submit-thesis.html" class="nav-item">
+                <i class="fa-solid fa-file-arrow-up"></i> Submit Thesis
+            </a>
+            <a href="../my submission/my-submissions.html" class="nav-item">
+                <i class="fa-solid fa-file-lines"></i> My Submissions
+            </a>
+
+            <p class="nav-label">SERVICES</p>
+            <a href="../repository/repository.html" class="nav-item">
+                <i class="fa-solid fa-database"></i> Repository
+            </a>
+            <a href="../avail services/avail-services.html" class="nav-item">
+                <i class="fa-solid fa-wrench"></i> Avail Services
+            </a>
+            <a href="../payments reciepts/payments-reciepts.html" class="nav-item">
+                <i class="fa-solid fa-credit-card"></i> Payments & Receipts
+            </a>
+            <p class="nav-label">EVENTS</p>
+            <a href="../events dashboard/events-dashboard.html" class="nav-item">
+                <i class="fa-solid fa-calendar-days"></i> Events Dashboard
+            </a>
+            <a href="../feedback/my-feedback.html" class="nav-item">
+                <i class="fa-solid fa-star"></i> My Feedback
+            </a>
+        </nav>
+
+        <div class="sidebar-user" onclick="window.location.href='../profile/my-profile.html'" style="cursor:pointer;">
+            <div class="user-avatar">JD</div>
+            <div class="user-info">
+                <span class="user-name">Juan Dela Cruz</span>
+                <span class="user-role">BSIT Student</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <div class="main">
+        <!-- TOPBAR -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <h2 class="page-title">Dashboard</h2>
+                <p class="page-sub">Welcome back, Juan!</p>
+            </div>
+            <div class="topbar-right">
+                <span class="status-badge"><span class="dot"></span> Online</span>
+                <button class="btn-signout" onclick="handleSignOut()">Sign Out</button>
+            </div>
+        </header>
+
+        <!-- STAT CARDS -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon blue"><i class="fa-solid fa-file-lines"></i></div>
+                <div class="stat-value" id="stat-submissions">2</div>
+                <div class="stat-label">Submissions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
+                <div class="stat-value" id="stat-approved">1</div>
+                <div class="stat-label">Approved</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon gold"><i class="fa-solid fa-credit-card"></i></div>
+                <div class="stat-value" id="stat-paid">₱850</div>
+                <div class="stat-label">Total Paid</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon amber"><i class="fa-solid fa-star"></i></div>
+                <div class="stat-value" id="stat-rating">4.8</div>
+                <div class="stat-label">My Rating Given</div>
+            </div>
+        </section>
+
+        <!-- BOTTOM GRID -->
+        <div class="bottom-grid">
+            <!-- RECENT SUBMISSIONS TABLE -->
+            <div class="card table-card">
+                <div class="card-header">
+                    <h3>Recent Thesis Submissions</h3>
+                    <a href="../my submission/my-submissions.html" class="btn-new">+ New</a>
+                </div>
+                <table class="thesis-table">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Submitted</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="thesis-tbody">
+                        <tr>
+                            <td>Impact of Social Media on Academic Performance of NC Students</td>
+                            <td>Jan 2025</td>
+                            <td><span class="badge badge-approved">✔ Approved</span></td>
+                            <td><button class="btn-action" onclick="viewThesis(1)">View</button></td>
+                        </tr>
+                        <tr>
+                            <td>AI Integration in Local Government Services in Norzagaray</td>
+                            <td>Mar 2025</td>
+                            <td><span class="badge badge-review">⏳ Under Review</span></td>
+                            <td><button class="btn-action" onclick="viewThesis(2)">View</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- RIGHT PANEL -->
+            <div class="right-panel">
+                <!-- UPCOMING EVENTS -->
+                <div class="card events-card">
+                    <div class="card-header">
+                        <h3>📅 Upcoming Events</h3>
+                    </div>
+                    <div class="event-list" id="event-list">
+                        <div class="event-item">
+                            <div class="event-date"><span class="month">APR</span><span class="day">15</span></div>
+                            <div class="event-info">
+                                <p class="event-title">Thesis Defense Schedule</p>
+                                <p class="event-loc"><i class="fa-solid fa-location-dot"></i> AVR Hall, 8:00 AM</p>
+                            </div>
+                        </div>
+                        <div class="event-item">
+                            <div class="event-date"><span class="month">APR</span><span class="day">22</span></div>
+                            <div class="event-info">
+                                <p class="event-title">Research Writing Workshop</p>
+                                <p class="event-loc"><i class="fa-solid fa-location-dot"></i> Library, 1:00 PM</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- QUICK ACTION -->
+                <div class="card quick-action-card">
+                    <p class="qa-label">QUICK ACTION</p>
+                    <h3 class="qa-title">Ready to submit?</h3>
+                    <a href="../submit thesis/submit-thesis.html" class="btn-submit-full">📄 Submit Thesis</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <SCript src="../login/login.js"></SCript>
+    <script src="dashboard.js"></script>
+</body>
+
+</html>
