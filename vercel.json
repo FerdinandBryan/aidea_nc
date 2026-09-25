@@ -1,0 +1,5 @@
+{
+  "buildCommand": "mkdir -p public && cp -r user admin public/",
+  "outputDirectory": "public",
+  "redirects": [{ "source": "/", "destination": "/user/landing/index.html", "permanent": false }]
+}

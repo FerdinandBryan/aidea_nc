@@ -1,0 +1,278 @@
+/* ==========================================================================
+   AIDEA Student — My Feedback
+   Reuses dashboard.css for shell + panel styles. This file adds the form
+   fields, star rating widget, and the feedback summary/history cards.
+   ========================================================================== */
+
+.feedback-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 20px;
+    align-items: start;
+}
+
+/* ── Form card ── */
+.feedback-form-card .panel-title {
+    margin-bottom: 4px;
+}
+
+.feedback-form-card .panel-sub {
+    margin-bottom: 22px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-bottom: 18px;
+}
+
+.form-group label {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.form-group select,
+.form-group input[type="text"],
+.form-group textarea {
+    padding: 10px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 13.5px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+    resize: vertical;
+    transition: border-color .15s, box-shadow .15s;
+}
+
+.form-group select {
+    -webkit-appearance: none;
+    appearance: none;
+    padding-right: 34px;
+    cursor: pointer;
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235f6d8c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+}
+
+:root[data-theme="dark"] .form-group select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2393a2c6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+}
+
+.form-group select:focus,
+.form-group input[type="text"]:focus,
+.form-group textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+/* ── Star rating ── */
+.star-rating {
+    display: flex;
+    gap: 6px;
+    cursor: pointer;
+    margin-bottom: 4px;
+}
+
+.star {
+    font-size: 28px;
+    line-height: 1;
+    color: var(--border);
+    transition: color .12s, transform .12s;
+    user-select: none;
+}
+
+.star:hover,
+.star.active {
+    color: var(--accent);
+    transform: scale(1.12);
+}
+
+.rating-label {
+    font-size: 12.5px;
+    color: var(--muted);
+    font-weight: 500;
+}
+
+/* ── Recommend radios ── */
+.radio-group {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13.5px;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.radio-label input {
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+/* ── Submit button ── */
+.btn-submit-fb {
+    width: 100%;
+    justify-content: center;
+    margin-top: 4px;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-submit-fb:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+    filter: none;
+}
+
+/* ── Right panel: summary ── */
+.right-fb-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.fb-summary-card {
+    text-align: center;
+}
+
+.fb-summary-card .panel-title {
+    text-align: left;
+    margin-bottom: 14px;
+}
+
+.fb-stat {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    text-align: left;
+}
+
+.fb-stat-num {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums;
+}
+
+.fb-stat-label {
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.avg-rating {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: var(--yellow-soft);
+    border-radius: 10px;
+    padding: 16px;
+}
+
+.avg-num {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    color: var(--text);
+}
+
+.avg-stars {
+    font-size: 20px;
+    color: var(--accent);
+    letter-spacing: 2px;
+}
+
+.avg-label {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 500;
+}
+
+/* ── Previous feedbacks ── */
+.prev-fb-card .panel-title {
+    margin-bottom: 14px;
+}
+
+.fb-empty {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 8px 0;
+}
+
+.prev-fb-item {
+    padding: 13px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 10px;
+}
+
+.prev-fb-item:last-child {
+    margin-bottom: 0;
+}
+
+.prev-fb-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.prev-fb-header strong {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.prev-stars {
+    font-size: 13px;
+    color: var(--accent);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.prev-fb-ref {
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-bottom: 5px;
+}
+
+.prev-fb-comment {
+    font-size: 12.5px;
+    color: var(--text);
+    font-style: italic;
+    line-height: 1.55;
+    margin-bottom: 6px;
+    overflow-wrap: anywhere;
+}
+
+.prev-fb-date {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 500;
+}
+
+/* ══ Responsive ══ */
+@media (max-width: 1024px) {
+    .feedback-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 420px) {
+    .radio-group {
+        flex-direction: column;
+        gap: 10px;
+    }
+}

@@ -1,0 +1,414 @@
+/* ==========================================================================
+   AIDEA Admin — File Transfer
+   Extends dashboard.css: same tokens (--surface, --border, --primary, …),
+   same light/dark theme. This file only adds what dashboard.css doesn't
+   already define: tabs, transfer cards, and the send form.
+   ========================================================================== */
+
+/* ── Tabs (Send / Received) ─────────────────────────────────────────────── */
+.review-tabs {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+}
+
+.review-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color .15s, color .15s;
+}
+
+.review-tab:hover {
+    color: var(--text);
+}
+
+.review-tab.active {
+    background: var(--surface);
+    color: var(--primary);
+    box-shadow: var(--shadow);
+}
+
+.tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--border);
+    color: var(--text);
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+.review-tab.active .tab-count {
+    background: var(--blue-soft);
+    color: var(--primary);
+}
+
+/* ── Send form ───────────────────────────────────────────────────────────── */
+.account-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 4px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.field label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.field select,
+.field textarea {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: 13.5px;
+    transition: border-color .15s, box-shadow .15s;
+}
+
+.field select {
+    height: 42px;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235f6d8c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    padding-right: 36px;
+}
+
+.field select optgroup {
+    font-style: normal;
+    font-weight: 700;
+    color: var(--muted);
+}
+
+.field textarea {
+    resize: vertical;
+    min-height: 76px;
+}
+
+.field select:focus,
+.field textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--blue-soft);
+}
+
+/* File drop zone */
+.file-drop {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    background: var(--surface-2);
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color .15s, background-color .15s, color .15s;
+}
+
+.file-drop svg {
+    flex-shrink: 0;
+}
+
+.file-drop:hover,
+.file-drop.is-dragover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--blue-soft);
+}
+
+.file-drop.has-file {
+    border-style: solid;
+    border-color: var(--primary);
+    color: var(--text);
+    background: var(--blue-soft);
+}
+
+.form-msg {
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 1em;
+}
+
+.form-msg.is-success {
+    color: var(--ok-fg);
+}
+
+.form-msg.is-error {
+    color: var(--bad-fg);
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 42px;
+    padding: 0 20px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter .15s, background-color .15s;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: var(--primary-contrast);
+}
+
+.btn-primary:hover {
+    filter: brightness(1.06);
+}
+
+.btn:disabled,
+.btn.is-loading {
+    opacity: .65;
+    cursor: not-allowed;
+}
+
+.btn.is-loading .btn-label {
+    visibility: hidden;
+    position: relative;
+}
+
+.btn.is-loading {
+    position: relative;
+}
+
+.btn.is-loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, .4);
+    border-top-color: #fff;
+    animation: spin .7s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ── Transfer list / cards (Sent + Received) ────────────────────────────── */
+.review-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.review-empty {
+    padding: 32px 14px;
+    text-align: center;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.review-card {
+    display: flex;
+    gap: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+}
+
+.review-card.is-approved .review-card-icon {
+    background: var(--ok-bg);
+    color: var(--ok-fg);
+}
+
+.review-card-icon {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: var(--blue-soft);
+    color: var(--primary);
+}
+
+.review-card-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.review-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.review-card-title {
+    font-size: 14.5px;
+    font-weight: 700;
+    letter-spacing: -.01em;
+}
+
+.review-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 12.5px;
+}
+
+.review-card-note {
+    font-size: 13px;
+    color: var(--text);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+}
+
+.review-card-note span {
+    font-weight: 700;
+    color: var(--muted);
+}
+
+.review-card-files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 12.5px;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.file-chip:hover {
+    background: var(--hover);
+}
+
+.review-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 12.5px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color .15s, border-color .15s;
+}
+
+.action-btn:hover {
+    background: var(--hover);
+}
+
+.action-btn-primary {
+    background: var(--primary);
+    color: var(--primary-contrast);
+    border-color: transparent;
+}
+
+.action-btn-primary:hover {
+    filter: brightness(1.06);
+    background: var(--primary);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .review-card {
+        flex-direction: column;
+        padding: 16px;
+    }
+}
+
+@media (max-width: 420px) {
+    .review-tabs {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .review-tab {
+        flex: 1;
+        justify-content: center;
+    }
+}   

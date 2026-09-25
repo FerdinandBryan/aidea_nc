@@ -1,0 +1,228 @@
+/* ==========================================================================
+   AIDEA Student — My Submissions
+   Page-specific styles only. The shell (tokens, sidebar, topbar, modal, panel,
+   table, badges, dark mode) comes from ../dashboard/dashboard.css, loaded first.
+   ========================================================================== */
+
+.btn-primary {
+    border: 0;
+    cursor: pointer;
+}
+
+/* ── Toolbar: search + status filter + action ── */
+.toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.search {
+    position: relative;
+    flex: 1;
+    min-width: 220px;
+}
+
+.search svg {
+    position: absolute;
+    left: 13px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    pointer-events: none;
+}
+
+.search input {
+    width: 100%;
+    height: 40px;
+    padding: 0 14px 0 38px;
+    font: inherit;
+    font-size: 13.5px;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    transition: border-color .15s, box-shadow .15s;
+}
+
+.search input::placeholder {
+    color: var(--muted);
+}
+
+.search input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.chip {
+    height: 40px;
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    transition: background-color .15s, color .15s, border-color .15s;
+}
+
+.chip:hover {
+    background: var(--hover);
+    color: var(--text);
+}
+
+.chip.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--primary-contrast);
+}
+
+/* ── Table ── */
+.title-cell {
+    max-width: 340px;
+    font-weight: 600;
+}
+
+.actions-cell {
+    white-space: nowrap;
+}
+
+.actions-cell .btn-action+.btn-action {
+    margin-left: 6px;
+}
+
+.btn-review {
+    background: var(--yellow-soft);
+    border-color: transparent;
+    color: var(--warn-fg);
+}
+
+.btn-review:hover {
+    background: var(--yellow-soft);
+    filter: brightness(.96);
+}
+
+/* ── Detail modal (uses the shared .modal-backdrop / .modal) ── */
+.modal-wide {
+    width: min(520px, 100%);
+    max-height: calc(100dvh - 40px);
+    overflow-y: auto;
+}
+
+.modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.modal-head .modal-title {
+    overflow-wrap: anywhere;
+}
+
+.modal-head .icon-btn {
+    width: 36px;
+    height: 36px;
+    border-color: transparent;
+    background: transparent;
+}
+
+.detail-list {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 12px 16px;
+}
+
+.detail-list dt {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.detail-list dd {
+    font-size: 14px;
+    overflow-wrap: anywhere;
+}
+
+.remarks {
+    margin-top: 18px;
+}
+
+.remarks h4 {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.remarks p {
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    border-left: 4px solid currentColor;
+    font-size: 14px;
+    line-height: 1.6;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+.remarks-approved {
+    background: var(--ok-bg);
+    color: var(--ok-fg);
+}
+
+.remarks-rejected {
+    background: var(--bad-bg);
+    color: var(--bad-fg);
+}
+
+.remarks-under_review {
+    background: var(--warn-bg);
+    color: var(--warn-fg);
+}
+
+@media (max-width: 720px) {
+    .title-cell {
+        max-width: none;
+    }
+
+    .chips {
+        width: 100%;
+    }
+
+    .chip {
+        flex: 1;
+        padding: 0 8px;
+    }
+
+    .actions-cell {
+        justify-content: flex-end;
+    }
+
+    tbody td.actions-cell {
+        gap: 6px;
+    }
+
+    .detail-list {
+        grid-template-columns: 1fr;
+        gap: 2px;
+    }
+
+    .detail-list dd {
+        margin-bottom: 10px;
+    }
+}
+
+@media (max-width: 420px) {
+    .toolbar .btn-primary {
+        width: 100%;
+        justify-content: center;
+    }
+}
