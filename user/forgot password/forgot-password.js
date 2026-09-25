@@ -1,153 +1,82 @@
-document.addEventListener('DOMContentLoaded', () => {
+﻿(function () {
+    'use strict';
 
-    /* ── STATE ── */
-    let submittedEmail = '';
-    let resendCountdown = null;
+    var themeBtn = document.getElementById('themeBtn');
+    if (themeBtn) {
+        themeBtn.addEventListener('click', function () {
+            var current = document.documentElement.getAttribute('data-theme');
+            var next = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            try { localStorage.setItem('aidea_user_theme', next); } catch (e) { }
+            themeBtn.setAttribute('aria-label', next === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+        });
+    }
 
-    /* ── ELEMENTS ── */
-    const forgotForm = document.getElementById('forgotForm');
-    const resetEmailEl = document.getElementById('resetEmail');
-    const errResetEmail = document.getElementById('errResetEmail');
-    const resetBtn = document.getElementById('resetBtn');
-    const resetBtnText = document.getElementById('resetBtnText');
-    const resetBtnSpinner = document.getElementById('resetBtnSpinner');
+    var forgotForm = document.getElementById('forgotForm');
+    var emailEl = document.getElementById('email');
+    var emailError = document.getElementById('emailError');
+    var sendBtn = document.getElementById('sendBtn');
 
-    const panelRequest = document.getElementById('panelRequest');
-    const panelSent = document.getElementById('panelSent');
-    const sentEmailDisplay = document.getElementById('sentEmailDisplay');
+    var requestCard = document.getElementById('requestCard');
+    var confirmCard = document.getElementById('confirmCard');
+    var sentEmailEl = document.getElementById('sentEmail');
 
-    const resendBtn = document.getElementById('resendBtn');
-    const resendBtnText = document.getElementById('resendBtnText');
-    const resendBtnSpinner = document.getElementById('resendBtnSpinner');
-    const resendTimer = document.getElementById('resendTimer');
-    const timerCount = document.getElementById('timerCount');
+    var backToLoginBtn = document.getElementById('backToLoginBtn');
+    var resendBtn = document.getElementById('resendBtn');
 
-    /* ── FORM SUBMIT ── */
-    forgotForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (!validateEmail()) return;
+    function isValidEmail(value) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    }
 
-        submittedEmail = resetEmailEl.value.trim();
+    function setLoading(isLoading) {
+        if (!sendBtn) return;
+        sendBtn.disabled = isLoading;
+        sendBtn.classList.toggle('is-loading', isLoading);
+    }
 
-        setLoading(resetBtn, resetBtnText, resetBtnSpinner, true);
-        await delay(1600);
-        setLoading(resetBtn, resetBtnText, resetBtnSpinner, false);
+    if (forgotForm) {
+        forgotForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var value = emailEl ? emailEl.value.trim() : '';
 
-        // Show sent panel
-        sentEmailDisplay.textContent = submittedEmail;
-        panelRequest.style.display = 'none';
-        panelSent.style.display = 'block';
-
-        // Start resend cooldown
-        startResendTimer();
-
-        showToast('Reset link sent! Check your inbox.', 'success');
-    });
-
-    /* ── RESEND BUTTON ── */
-    resendBtn.addEventListener('click', async () => {
-        setLoading(resendBtn, resendBtnText, resendBtnSpinner, true);
-        await delay(1400);
-        setLoading(resendBtn, resendBtnText, resendBtnSpinner, false);
-
-        showToast('Reset link resent to ' + submittedEmail, 'success');
-
-        // Start cooldown again
-        startResendTimer();
-    });
-
-    /* ── RESEND COUNTDOWN ── */
-    function startResendTimer() {
-        // Disable resend button, show timer
-        resendBtn.disabled = true;
-        resendTimer.style.display = 'block';
-
-        let seconds = 60;
-        timerCount.textContent = seconds;
-
-        if (resendCountdown) clearInterval(resendCountdown);
-
-        resendCountdown = setInterval(() => {
-            seconds--;
-            timerCount.textContent = seconds;
-
-            if (seconds <= 0) {
-                clearInterval(resendCountdown);
-                resendBtn.disabled = false;
-                resendTimer.style.display = 'none';
+            if (!isValidEmail(value)) {
+                if (emailEl) emailEl.classList.add('has-error');
+                if (emailError) emailError.textContent = 'Please enter a valid email address.';
+                return;
             }
-        }, 1000);
+
+            if (emailEl) emailEl.classList.remove('has-error');
+            if (emailError) emailError.textContent = '';
+
+            setLoading(true);
+
+            setTimeout(function () {
+                setLoading(false);
+                if (sentEmailEl) sentEmailEl.textContent = value;
+                if (requestCard) requestCard.hidden = true;
+                if (confirmCard) confirmCard.hidden = false;
+            }, 900);
+        });
     }
 
-    /* ── VALIDATION ── */
-    function validateEmail() {
-        clearError('errResetEmail');
-        resetEmailEl.classList.remove('error');
-
-        const val = resetEmailEl.value.trim();
-
-        if (!val) {
-            showError('errResetEmail', 'Email address is required');
-            resetEmailEl.classList.add('error');
-            resetEmailEl.focus();
-            return false;
-        }
-
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
-            showError('errResetEmail', 'Please enter a valid email address');
-            resetEmailEl.classList.add('error');
-            resetEmailEl.focus();
-            return false;
-        }
-
-        return true;
+    if (backToLoginBtn) {
+        backToLoginBtn.addEventListener('click', function () {
+            window.location.href = '../login/login.html';
+        });
     }
 
-    /* ── REAL-TIME VALIDATION ── */
-    resetEmailEl.addEventListener('input', () => {
-        if (resetEmailEl.classList.contains('error')) {
-            clearError('errResetEmail');
-            resetEmailEl.classList.remove('error');
-        }
-    });
-
-    resetEmailEl.addEventListener('blur', () => {
-        validateEmail();
-    });
-
-    /* ── ERROR HELPERS ── */
-    function showError(id, msg) {
-        const el = document.getElementById(id);
-        if (el) el.textContent = msg;
+    if (resendBtn) {
+        resendBtn.addEventListener('click', function () {
+            resendBtn.disabled = true;
+            var original = resendBtn.textContent;
+            resendBtn.textContent = 'Sending...';
+            setTimeout(function () {
+                resendBtn.textContent = 'Sent!';
+                setTimeout(function () {
+                    resendBtn.textContent = original;
+                    resendBtn.disabled = false;
+                }, 2000);
+            }, 800);
+        });
     }
-
-    function clearError(id) {
-        const el = document.getElementById(id);
-        if (el) el.textContent = '';
-    }
-
-    /* ── LOADING STATE ── */
-    function setLoading(btn, textEl, spinnerEl, on) {
-        btn.disabled = on;
-        textEl.style.display = on ? 'none' : 'inline';
-        spinnerEl.style.display = on ? 'inline-block' : 'none';
-    }
-
-    /* ── TOAST ── */
-    function showToast(msg, type = 'info') {
-        const wrap = document.getElementById('toastWrap');
-        const t = document.createElement('div');
-        t.className = `toast ${type}`;
-        t.textContent = msg;
-        wrap.appendChild(t);
-        setTimeout(() => {
-            t.style.transition = 'opacity 0.3s';
-            t.style.opacity = '0';
-            setTimeout(() => t.remove(), 300);
-        }, 3200);
-    }
-
-    /* ── HELPERS ── */
-    function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-});
+})();
