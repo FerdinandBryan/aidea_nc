@@ -1,9 +1,10 @@
 // my-profile.js — My Profile (student side)
-// Self-contained (like dashboard.js): reads the session from localStorage.
+// Reads/saves via the real /api/profile endpoints. localStorage.aidea_user
+// is kept in sync only as a cache for other pages (dashboard footer etc.).
 
 const API_BASE = 'https://aideanc-production.up.railway.app/api';
 const LOGIN_URL = '../login/login.html';
-const THEME_KEY = 'aidea_user_theme'; // shared with the other student pages
+const THEME_KEY = 'aidea_user_theme';
 
 const $ = id => document.getElementById(id);
 
@@ -33,6 +34,40 @@ async function performSignOut() {
   localStorage.removeItem('auth_token');
   localStorage.removeItem('aidea_user');
   window.location.href = LOGIN_URL;
+}
+
+// -- API helper ---------------------------------------------------------------
+
+async function api(path, options = {}) {
+  const token = getToken();
+  const headers = Object.assign(
+    { 'Accept': 'application/json' },
+    options.headers || {}
+  );
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (options.json) headers['Content-Type'] = 'application/json';
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: options.method || 'GET',
+    headers,
+    body: options.json ? JSON.stringify(options.json) : options.body,
+  });
+
+  if (res.status === 401) {
+    await performSignOut();
+    throw new Error('Unauthorized');
+  }
+
+  let data = null;
+  try { data = await res.json(); } catch { }
+
+  if (!res.ok) {
+    const err = new Error((data && data.message) || `Request failed (${res.status})`);
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
 }
 
 // -- Theme ------------------------------------------------------------------
@@ -122,24 +157,22 @@ function initSignOutModal() {
 
 // -- Identity helpers -------------------------------------------------------
 
-function splitName(user) {
-  const full = (user.full_name || user.name
-    || [user.fname, user.lname].filter(Boolean).join(' ')).trim();
-  const parts = full.split(/\s+/).filter(Boolean);
-  return { first: parts[0] || '', last: parts.slice(1).join(' ') };
-}
-
 function makeInitials(first, last) {
   return ((first[0] || '') + (last[0] || first[1] || '')).toUpperCase() || 'ST';
 }
 
-// Shows the photo if one is saved, otherwise the initials
+function roleLabel(user) {
+  if (user.is_admin) return 'Admin';
+  if (user.role) return user.role.charAt(0).toUpperCase() + user.role.slice(1);
+  return 'Student';
+}
+
 function setAvatar(el, user, initials) {
   if (!el) return;
   el.textContent = '';
-  if (typeof user.avatar === 'string' && user.avatar.startsWith('data:image/')) {
+  if (user.avatar_url) {
     const img = document.createElement('img');
-    img.src = user.avatar;
+    img.src = user.avatar_url;
     img.alt = '';
     el.appendChild(img);
   } else {
@@ -147,22 +180,23 @@ function setAvatar(el, user, initials) {
   }
 }
 
-// Updates the sidebar footer, the identity card and the page state from a user object
 function renderIdentity(user) {
-  const { first, last } = splitName(user);
+  const first = user.fname || '';
+  const last = user.lname || '';
   const fullName = [first, last].filter(Boolean).join(' ') || 'Student';
   const initials = makeInitials(first, last);
+  const role = roleLabel(user);
 
   const q = s => document.querySelector(s);
   setAvatar(q('.footer-avatar'), user, initials);
   if (q('.footer-name')) q('.footer-name').textContent = fullName;
-  if (q('.footer-role')) q('.footer-role').textContent = user.course || 'Student';
+  if (q('.footer-role')) q('.footer-role').textContent = role;
 
   setAvatar($('avatarCircle'), user, initials);
-  if ($('removePhoto')) $('removePhoto').hidden = !user.avatar;
-  if ($('changePhoto')) $('changePhoto').textContent = user.avatar ? 'Change photo' : 'Upload photo';
+  if ($('removePhoto')) $('removePhoto').hidden = !user.avatar_url;
+  if ($('changePhoto')) $('changePhoto').textContent = user.avatar_url ? 'Change photo' : 'Upload photo';
   $('displayName').textContent = fullName;
-  $('displayRole').textContent = user.course || 'Student';
+  $('displayRole').textContent = role;
   $('displayEmail').textContent = user.email || '';
 }
 
@@ -184,10 +218,8 @@ function initProfileForm(user) {
   let editing = false;
 
   const fill = () => {
-    const { first, last } = splitName(user);
-    $('firstName').value = first;
-    $('lastName').value = last;
-    $('course').value = user.course || '';
+    $('firstName').value = user.fname || '';
+    $('lastName').value = user.lname || '';
     $('email').value = user.email || '';
   };
 
@@ -205,24 +237,37 @@ function initProfileForm(user) {
   });
   $('cancelEdit').addEventListener('click', () => { fill(); setEditing(false); });
 
-  form.addEventListener('submit', e => {
+  form.addEventListener('submit', async e => {
     e.preventDefault();
     const first = $('firstName').value.trim();
     const last = $('lastName').value.trim();
     const email = $('email').value.trim();
 
     if (!first) { toast('First name is required.', 'error'); return; }
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) { toast('Enter a valid email address.', 'error'); return; }
+    if (!last) { toast('Last name is required.', 'error'); return; }
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) { toast('Enter a valid email address.', 'error'); return; }
 
-    Object.assign(user, {
-      full_name: [first, last].filter(Boolean).join(' '),
-      course: $('course').value.trim(),
-      email,
-    });
-    saveUser(user);
-    renderIdentity(user);
-    setEditing(false);
-    toast('Profile updated successfully!');
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+
+    try {
+      const data = await api('/profile', {
+        method: 'PUT',
+        json: { fname: first, lname: last, email },
+      });
+      Object.assign(user, data.user);
+      saveUser(user);
+      renderIdentity(user);
+      setEditing(false);
+      toast('Profile updated successfully!');
+    } catch (err) {
+      const msg = err.data?.errors
+        ? Object.values(err.data.errors).flat().join(' ')
+        : err.message;
+      toast(msg || 'Could not update profile.', 'error');
+    } finally {
+      submitBtn.disabled = false;
+    }
   });
 
   fill();
@@ -246,28 +291,42 @@ function initPasswordForm() {
   toggleBtn.addEventListener('click', () => setOpen(box.hidden));
   $('cancelPassword').addEventListener('click', () => setOpen(false));
 
-  $('savePassword').addEventListener('click', () => {
+  $('savePassword').addEventListener('click', async () => {
     const [cur, nw, conf] = ids.map(id => $(id).value);
     if (!cur || !nw || !conf) return toast('Please fill all password fields.', 'error');
     if (nw !== conf) return toast('New passwords do not match.', 'error');
-    if (nw.length < 6) return toast('Password must be at least 6 characters.', 'error');
+    if (nw.length < 8) return toast('Password must be at least 8 characters.', 'error');
 
-    // TODO: send to the API once a change-password endpoint exists
-    setOpen(false);
-    toast('Password updated successfully!');
+    const btn = $('savePassword');
+    btn.disabled = true;
+
+    try {
+      await api('/profile/password', {
+        method: 'PUT',
+        json: {
+          current_password: cur,
+          password: nw,
+          password_confirmation: conf,
+        },
+      });
+      setOpen(false);
+      toast('Password updated successfully!');
+    } catch (err) {
+      const msg = err.data?.errors
+        ? Object.values(err.data.errors).flat().join(' ')
+        : err.message;
+      toast(msg || 'Could not update password.', 'error');
+    } finally {
+      btn.disabled = false;
+    }
   });
 }
 
-// -- Stats (same endpoint the dashboard uses) -------------------------------
+// -- Stats ----------------------------------------------------------------
 
 async function loadStats() {
   try {
-    const res = await fetch(`${API_BASE}/dashboard/stats`, {
-      headers: { 'Authorization': `Bearer ${getToken()}`, 'Accept': 'application/json' },
-    });
-    if (res.status === 401) { await performSignOut(); return; }
-    if (!res.ok) throw new Error(res.status);
-    const d = await res.json();
+    const d = await api('/dashboard/stats');
     $('pstat-submissions').textContent = d.submissions ?? '—';
     $('pstat-approved').textContent = d.approved ?? '—';
   } catch (err) {
@@ -277,26 +336,7 @@ async function loadStats() {
 
 // -- Profile photo ----------------------------------------------------------
 
-const PHOTO_MAX_BYTES = 5 * 1024 * 1024; // reject huge originals
-const PHOTO_SIZE = 256;                  // saved as a 256×256 square
-
-function resizeToSquare(file) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const side = Math.min(img.width, img.height);
-      const canvas = document.createElement('canvas');
-      canvas.width = canvas.height = PHOTO_SIZE;
-      canvas.getContext('2d').drawImage(
-        img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, PHOTO_SIZE, PHOTO_SIZE);
-      URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL('image/jpeg', 0.85));
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Bad image')); };
-    img.src = url;
-  });
-}
+const PHOTO_MAX_BYTES = 2 * 1024 * 1024; // matches backend's max:2048 (KB)
 
 function initPhoto(user) {
   const input = $('photoInput');
@@ -309,30 +349,42 @@ function initPhoto(user) {
     input.value = ''; // allow picking the same file again
     if (!file) return;
     if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) return toast('Please choose a PNG, JPG or WebP image.', 'error');
-    if (file.size > PHOTO_MAX_BYTES) return toast('Image is too large (max 5 MB).', 'error');
+    if (file.size > PHOTO_MAX_BYTES) return toast('Image is too large (max 2 MB).', 'error');
+
+    const fd = new FormData();
+    fd.append('avatar', file);
 
     try {
-      user.avatar = await resizeToSquare(file);
+      const data = await api('/profile/avatar', { method: 'POST', body: fd });
+      Object.assign(user, data.user);
       saveUser(user);
       renderIdentity(user);
       toast('Profile photo updated!');
-    } catch {
-      toast("Couldn't read that image. Try another one.", "error");
+    } catch (err) {
+      const msg = err.data?.errors
+        ? Object.values(err.data.errors).flat().join(' ')
+        : err.message;
+      toast(msg || 'Could not upload photo.', 'error');
     }
   });
 
-  $('removePhoto').addEventListener('click', () => {
-    delete user.avatar;
-    saveUser(user);
-    renderIdentity(user);
-    toast('Profile photo removed.');
+  $('removePhoto').addEventListener('click', async () => {
+    try {
+      const data = await api('/profile/avatar', { method: 'DELETE' });
+      Object.assign(user, data.user);
+      saveUser(user);
+      renderIdentity(user);
+      toast('Profile photo removed.');
+    } catch (err) {
+      toast(err.message || 'Could not remove photo.', 'error');
+    }
   });
 }
 
 // -- Boot -------------------------------------------------------------------
 
-document.addEventListener('DOMContentLoaded', () => {
-  const user = getUser();
+document.addEventListener('DOMContentLoaded', async () => {
+  let user = getUser();
   if (!getToken() || !user) {
     window.location.href = LOGIN_URL;
     return;
@@ -343,9 +395,23 @@ document.addEventListener('DOMContentLoaded', () => {
   initProfileMenu();
   initSignOutModal();
 
+  // Render whatever we have cached immediately, then refresh from the real API
   renderIdentity(user);
   initProfileForm(user);
   initPasswordForm();
   initPhoto(user);
   loadStats();
+
+  try {
+    const data = await api('/profile');
+    user = Object.assign(user, data.user);
+    saveUser(user);
+    renderIdentity(user);
+    // Refill the form in case cached values were stale
+    if ($('firstName')) $('firstName').value = user.fname || '';
+    if ($('lastName')) $('lastName').value = user.lname || '';
+    if ($('email')) $('email').value = user.email || '';
+  } catch (err) {
+    console.warn('Could not refresh profile from server:', err);
+  }
 });
