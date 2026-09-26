@@ -317,7 +317,7 @@ function initPhoto(user) {
       renderIdentity(user);
       toast('Profile photo updated!');
     } catch {
-      toast('Couldn't read that image. Try another one.', 'error');
+      toast("Couldn't read that image. Try another one.", "error");
     }
   });
 
