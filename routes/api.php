@@ -16,6 +16,8 @@ use App\Http\Controllers\Admin\FeedbackController as AdminFeedbackController;
 use App\Http\Controllers\Admin\AccountController as AdminAccountController;
 use App\Http\Controllers\Student\FeedbackController as StudentFeedbackController;
 
+require __DIR__.'/profile.php';
+
 
 
 /* -- Public routes (no token needed) -- */
