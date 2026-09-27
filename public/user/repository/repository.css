@@ -1,16 +1,50 @@
 /* ==========================================================================
-   AIDEA Student � Repository
-   Page-specific styles only. Shell, sidebar, topbar, theme variables (light/dark),
-   .btn-primary and .modal come from ../dashboard/dashboard.css (loaded first).
-   Everything here uses those variables, so dark mode works automatically.
+   AIDEA Student — Repository
+   Page-specific styles only. Shell, sidebar, topbar, dark-mode variables,
+   and the sign-out modal all come from ../dashboard/dashboard.css (loaded
+   first). Everything here reads those same variables, so dark mode and
+   the sidebar's icon-rail collapse at 700px both work automatically.
    ========================================================================== */
 
-/* -- Toolbar: search + filters -- */
+/* ── Icon button (theme toggle + modal close) ── */
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color .15s, border-color .15s;
+}
+
+.icon-btn:hover {
+    background: var(--hover);
+}
+
+.i-sun {
+    display: none;
+}
+
+[data-theme="dark"] .i-moon {
+    display: none;
+}
+
+[data-theme="dark"] .i-sun {
+    display: inline;
+}
+
+/* ── Toolbar: search + filters ── */
 .toolbar {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 12px;
+    margin-bottom: 4px;
 }
 
 .search {
@@ -21,7 +55,7 @@
     gap: 10px;
     height: 40px;
     padding: 0 14px;
-    background: var(--surface);
+    background: var(--card);
     color: var(--muted);
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -29,12 +63,13 @@
 }
 
 .search:focus-within {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.18);
 }
 
-.search svg {
+.search i {
     flex-shrink: 0;
+    font-size: 13px;
 }
 
 .search input {
@@ -53,17 +88,13 @@
     color: var(--muted);
 }
 
-.search input::-webkit-search-cancel-button {
-    cursor: pointer;
-}
-
 .filter-select {
     height: 40px;
     padding: 0 12px;
     font: inherit;
     font-size: 13.5px;
     color: var(--text);
-    background: var(--surface);
+    background: var(--card);
     border: 1px solid var(--border);
     border-radius: 10px;
     cursor: pointer;
@@ -72,69 +103,62 @@
 
 .filter-select:focus {
     outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.18);
 }
 
 .filter-select option {
-    background: var(--surface);
+    background: var(--card);
     color: var(--text);
 }
 
 .result-count {
     color: var(--muted);
     font-size: 13px;
-    margin-top: -6px;
+    margin: 10px 0 14px;
 }
 
-/* -- Buttons (secondary + small; .btn-primary is in dashboard.css) -- */
-.btn-secondary {
+/* ── Card action buttons ── */
+.btn-read {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    height: 40px;
-    padding: 0 18px;
-    background: transparent;
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    font-size: 13.5px;
-    font-weight: 600;
+    background: var(--gold);
+    color: #0f1117;
+    border: none;
+    padding: 7px 14px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 700;
     text-decoration: none;
     cursor: pointer;
-    transition: background-color .15s;
+    font-family: inherit;
+    transition: background .15s;
 }
 
-.btn-secondary:hover {
-    background: var(--hover);
-}
-
-.btn-sm {
-    height: 34px;
-    padding: 0 13px;
-    font-size: 12.5px;
-    border-radius: 9px;
+.btn-read:hover {
+    background: var(--gold-light);
 }
 
 .btn-disabled {
     display: inline-flex;
     align-items: center;
-    height: 34px;
-    padding: 0 13px;
-    border-radius: 9px;
-    background: var(--surface-2);
+    padding: 7px 14px;
+    border-radius: 7px;
+    background: var(--bg);
     color: var(--muted);
     border: 1px solid var(--border);
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 600;
     cursor: not-allowed;
 }
 
-/* -- Grid -- */
+/* ── Grid ── */
 .repo-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
     gap: 16px;
+    margin-top: 18px;
 }
 
 .repo-card {
@@ -143,16 +167,16 @@
     gap: 8px;
     min-width: 0;
     padding: 20px;
-    background: var(--surface);
+    background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
-    transition: border-color .15s, transform .15s;
-    animation: rise .35s ease both;
+    transition: border-color .15s, transform .15s, box-shadow .15s;
 }
 
 .repo-card:hover {
-    border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+    border-color: rgba(201, 168, 76, 0.4);
+    box-shadow: var(--shadow-hover);
     transform: translateY(-2px);
 }
 
@@ -166,11 +190,15 @@
 .repo-course {
     padding: 3px 10px;
     border-radius: 999px;
-    background: var(--blue-soft);
-    color: var(--primary);
+    background: rgba(201, 168, 76, 0.15);
+    color: #9a7b00;
     font-size: 12px;
     font-weight: 700;
     white-space: nowrap;
+}
+
+[data-theme="dark"] .repo-course {
+    color: var(--gold-light);
 }
 
 .repo-year {
@@ -180,10 +208,11 @@
 }
 
 .repo-title {
+    font-family: var(--display);
     font-size: 15px;
     font-weight: 700;
     line-height: 1.4;
-    letter-spacing: -.005em;
+    color: var(--text);
     overflow-wrap: anywhere;
     display: -webkit-box;
     -webkit-line-clamp: 3;
@@ -241,7 +270,7 @@
     grid-column: 1 / -1;
     padding: 56px 16px;
     text-align: center;
-    background: var(--surface);
+    background: var(--card);
     border: 1px dashed var(--border);
     border-radius: var(--radius);
 }
@@ -250,6 +279,7 @@
     display: block;
     font-size: 15px;
     font-weight: 700;
+    color: var(--text);
 }
 
 .repo-empty p {
@@ -258,12 +288,19 @@
     font-size: 13.5px;
 }
 
-/* -- Details modal -- */
+/* ── Details modal ── */
 .modal-wide {
     width: min(640px, 100%);
+    max-width: 640px;
     max-height: calc(100dvh - 40px);
     overflow-y: auto;
     overscroll-behavior: contain;
+    text-align: left;
+    padding: 24px;
+}
+
+.modal-wide .modal-title {
+    font-size: 17px;
 }
 
 .modal-head {
@@ -275,6 +312,7 @@
 }
 
 .modal-head .modal-title {
+    margin-bottom: 0;
     overflow-wrap: anywhere;
     line-height: 1.35;
 }
@@ -292,6 +330,7 @@
 }
 
 .detail-list dd {
+    color: var(--text);
     overflow-wrap: anywhere;
 }
 
@@ -304,11 +343,13 @@
 .abstract-block h4 {
     font-size: 13px;
     font-weight: 700;
+    color: var(--text);
     margin-bottom: 8px;
 }
 
 .abstract-block p {
     font-size: 14px;
+    color: var(--text);
     line-height: 1.75;
     white-space: pre-line;
     overflow-wrap: anywhere;
@@ -322,21 +363,7 @@
     margin-top: 22px;
 }
 
-.modal-foot .btn-primary,
-.modal-foot .btn-secondary,
-.modal-foot .btn-disabled {
-    justify-content: center;
-    white-space: nowrap;
-}
-
-.modal-foot .btn-disabled {
-    height: 40px;
-    padding: 0 18px;
-    border-radius: 10px;
-    font-size: 13.5px;
-}
-
-/* -- Responsive -- */
+/* ── Responsive ── */
 @media (max-width: 720px) {
     .search {
         flex-basis: 100%;
@@ -376,8 +403,8 @@
         justify-content: center;
     }
 
-    .modal {
-        padding: 20px 16px;
+    .modal-wide {
+        padding: 18px 16px;
     }
 }
 

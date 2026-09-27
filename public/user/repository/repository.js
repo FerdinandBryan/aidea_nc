@@ -1,35 +1,49 @@
-// repository.js - Repository (student side)
-// Self-contained (like dashboard.js): reads the session from localStorage.
-// Papers come from the admin approved-thesis store in localStorage (aidea_repository).
+// repository.js — Repository (student side)
+// Self-contained, like dashboard.js: reads the session from localStorage
+// and talks to the real Laravel API. Papers come from the admin's
+// approved-thesis store in localStorage ('aidea_repository').
 
-const API_BASE = "https://aideanc-production.up.railway.app/api";
-const LOGIN_URL = "../login/login.html";
-const THEME_KEY = "aidea_user_theme";
-const REPO_KEY = "aidea_repository";
+const API_BASE = 'https://aideanc-production.up.railway.app/api';
+const LOGIN_URL = '../login/login.html';
+const THEME_KEY = 'aidea_user_theme';
+const REPO_KEY = 'aidea_repository';
 
 const $ = id => document.getElementById(id);
 
 function escHtml(str) {
-  return String(str ?? "")
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return String(str ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Only allow normal file links (blocks javascript: and similar)
 function safeUrl(u) {
   if (!u) return null;
   try {
     const url = new URL(u, window.location.href);
-    const ok = ["http:", "https:", "blob:", "file:"].includes(url.protocol)
+    const ok = ['http:', 'https:', 'blob:', 'file:'].includes(url.protocol)
       || /^data:application\//i.test(url.href);
     return ok ? url.href : null;
   } catch { return null; }
 }
 
-const getToken = () => localStorage.getItem("auth_token") || null;
+// ── Session ────────────────────────────────────────────────────────────────
+
+const getToken = () => localStorage.getItem('auth_token') || null;
 
 function getUser() {
-  try { return JSON.parse(localStorage.getItem("aidea_user")); }
+  try { return JSON.parse(localStorage.getItem('aidea_user')); }
   catch { return null; }
+}
+
+function requireSession() {
+  const token = getToken();
+  const user = getUser();
+  if (!token || !user) {
+    window.location.href = LOGIN_URL;
+    return null;
+  }
+  return { token, user };
 }
 
 async function performSignOut() {
@@ -37,112 +51,137 @@ async function performSignOut() {
   if (token) {
     try {
       await fetch(`${API_BASE}/logout`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}`, "Accept": "application/json" },
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
       });
-    } catch { }
+    } catch { /* clear the session locally regardless */ }
   }
-  localStorage.removeItem("auth_token");
-  localStorage.removeItem("aidea_user");
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('aidea_user');
   window.location.href = LOGIN_URL;
-}
-
-const currentTheme = () => document.documentElement.getAttribute("data-theme") || "light";
-
-function applyTheme(theme, persist) {
-  document.documentElement.setAttribute("data-theme", theme);
-  if (persist) { try { localStorage.setItem(THEME_KEY, theme); } catch { } }
-  $("themeBtn")?.setAttribute("aria-label", `Switch to ${theme === "dark" ? "light" : "dark"} mode`);
-  document.querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", theme === "dark" ? "#050a17" : "#0a1a3f");
-}
-
-function initTheme() {
-  applyTheme(currentTheme(), false);
-  $("themeBtn")?.addEventListener("click", () => applyTheme(currentTheme() === "dark" ? "light" : "dark", true));
-
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", e => {
-    let saved = null;
-    try { saved = localStorage.getItem(THEME_KEY); } catch { }
-    if (!saved) applyTheme(e.matches ? "dark" : "light", false);
-  });
-}
-
-function initDrawer() {
-  const sidebar = $("sidebar"), scrim = $("scrim"), btn = $("menuBtn");
-  if (!sidebar || !scrim || !btn) return;
-
-  const set = open => {
-    sidebar.classList.toggle("open", open);
-    scrim.hidden = !open;
-    document.body.classList.toggle("no-scroll", open);
-    btn.setAttribute("aria-expanded", String(open));
-  };
-  btn.addEventListener("click", () => set(!sidebar.classList.contains("open")));
-  scrim.addEventListener("click", () => set(false));
-  document.addEventListener("keydown", e => { if (e.key === "Escape") set(false); });
-  sidebar.querySelectorAll("a").forEach(a => a.addEventListener("click", () => set(false)));
-  window.matchMedia("(min-width: 1025px)").addEventListener?.("change", e => { if (e.matches) set(false); });
-}
-
-function initProfileMenu() {
-  const btn = $("profileBtn"), menu = $("profileMenu");
-  if (!btn || !menu) return;
-
-  const setOpen = open => { menu.hidden = !open; btn.setAttribute("aria-expanded", String(open)); };
-  btn.addEventListener("click", e => { e.stopPropagation(); setOpen(menu.hidden); });
-  document.addEventListener("click", e => { if (!menu.hidden && !menu.contains(e.target)) setOpen(false); });
-  document.addEventListener("keydown", e => {
-    if (e.key === "Escape" && !menu.hidden) { setOpen(false); btn.focus(); }
-  });
-}
-
-function initSignOutModal() {
-  const modal = $("signOutModal"), cancel = $("signOutCancel"), confirmBtn = $("signOutConfirm");
-  if (!modal || !cancel || !confirmBtn) return;
-
-  const open = () => {
-    $("profileMenu").hidden = true;
-    $("profileBtn").setAttribute("aria-expanded", "false");
-    modal.hidden = false;
-    document.body.classList.add("no-scroll");
-    cancel.focus();
-  };
-  const close = () => {
-    modal.hidden = true;
-    if (!$("sidebar")?.classList.contains("open")) document.body.classList.remove("no-scroll");
-    $("profileBtn")?.focus();
-  };
-
-  $("signOutBtn")?.addEventListener("click", open);
-  cancel.addEventListener("click", close);
-  confirmBtn.addEventListener("click", performSignOut);
-  modal.addEventListener("click", e => { if (e.target === modal) close(); });
-  document.addEventListener("keydown", e => {
-    if (modal.hidden) return;
-    if (e.key === "Escape") { e.preventDefault(); close(); return; }
-    if (e.key === "Tab") {
-      if (e.shiftKey && document.activeElement === cancel) { e.preventDefault(); confirmBtn.focus(); }
-      else if (!e.shiftKey && document.activeElement === confirmBtn) { e.preventDefault(); cancel.focus(); }
-    }
-  });
 }
 
 function renderUserIdentity(user) {
   const fullName = user.full_name || user.name
-    || [user.fname, user.lname].filter(Boolean).join(" ") || "Student";
+    || [user.fname, user.lname].filter(Boolean).join(' ') || 'Student';
   const parts = fullName.trim().split(/\s+/);
   const initials = (parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)).toUpperCase();
 
-  const q = s => document.querySelector(s);
-  if (q(".footer-avatar")) q(".footer-avatar").textContent = initials;
-  if (q(".footer-name")) q(".footer-name").textContent = fullName;
-  if (q(".footer-role")) q(".footer-role").textContent = user.course || "Student";
+  const avatarEl = document.querySelector('.user-avatar');
+  const nameEl = document.querySelector('.user-name');
+  const roleEl = document.querySelector('.user-role');
+  if (avatarEl) avatarEl.textContent = initials;
+  if (nameEl) nameEl.textContent = fullName;
+  if (roleEl) roleEl.textContent = user.course || 'Student';
 }
+
+// ── Theme ──────────────────────────────────────────────────────────────────
+
+const currentTheme = () => document.documentElement.getAttribute('data-theme') || 'light';
+
+function applyTheme(theme, persist) {
+  document.documentElement.setAttribute('data-theme', theme);
+  if (persist) { try { localStorage.setItem(THEME_KEY, theme); } catch { } }
+  $('themeBtn')?.setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`);
+}
+
+function initTheme() {
+  applyTheme(currentTheme(), false);
+  $('themeBtn')?.addEventListener('click', () => applyTheme(currentTheme() === 'dark' ? 'light' : 'dark', true));
+
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', e => {
+    let saved = null;
+    try { saved = localStorage.getItem(THEME_KEY); } catch { }
+    if (!saved) applyTheme(e.matches ? 'dark' : 'light', false);
+  });
+}
+
+// ── Sidebar nav-group accordions (same behavior as dashboard.js) ──────────
+
+function initNavGroups() {
+  const toggles = document.querySelectorAll('.nav-group-toggle');
+
+  toggles.forEach((toggle) => {
+    toggle.addEventListener('click', () => {
+      const group = toggle.closest('.nav-group');
+      if (group) group.classList.toggle('open');
+    });
+  });
+
+  // Auto-expand whichever group holds the active page link.
+  const activeGroup = document.querySelector('.nav-group .nav-item.active')?.closest('.nav-group');
+  if (activeGroup) activeGroup.classList.add('open');
+}
+
+// ── Sidebar footer dropdown (same behavior as dashboard.js) ───────────────
+
+function initSidebarDropdown() {
+  const sidebarUser = document.getElementById('sidebarUser');
+  const dropdown = document.getElementById('userDropdown');
+  const signOutBtn = document.getElementById('dropdownSignOutBtn');
+  if (!sidebarUser || !dropdown) return;
+
+  function closeDropdown() {
+    sidebarUser.classList.remove('open');
+  }
+
+  sidebarUser.addEventListener('click', (e) => {
+    if (dropdown.contains(e.target)) return;
+    sidebarUser.classList.toggle('open');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!sidebarUser.contains(e.target)) closeDropdown();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeDropdown();
+  });
+
+  if (signOutBtn) {
+    signOutBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeDropdown();
+      openSignOutModal();
+    });
+  }
+}
+
+// ── Sign-out confirmation modal (same markup/behavior as dashboard.js) ────
+
+function initSignOutModal() {
+  const overlay = document.getElementById('signoutModalOverlay');
+  const cancelBtn = document.getElementById('signoutCancelBtn');
+  const confirmBtn = document.getElementById('signoutConfirmBtn');
+  if (!overlay) return;
+
+  cancelBtn?.addEventListener('click', closeSignOutModal);
+  confirmBtn?.addEventListener('click', performSignOut);
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeSignOutModal();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) {
+      closeSignOutModal();
+    }
+  });
+}
+
+function openSignOutModal() {
+  document.getElementById('signoutModalOverlay')?.classList.add('open');
+}
+
+function closeSignOutModal() {
+  document.getElementById('signoutModalOverlay')?.classList.remove('open');
+}
+
+// ── Repository grid ─────────────────────────────────────────────────────────
 
 function getRepository() {
   try {
-    const list = JSON.parse(localStorage.getItem(REPO_KEY) || "[]");
+    const list = JSON.parse(localStorage.getItem(REPO_KEY) || '[]');
     return Array.isArray(list) ? list : [];
   } catch { return []; }
 }
@@ -150,26 +189,26 @@ function getRepository() {
 function formatDate(raw) {
   const d = new Date(raw);
   return raw && !isNaN(d)
-    ? d.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })
-    : "-";
+    ? d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '—';
 }
 
 function initRepository() {
-  const grid = $("repoGrid");
-  const modal = $("paperModal");
+  const grid = $('repoGrid');
+  const modalOverlay = $('paperModalOverlay');
   let papers = getRepository();
   let visible = [];
-  let search = "", course = "", year = "";
+  let search = '', course = '', year = '';
   let lastTrigger = null;
 
   function populateFilters() {
     const years = [...new Set(papers.map(p => p.year).filter(Boolean).map(String))].sort((a, b) => b - a);
     const courses = [...new Set(papers.map(p => p.course).filter(Boolean))].sort();
 
-    $("yearFilter").innerHTML = '<option value="">All years</option>'
-      + years.map(y => `<option value="${escHtml(y)}"${y === year ? " selected" : ""}>${escHtml(y)}</option>`).join("");
-    $("courseFilter").innerHTML = '<option value="">All courses</option>'
-      + courses.map(c => `<option value="${escHtml(c)}"${c === course ? " selected" : ""}>${escHtml(c)}</option>`).join("");
+    $('yearFilter').innerHTML = '<option value="">All years</option>'
+      + years.map(y => `<option value="${escHtml(y)}"${y === year ? ' selected' : ''}>${escHtml(y)}</option>`).join('');
+    $('courseFilter').innerHTML = '<option value="">All courses</option>'
+      + courses.map(c => `<option value="${escHtml(c)}"${c === course ? ' selected' : ''}>${escHtml(c)}</option>`).join('');
   }
 
   const empty = (title, sub) =>
@@ -178,25 +217,25 @@ function initRepository() {
   function render() {
     visible = papers.filter(p => {
       const matchSearch = !search
-        || (p.title || "").toLowerCase().includes(search)
-        || (p.authors || "").toLowerCase().includes(search)
-        || (p.abstract || "").toLowerCase().includes(search);
+        || (p.title || '').toLowerCase().includes(search)
+        || (p.authors || '').toLowerCase().includes(search)
+        || (p.abstract || '').toLowerCase().includes(search);
       return matchSearch
         && (!course || p.course === course)
         && (!year || String(p.year) === year);
     });
 
-    $("resultCount").textContent = papers.length
-      ? `Showing ${visible.length} of ${papers.length} ${papers.length === 1 ? "paper" : "papers"}`
-      : "\u00a0";
+    $('resultCount').textContent = papers.length
+      ? `Showing ${visible.length} of ${papers.length} ${papers.length === 1 ? 'paper' : 'papers'}`
+      : '\u00a0';
 
     if (!papers.length) {
-      grid.innerHTML = empty("No papers in the repository yet",
-        "Papers approved by the Research Office will appear here.");
+      grid.innerHTML = empty('No papers in the repository yet',
+        'Papers approved by the Research Office will appear here.');
       return;
     }
     if (!visible.length) {
-      grid.innerHTML = empty("No papers match your search", "Try a different keyword or clear a filter.");
+      grid.innerHTML = empty('No papers match your search', 'Try a different keyword or clear a filter.');
       return;
     }
 
@@ -205,24 +244,24 @@ function initRepository() {
       return `
             <article class="repo-card">
                 <div class="repo-meta">
-                    <span class="repo-course">${escHtml(p.course || "-")}</span>
-                    <span class="repo-year">${escHtml(p.year || "-")}</span>
+                    <span class="repo-course">${escHtml(p.course || '—')}</span>
+                    <span class="repo-year">${escHtml(p.year || '—')}</span>
                 </div>
                 <h4 class="repo-title">${escHtml(p.title)}</h4>
-                <p class="repo-people"><strong>Authors:</strong> ${escHtml(p.authors || "Unknown")}</p>
-                ${p.adviser ? `<p class="repo-people"><strong>Adviser:</strong> ${escHtml(p.adviser)}</p>` : ""}
-                <p class="repo-abstract">${escHtml(p.abstract || "No abstract available.")}</p>
+                <p class="repo-people"><strong>Authors:</strong> ${escHtml(p.authors || 'Unknown')}</p>
+                ${p.adviser ? `<p class="repo-people"><strong>Adviser:</strong> ${escHtml(p.adviser)}</p>` : ''}
+                <p class="repo-abstract">${escHtml(p.abstract || 'No abstract available.')}</p>
                 <div class="repo-footer">
                     <span class="repo-added">Added ${formatDate(p.addedAt)}</span>
                     <div class="repo-actions">
-                        <button class="btn-secondary btn-sm" type="button" data-i="${i}">Details</button>
+                        <button class="btn-ghost" type="button" data-i="${i}">Details</button>
                         ${url
-          ? `<a class="btn-primary btn-sm" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">Read paper</a>`
+          ? `<a class="btn-read" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">Read paper</a>`
           : `<span class="btn-disabled" title="No file available">No file</span>`}
                     </div>
                 </div>
             </article>`;
-    }).join("");
+    }).join('');
   }
 
   function openModal(i, trigger) {
@@ -231,51 +270,52 @@ function initRepository() {
     lastTrigger = trigger;
     const url = safeUrl(p.fileUrl);
 
-    $("paperTitle").textContent = p.title || "Paper details";
-    $("paperBody").innerHTML = `
+    $('paperTitle').textContent = p.title || 'Paper details';
+    $('paperBody').innerHTML = `
             <dl class="detail-list">
-                <dt>Course</dt><dd>${escHtml(p.course || "-")}</dd>
-                <dt>Year</dt><dd>${escHtml(p.year || "-")}</dd>
-                <dt>Authors</dt><dd>${escHtml(p.authors || "Unknown")}</dd>
-                <dt>Adviser</dt><dd>${escHtml(p.adviser || "-")}</dd>
+                <dt>Course</dt><dd>${escHtml(p.course || '—')}</dd>
+                <dt>Year</dt><dd>${escHtml(p.year || '—')}</dd>
+                <dt>Authors</dt><dd>${escHtml(p.authors || 'Unknown')}</dd>
+                <dt>Adviser</dt><dd>${escHtml(p.adviser || '—')}</dd>
                 <dt>Added</dt><dd>${formatDate(p.addedAt)}</dd>
             </dl>
             <div class="abstract-block">
                 <h4>Abstract</h4>
-                <p>${escHtml(p.abstract || "No abstract available.")}</p>
+                <p>${escHtml(p.abstract || 'No abstract available.')}</p>
             </div>
             <div class="modal-foot">
-                <button class="btn-secondary" type="button" id="paperDone">Close</button>
+                <button class="btn-ghost" type="button" id="paperDone">Close</button>
                 ${url
-        ? `<a class="btn-primary" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">Read paper</a>`
+        ? `<a class="btn-read" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">Read paper</a>`
         : `<span class="btn-disabled">No file available</span>`}
             </div>`;
-    $("paperDone").addEventListener("click", closeModal);
+    $('paperDone').addEventListener('click', closeModal);
 
-    modal.hidden = false;
-    document.body.classList.add("no-scroll");
-    $("paperClose").focus();
+    modalOverlay.classList.add('open');
+    $('paperClose').focus();
   }
 
   function closeModal() {
-    modal.hidden = true;
-    if (!$("sidebar")?.classList.contains("open")) document.body.classList.remove("no-scroll");
+    modalOverlay.classList.remove('open');
     lastTrigger?.focus?.();
   }
 
-  grid.addEventListener("click", e => {
-    const btn = e.target.closest("button[data-i]");
+  grid.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-i]');
     if (btn) openModal(Number(btn.dataset.i), btn);
   });
-  $("paperClose").addEventListener("click", closeModal);
-  modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
-  document.addEventListener("keydown", e => { if (e.key === "Escape" && !modal.hidden) closeModal(); });
+  $('paperClose').addEventListener('click', closeModal);
+  modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) closeModal(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && modalOverlay.classList.contains('open')) closeModal();
+  });
 
-  $("repoSearch").addEventListener("input", e => { search = e.target.value.trim().toLowerCase(); render(); });
-  $("courseFilter").addEventListener("change", e => { course = e.target.value; render(); });
-  $("yearFilter").addEventListener("change", e => { year = e.target.value; render(); });
+  $('repoSearch').addEventListener('input', e => { search = e.target.value.trim().toLowerCase(); render(); });
+  $('courseFilter').addEventListener('change', e => { course = e.target.value; render(); });
+  $('yearFilter').addEventListener('change', e => { year = e.target.value; render(); });
 
-  window.addEventListener("storage", e => {
+  // live sync when the admin updates the repository in another tab
+  window.addEventListener('storage', e => {
     if (e.key !== REPO_KEY) return;
     papers = getRepository();
     populateFilters();
@@ -286,17 +326,16 @@ function initRepository() {
   render();
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  const user = getUser();
-  if (!getToken() || !user) {
-    window.location.href = LOGIN_URL;
-    return;
-  }
+// ── Boot ───────────────────────────────────────────────────────────────────
 
-  renderUserIdentity(user);
+document.addEventListener('DOMContentLoaded', () => {
+  const session = requireSession();
+  if (!session) return;
+
+  renderUserIdentity(session.user);
   initTheme();
-  initDrawer();
-  initProfileMenu();
+  initSidebarDropdown();
+  initNavGroups();
   initSignOutModal();
   initRepository();
 });
