@@ -1,0 +1,468 @@
+// Report_generator.js
+// Real reports from GET /api/reports, modal dialogs (no alert/confirm), working CSV / Excel / PDF downloads.
+(function () {
+    'use strict';
+
+    // Same-origin when served by `php artisan serve` (port 8000); otherwise talk to localhost:8000.
+    // Override by setting window.API_BASE before this script loads.
+    const API_BASE = window.API_BASE ||
+        ((location.protocol.indexOf('http') === 0 && location.port === '8000') ? '' : 'http://localhost:8000');
+    const HISTORY_KEY = 'aidea_report_history';
+    const MANUAL_TOKEN_KEY = 'aidea_report_token';
+
+    const REPORT_TYPES = {
+        'Revenue Summary':           { key: 'revenue',       label: 'Revenue Summary' },
+        'Thesis Submission Report':  { key: 'thesis',        label: 'Thesis Submission Report' },
+        'All Student Report': { key: 'enrollment', label: 'All Student Report' },
+        'Student Enrollment Report': { key: 'enrollment',    label: 'Student Enrollment Report' },
+        'Service Usage Report':      { key: 'service_usage', label: 'Service Usage Report' },
+        'Satisfaction Report':       { key: 'satisfaction',  label: 'Satisfaction Report' }
+    };
+    const TOTALS = { revenue: ['amount'], service_usage: ['requests', 'completed', 'revenue'] };
+    const MONEY = ['amount', 'revenue'];
+
+    // ------------------------------------------------------------------ helpers
+    function el(tag, cls, text) {
+        const e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (text !== undefined) e.textContent = text;
+        return e;
+    }
+
+    function mkErr(message, kind) {
+        const e = new Error(message);
+        e.kind = kind || 'error';
+        return e;
+    }
+
+    function prettify(key) {
+        return String(key).replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+    }
+
+    function fmtMoney(n) {
+        return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // ------------------------------------------------------------------ modal
+    const ACCENTS = {
+        info:    { color: '#2563eb', icon: 'i' },
+        success: { color: '#16a34a', icon: '\u2713' },
+        error:   { color: '#dc2626', icon: '\u2715' },
+        warning: { color: '#d97706', icon: '!' }
+    };
+
+    function injectStyles() {
+        if (document.getElementById('rg-modal-styles')) return;
+        const s = document.createElement('style');
+        s.id = 'rg-modal-styles';
+        s.textContent = [
+            '.rg-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;z-index:10000;padding:16px;animation:rg-fade .15s ease-out}',
+            '.rg-modal{background:#fff;color:#0f172a;width:100%;max-width:420px;border-radius:14px;border-top:5px solid #2563eb;padding:24px;box-shadow:0 20px 50px rgba(0,0,0,.3);animation:rg-pop .18s ease-out;font-family:inherit}',
+            '.rg-icon{width:36px;height:36px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;margin-bottom:12px}',
+            '.rg-title{margin:0 0 8px;font-size:18px;font-weight:700}',
+            '.rg-msg{margin:0 0 18px;font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:#334155}',
+            '.rg-input{width:100%;box-sizing:border-box;padding:9px 11px;margin:0 0 18px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px}',
+            '.rg-actions{display:flex;justify-content:flex-end;gap:10px}',
+            '.rg-btn{border:0;border-radius:8px;padding:9px 20px;font-size:14px;font-weight:600;cursor:pointer}',
+            '.rg-btn-secondary{background:#e2e8f0;color:#0f172a}',
+            '.rg-btn-primary{color:#fff}',
+            '@keyframes rg-fade{from{opacity:0}to{opacity:1}}',
+            '@keyframes rg-pop{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}'
+        ].join('\n');
+        document.head.appendChild(s);
+    }
+
+    // Resolves: true/false for confirm dialogs, string/null for input dialogs, true for plain notices.
+    function openModal(opts) {
+        return new Promise(function (resolve) {
+            const accent = ACCENTS[opts.type || 'info'];
+            const overlay = el('div', 'rg-overlay');
+            const box = el('div', 'rg-modal');
+            box.style.borderTopColor = accent.color;
+            box.setAttribute('role', 'dialog');
+            box.setAttribute('aria-modal', 'true');
+
+            const icon = el('div', 'rg-icon', accent.icon);
+            icon.style.background = accent.color;
+            box.appendChild(icon);
+            box.appendChild(el('h3', 'rg-title', opts.title || 'Notice'));
+            box.appendChild(el('p', 'rg-msg', opts.message || ''));
+
+            let input = null;
+            if (opts.input) {
+                input = el('input', 'rg-input');
+                input.type = 'password';
+                input.placeholder = opts.input;
+                box.appendChild(input);
+            }
+
+            const actions = el('div', 'rg-actions');
+            const needsChoice = !!opts.confirmText || !!opts.input;
+
+            function done(ok) {
+                document.removeEventListener('keydown', onKey);
+                overlay.remove();
+                if (input) resolve(ok ? input.value.trim() : null);
+                else resolve(needsChoice ? ok : true);
+            }
+            function onKey(ev) {
+                if (ev.key === 'Escape') done(false);
+                else if (ev.key === 'Enter') done(true);
+            }
+
+            let primary;
+            if (needsChoice) {
+                const cancel = el('button', 'rg-btn rg-btn-secondary', opts.cancelText || 'Cancel');
+                cancel.type = 'button';
+                cancel.addEventListener('click', function () { done(false); });
+                actions.appendChild(cancel);
+                primary = el('button', 'rg-btn rg-btn-primary', opts.confirmText || 'OK');
+            } else {
+                primary = el('button', 'rg-btn rg-btn-primary', 'OK');
+            }
+            primary.type = 'button';
+            primary.style.background = accent.color;
+            primary.addEventListener('click', function () { done(true); });
+            actions.appendChild(primary);
+
+            box.appendChild(actions);
+            overlay.appendChild(box);
+            overlay.addEventListener('mousedown', function (ev) { if (ev.target === overlay && !input) done(false); });
+            document.addEventListener('keydown', onKey);
+            document.body.appendChild(overlay);
+            (input || primary).focus();
+        });
+    }
+
+    // ------------------------------------------------------------------ auth token
+    function cleanToken(v) {
+        v = String(v || '').trim().replace(/^"+|"+$/g, '').replace(/^Bearer\s+/i, '');
+        return (v && v.charAt(0) !== '{' && v.charAt(0) !== '[') ? v : null;
+    }
+
+    // Recognises Laravel Sanctum tokens ("156|abc...") plain or inside a JSON object.
+    function sanctumFrom(raw) {
+        if (!raw) return null;
+        const v = cleanToken(raw);
+        if (v && /^\d+\|[A-Za-z0-9]{20,}$/.test(v)) return v;
+        if (String(raw).trim().charAt(0) === '{') {
+            try {
+                const o = JSON.parse(raw);
+                const cand = o.token || o.access_token || o.plainTextToken || (o.data && (o.data.token || o.data.access_token));
+                return cand ? cleanToken(cand) : null;
+            } catch (e) { return null; }
+        }
+        return null;
+    }
+
+    function findToken() {
+        const stores = [];
+        try { stores.push(sessionStorage); } catch (e) { /* blocked */ }
+        try { stores.push(localStorage); } catch (e) { /* blocked */ }
+        const names = [MANUAL_TOKEN_KEY, 'token', 'auth_token', 'authToken', 'access_token', 'accessToken',
+                       'admin_token', 'adminToken', 'aidea_token', 'api_token', 'sanctum_token'];
+        for (let s = 0; s < stores.length; s++) {
+            for (let n = 0; n < names.length; n++) {
+                try {
+                    const raw = stores[s].getItem(names[n]);
+                    if (raw) { const t = sanctumFrom(raw) || cleanToken(raw); if (t) return t; }
+                } catch (e) { /* ignore */ }
+            }
+        }
+        for (let s = 0; s < stores.length; s++) {
+            try {
+                for (let i = 0; i < stores[s].length; i++) {
+                    const t = sanctumFrom(stores[s].getItem(stores[s].key(i)));
+                    if (t) return t;
+                }
+            } catch (e) { /* ignore */ }
+        }
+        return null;
+    }
+
+    async function askToken() {
+        const v = await openModal({
+            title: 'Admin token needed', type: 'warning',
+            message: 'Could not find your login token in this browser. Paste an admin API token to continue. It is kept only for this browser session.',
+            input: 'Paste token, e.g. 156|abc...', confirmText: 'Use token', cancelText: 'Cancel'
+        });
+        const t = v ? cleanToken(v) : null;
+        if (t) { try { sessionStorage.setItem(MANUAL_TOKEN_KEY, t); } catch (e) { /* ignore */ } }
+        return t;
+    }
+
+    // ------------------------------------------------------------------ API
+    async function fetchReport(key, from, to) {
+        let token = findToken();
+        if (!token) token = await askToken();
+        if (!token) throw mkErr('A token is required to generate reports.', 'warning');
+
+        const url = API_BASE + '/api/reports?' + new URLSearchParams({ type: key, from: from, to: to }).toString();
+        let res;
+        try {
+            res = await fetch(url, { headers: { Accept: 'application/json', Authorization: 'Bearer ' + token } });
+        } catch (e) {
+            throw mkErr('Could not reach the server at ' + (API_BASE || location.origin) +
+                '.\nMake sure it is running (php artisan serve) and try again.');
+        }
+
+        let body = {};
+        try { body = await res.json(); } catch (e) { /* non-JSON body */ }
+
+        if (!res.ok) {
+            let msg = body.error || body.message || ('Request failed (' + res.status + ').');
+            if (res.status === 422 && body.errors) {
+                const first = Object.keys(body.errors)[0];
+                if (first) msg = body.errors[first][0];
+            }
+            if (res.status === 401) {
+                try { sessionStorage.removeItem(MANUAL_TOKEN_KEY); } catch (e) { /* ignore */ }
+                throw mkErr('Your session has expired or the token is invalid. Please sign in again as an admin.');
+            }
+            if (res.status === 403) throw mkErr(msg, 'warning');
+            if (res.status === 404) throw mkErr('The reports endpoint was not found at ' + (API_BASE || location.origin) + '/api/reports.');
+            if (res.status === 501) throw mkErr(msg, 'info');
+            throw mkErr(msg);
+        }
+        return Array.isArray(body.data) ? body.data : [];
+    }
+
+    // ------------------------------------------------------------------ exporters
+    function libError(what) {
+        return mkErr('The ' + what + ' library did not load. It comes from cdnjs.cloudflare.com, so check your internet connection and reload the page (Ctrl+F5).');
+    }
+
+    function saveBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+    }
+
+    function csvCell(v) {
+        if (v === null || v === undefined) return '""';
+        let s = String(v);
+        if (typeof v === 'string' && /^([=+@]|-.)/.test(s)) s = "'" + s;   // stop spreadsheet formula injection
+        return '"' + s.replace(/"/g, '""') + '"';
+    }
+
+    function exportCsv(rows, cols, fileName) {
+        const lines = [cols.map(prettify).map(csvCell).join(',')];
+        rows.forEach(function (r) { lines.push(cols.map(function (c) { return csvCell(r[c]); }).join(',')); });
+        saveBlob(new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }), fileName);   // BOM so Excel reads UTF-8
+    }
+
+    function exportExcel(cfg, rows, cols, fileName) {
+        if (typeof XLSX === 'undefined') throw libError('Excel');
+        const data = rows.map(function (r) {
+            const o = {};
+            cols.forEach(function (c) { o[prettify(c)] = r[c]; });
+            return o;
+        });
+        const ws = XLSX.utils.json_to_sheet(data);
+        ws['!cols'] = cols.map(function (c) {
+            const w = rows.reduce(function (m, r) { return Math.max(m, String(r[c] == null ? '' : r[c]).length); }, prettify(c).length);
+            return { wch: Math.min(45, w + 2) };
+        });
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, cfg.label.slice(0, 31));
+        XLSX.writeFile(wb, fileName);
+    }
+
+    function exportPdf(cfg, rows, cols, from, to, fileName) {
+        if (!window.jspdf || !window.jspdf.jsPDF) throw libError('PDF');
+        const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+        if (typeof doc.autoTable !== 'function') throw libError('PDF table');
+
+        const right = [];
+        cols.forEach(function (c, i) {
+            if (rows.every(function (r) { return typeof r[c] === 'number'; })) right.push(i);
+        });
+
+        const body = rows.map(function (r) {
+            return cols.map(function (c) {
+                const v = r[c];
+                if (v === null || v === undefined) return '';
+                if (MONEY.indexOf(c) !== -1 && typeof v === 'number') return fmtMoney(v);
+                return String(v);
+            });
+        });
+
+        let foot;
+        const sumCols = TOTALS[cfg.key];
+        if (sumCols) {
+            foot = [cols.map(function (c, i) {
+                if (sumCols.indexOf(c) !== -1) {
+                    const sum = rows.reduce(function (t, r) { return t + (Number(r[c]) || 0); }, 0);
+                    return MONEY.indexOf(c) !== -1 ? fmtMoney(sum) : String(sum);
+                }
+                return i === 0 ? 'TOTAL' : '';
+            })];
+        }
+
+        const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+        doc.setFontSize(16);
+        doc.text('AIDEA - ' + cfg.label, 40, 40);
+        doc.setFontSize(10);
+        doc.text('Period: ' + from + ' to ' + to + '   |   Generated: ' + stamp + '   |   ' + rows.length + ' record(s)', 40, 58);
+
+        doc.autoTable({
+            head: [cols.map(prettify)],
+            body: body,
+            foot: foot,
+            showFoot: 'lastPage',
+            startY: 72,
+            margin: { left: 40, right: 40 },
+            styles: { fontSize: 9, cellPadding: 4 },
+            headStyles: { fillColor: [37, 99, 235] },
+            footStyles: { fillColor: [241, 245, 249], textColor: 20, fontStyle: 'bold' },
+            didParseCell: function (d) { if (right.indexOf(d.column.index) !== -1) d.cell.styles.halign = 'right'; }
+        });
+
+        const pages = doc.internal.getNumberOfPages();
+        const pw = doc.internal.pageSize.getWidth();
+        const ph = doc.internal.pageSize.getHeight();
+        for (let i = 1; i <= pages; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.text('Page ' + i + ' of ' + pages, pw - 40, ph - 20, { align: 'right' });
+        }
+        doc.save(fileName);
+    }
+
+    function exportRows(cfg, rows, fmt, from, to) {
+        const cols = Object.keys(rows[0]);
+        const ext = { PDF: 'pdf', CSV: 'csv', Excel: 'xlsx' }[fmt];
+        if (!ext) throw mkErr('Unknown format: ' + fmt);
+        const fileName = cfg.key + '_report_' + from + '_to_' + to + '.' + ext;
+        if (fmt === 'CSV') exportCsv(rows, cols, fileName);
+        else if (fmt === 'Excel') exportExcel(cfg, rows, cols, fileName);
+        else exportPdf(cfg, rows, cols, from, to, fileName);
+        return fileName;
+    }
+
+    // ------------------------------------------------------------------ history (Recent Reports)
+    function loadHistory() {
+        try { const h = JSON.parse(localStorage.getItem(HISTORY_KEY)); return Array.isArray(h) ? h : []; }
+        catch (e) { return []; }
+    }
+    function saveHistory(h) {
+        try { localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 10))); } catch (e) { /* ignore */ }
+    }
+
+    function typeIcon(t) {
+        const icons = { PDF: '\u{1F4C4}', CSV: '\u{1F4CA}', Excel: '\u{1F4C8}' };
+        return icons[t] || '\u{1F4C1}';
+    }
+
+    function showError(e) {
+        const kind = e.kind || 'error';
+        const title = kind === 'info' ? 'Not available yet' : kind === 'warning' ? 'Notice' : 'Report failed';
+        openModal({ title: title, message: e.message || String(e), type: kind });
+    }
+
+    function renderReports() {
+        const list = document.getElementById('reportList');
+        list.textContent = '';
+        const history = loadHistory();
+        if (!history.length) {
+            list.appendChild(el('div', 'report-meta', 'No reports generated yet. Use the form to create one.'));
+            return;
+        }
+        history.forEach(function (r) {
+            const item = el('div', 'report-item');
+            const info = el('div', 'report-info');
+            info.appendChild(el('div', 'report-name', typeIcon(r.fmt) + ' ' + r.label + ' \u2014 ' + r.from + ' to ' + r.to));
+            info.appendChild(el('div', 'report-meta',
+                r.fmt + ' \u00B7 ' + r.count + ' row(s) \u00B7 Generated ' +
+                new Date(r.created).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })));
+            const btn = el('button', 'btn-dl', 'Download');
+            btn.type = 'button';
+            btn.addEventListener('click', function () { redownload(r, btn); });
+            item.appendChild(info);
+            item.appendChild(btn);
+            list.appendChild(item);
+        });
+    }
+
+    async function redownload(r, btn) {
+        const cfg = REPORT_TYPES[r.label];
+        if (!cfg) return;
+        const original = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Preparing...';
+        try {
+            const rows = await fetchReport(cfg.key, r.from, r.to);   // re-fetched so the file has current data
+            if (!rows.length) {
+                openModal({ title: 'No data', message: 'That period now has no records.', type: 'info' });
+                return;
+            }
+            const file = exportRows(cfg, rows, r.fmt, r.from, r.to);
+            openModal({ title: 'Download ready', message: rows.length + ' row(s) saved as ' + file, type: 'success' });
+        } catch (e) {
+            showError(e);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = original;
+        }
+    }
+
+    // ------------------------------------------------------------------ generate
+    async function handleGenerate() {
+        const label = document.getElementById('reportType').value;
+        const cfg = REPORT_TYPES[label];
+        const from = document.getElementById('dateFrom').value;
+        const to = document.getElementById('dateTo').value;
+        const fmtEl = document.querySelector('input[name="fmt"]:checked');
+        const fmt = fmtEl ? fmtEl.value : 'PDF';
+
+        if (!cfg) { openModal({ title: 'Unknown report', message: 'Pick a report type from the list.', type: 'warning' }); return; }
+        if (!from || !to) { openModal({ title: 'Date range needed', message: 'Please select a date range.', type: 'warning' }); return; }
+        if (new Date(from) > new Date(to)) { openModal({ title: 'Check the dates', message: 'Start date must be before end date.', type: 'warning' }); return; }
+
+        const btn = document.getElementById('generateBtn');
+        btn.textContent = 'Generating...';
+        btn.disabled = true;
+        try {
+            const rows = await fetchReport(cfg.key, from, to);
+            if (!rows.length) {
+                openModal({ title: 'No data', message: 'No records found between ' + from + ' and ' + to + '.', type: 'info' });
+                return;
+            }
+            const file = exportRows(cfg, rows, fmt, from, to);
+            const history = loadHistory();
+            history.unshift({ label: cfg.label, fmt: fmt, from: from, to: to, count: rows.length, created: new Date().toISOString() });
+            saveHistory(history);
+            renderReports();
+            openModal({ title: 'Report ready', message: rows.length + ' row(s) exported as ' + fmt + '.\nFile: ' + file, type: 'success' });
+        } catch (e) {
+            showError(e);
+        } finally {
+            btn.textContent = 'Generate Report';
+            btn.disabled = false;
+        }
+    }
+
+    // ------------------------------------------------------------------ init
+    document.addEventListener('DOMContentLoaded', function () {
+        injectStyles();
+        renderReports();
+        document.getElementById('generateBtn').addEventListener('click', handleGenerate);
+        document.getElementById('homeBtn').addEventListener('click', function () { location.href = '../dashboard/dashboard.html'; });
+        document.getElementById('signOutBtn').addEventListener('click', function () {
+            openModal({ title: 'Sign out', message: 'Are you sure you want to sign out?', type: 'warning', confirmText: 'Sign out', cancelText: 'Cancel' })
+                .then(function (ok) {
+                    if (ok) openModal({ title: 'Signed out', message: 'You have been signed out.', type: 'success' });
+                });
+        });
+
+        function localISO(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+        const now = new Date();
+        document.getElementById('dateTo').value = localISO(now);
+        document.getElementById('dateFrom').value = localISO(new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()));
+    });
+})();
