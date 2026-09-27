@@ -1,202 +1,302 @@
-document.addEventListener('DOMContentLoaded', () => {
+// repository.js - Repository (student side)
+// Self-contained (like dashboard.js): reads the session from localStorage.
+// Papers come from the admin approved-thesis store in localStorage (aidea_repository).
 
-  /* ══════════════════════════════════════════
-     LOAD PAPERS FROM ADMIN REPOSITORY
-     Admin stores approved theses in localStorage
-     under 'aidea_repository' via Thesis_submissions.js
-  ══════════════════════════════════════════ */
-  function getRepository() {
+const API_BASE = "https://aideanc-production.up.railway.app/api";
+const LOGIN_URL = "../login/login.html";
+const THEME_KEY = "aidea_user_theme";
+const REPO_KEY = "aidea_repository";
+
+const $ = id => document.getElementById(id);
+
+function escHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function safeUrl(u) {
+  if (!u) return null;
+  try {
+    const url = new URL(u, window.location.href);
+    const ok = ["http:", "https:", "blob:", "file:"].includes(url.protocol)
+      || /^data:application\//i.test(url.href);
+    return ok ? url.href : null;
+  } catch { return null; }
+}
+
+const getToken = () => localStorage.getItem("auth_token") || null;
+
+function getUser() {
+  try { return JSON.parse(localStorage.getItem("aidea_user")); }
+  catch { return null; }
+}
+
+async function performSignOut() {
+  const token = getToken();
+  if (token) {
     try {
-      return JSON.parse(localStorage.getItem('aidea_repository') || '[]');
-    } catch {
-      return [];
-    }
+      await fetch(`${API_BASE}/logout`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Accept": "application/json" },
+      });
+    } catch { }
   }
+  localStorage.removeItem("auth_token");
+  localStorage.removeItem("aidea_user");
+  window.location.href = LOGIN_URL;
+}
 
-  let papers = getRepository();
-  let search = '';
-  let course = '';
-  let year = '';
+const currentTheme = () => document.documentElement.getAttribute("data-theme") || "light";
 
-  /* ── Populate filters dynamically from actual data ── */
-  function populateFilters() {
-    const yearFilter = document.getElementById('yearFilter');
-    const courseFilter = document.getElementById('courseFilter');
+function applyTheme(theme, persist) {
+  document.documentElement.setAttribute("data-theme", theme);
+  if (persist) { try { localStorage.setItem(THEME_KEY, theme); } catch { } }
+  $("themeBtn")?.setAttribute("aria-label", `Switch to ${theme === "dark" ? "light" : "dark"} mode`);
+  document.querySelector('meta[name="theme-color"]')
+    ?.setAttribute("content", theme === "dark" ? "#050a17" : "#0a1a3f");
+}
 
-    const years = [...new Set(papers.map(p => p.year).filter(Boolean))].sort((a, b) => b - a);
-    const courses = [...new Set(papers.map(p => p.course).filter(Boolean))].sort();
+function initTheme() {
+  applyTheme(currentTheme(), false);
+  $("themeBtn")?.addEventListener("click", () => applyTheme(currentTheme() === "dark" ? "light" : "dark", true));
 
-    yearFilter.innerHTML = '<option value="">All Years</option>' +
-      years.map(y => `<option value="${y}">${y}</option>`).join('');
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", e => {
+    let saved = null;
+    try { saved = localStorage.getItem(THEME_KEY); } catch { }
+    if (!saved) applyTheme(e.matches ? "dark" : "light", false);
+  });
+}
 
-    courseFilter.innerHTML = '<option value="">All Courses</option>' +
-      courses.map(c => `<option value="${c}">${c}</option>`).join('');
-  }
+function initDrawer() {
+  const sidebar = $("sidebar"), scrim = $("scrim"), btn = $("menuBtn");
+  if (!sidebar || !scrim || !btn) return;
 
-  /* ── FORMAT DATE ── */
-  function formatDate(raw) {
-    if (!raw) return '—';
-    return new Date(raw).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
-  }
+  const set = open => {
+    sidebar.classList.toggle("open", open);
+    scrim.hidden = !open;
+    document.body.classList.toggle("no-scroll", open);
+    btn.setAttribute("aria-expanded", String(open));
+  };
+  btn.addEventListener("click", () => set(!sidebar.classList.contains("open")));
+  scrim.addEventListener("click", () => set(false));
+  document.addEventListener("keydown", e => { if (e.key === "Escape") set(false); });
+  sidebar.querySelectorAll("a").forEach(a => a.addEventListener("click", () => set(false)));
+  window.matchMedia("(min-width: 1025px)").addEventListener?.("change", e => { if (e.matches) set(false); });
+}
 
-  /* ── FILE ICON ── */
-  function fileIcon(name) {
-    if (!name) return '📁';
-    const ext = name.split('.').pop().toLowerCase();
-    return { pdf: '📄', doc: '📝', docx: '📝' }[ext] || '📁';
-  }
+function initProfileMenu() {
+  const btn = $("profileBtn"), menu = $("profileMenu");
+  if (!btn || !menu) return;
 
-  /* ── RENDER GRID ── */
-  function render() {
-    const grid = document.getElementById('repoGrid');
-    papers = getRepository();
+  const setOpen = open => { menu.hidden = !open; btn.setAttribute("aria-expanded", String(open)); };
+  btn.addEventListener("click", e => { e.stopPropagation(); setOpen(menu.hidden); });
+  document.addEventListener("click", e => { if (!menu.hidden && !menu.contains(e.target)) setOpen(false); });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && !menu.hidden) { setOpen(false); btn.focus(); }
+  });
+}
 
-    const filtered = papers.filter(p => {
-      const matchSearch = !search ||
-        p.title.toLowerCase().includes(search) ||
-        (p.authors || '').toLowerCase().includes(search);
-      const matchCourse = !course || p.course === course;
-      const matchYear = !year || p.year === year;
-      return matchSearch && matchCourse && matchYear;
-    });
+function initSignOutModal() {
+  const modal = $("signOutModal"), cancel = $("signOutCancel"), confirmBtn = $("signOutConfirm");
+  if (!modal || !cancel || !confirmBtn) return;
 
-    if (papers.length === 0) {
-      grid.innerHTML = `
-        <div style="grid-column:1/-1;text-align:center;padding:60px 20px;">
-          <div style="font-size:48px;margin-bottom:16px;">📭</div>
-          <p style="color:#888;font-size:15px;font-weight:500;">No papers in the repository yet.</p>
-          <p style="color:#666;font-size:13px;margin-top:6px;">Papers approved by the Research Office will appear here.</p>
-        </div>`;
-      return;
-    }
-
-    if (filtered.length === 0) {
-      grid.innerHTML = `
-        <div style="grid-column:1/-1;text-align:center;padding:60px 20px;">
-          <div style="font-size:48px;margin-bottom:16px;">🔍</div>
-          <p style="color:#888;font-size:14px;">No papers found matching your search.</p>
-        </div>`;
-      return;
-    }
-
-    grid.innerHTML = filtered.map(p => `
-      <div class="repo-card">
-        <div class="repo-card-header">
-          <span class="repo-course">${p.course || '—'}</span>
-          <span class="repo-year-badge">📅 ${p.year || '—'}</span>
-        </div>
-        <h4>${p.title}</h4>
-        <p class="repo-authors">👤 ${p.authors || 'Unknown'}</p>
-        ${p.adviser ? `<p class="repo-adviser">🎓 Adviser: ${p.adviser}</p>` : ''}
-        <p class="repo-abstract">${p.abstract || 'No abstract available.'}</p>
-        <div class="repo-footer">
-          <span class="repo-added">Added ${formatDate(p.addedAt)}</span>
-          <div style="display:flex;gap:8px;">
-            <button class="btn-read btn-read-secondary" onclick='openAbstractModal(${JSON.stringify(p).replace(/'/g, "&#39;")})'>Details</button>
-            ${p.fileUrl
-        ? `<a class="btn-read" href="${p.fileUrl}" target="_blank" rel="noopener noreferrer">${fileIcon(p.fileName)} Read Paper</a>`
-        : `<button class="btn-read btn-read-disabled" disabled title="No file available">No File</button>`
-      }
-          </div>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  /* ── ABSTRACT MODAL ── */
-  window.openAbstractModal = function (paper) {
-    document.getElementById('abstractModal')?.remove();
-
-    const modal = document.createElement('div');
-    modal.id = 'abstractModal';
-    modal.style.cssText = `
-      position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;
-      display:flex;align-items:center;justify-content:center;padding:20px;
-    `;
-    modal.innerHTML = `
-      <div style="background:#1a1d2e;border-radius:16px;max-width:680px;width:100%;
-                  max-height:85vh;overflow-y:auto;padding:32px;position:relative;
-                  border:1px solid rgba(255,255,255,0.08);box-shadow:0 24px 60px rgba(0,0,0,0.4);">
-        <button onclick="document.getElementById('abstractModal').remove()"
-          style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.08);
-                 border:none;color:#aaa;width:32px;height:32px;border-radius:50%;
-                 cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;">✕</button>
-
-        <div style="display:inline-block;background:#1e3a5f;color:#60a5fa;font-size:11px;
-                    font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:14px;letter-spacing:.5px;">
-          ${paper.course || '—'}
-        </div>
-
-        <h3 style="color:#fff;font-size:18px;font-weight:700;margin:0 0 10px;line-height:1.4;padding-right:32px;">
-          ${paper.title}
-        </h3>
-
-        <p style="color:#888;font-size:13px;margin:0 0 4px;">👤 ${paper.authors || 'Unknown'}</p>
-        ${paper.adviser ? `<p style="color:#888;font-size:13px;margin:0 0 4px;">🎓 Adviser: ${paper.adviser}</p>` : ''}
-        <p style="color:#666;font-size:12px;margin:0 0 20px;">
-          📅 ${paper.year || '—'} &nbsp;·&nbsp; 🕓 Added ${formatDate(paper.addedAt)}
-        </p>
-
-        <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:16px;margin-bottom:20px;">
-          <p style="color:#aaa;font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px;">Abstract</p>
-          <p style="color:#ccc;font-size:14px;line-height:1.8;margin:0;">
-            ${paper.abstract || 'No abstract available.'}
-          </p>
-        </div>
-
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          ${paper.fileUrl
-        ? `<a href="${paper.fileUrl}" target="_blank" rel="noopener noreferrer"
-                  style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;
-                         background:#6366f1;color:#fff;border-radius:8px;text-decoration:none;
-                         font-size:13px;font-weight:600;"
-                  onmouseover="this.style.background='#4f52c9'" onmouseout="this.style.background='#6366f1'">
-                  ${fileIcon(paper.fileName)} Read Full Paper
-               </a>`
-        : `<span style="font-size:13px;color:#666;align-self:center;">📂 No file available</span>`
-      }
-          <button onclick="document.getElementById('abstractModal').remove()"
-            style="padding:10px 20px;background:rgba(255,255,255,0.06);color:#aaa;
-                   border:1px solid rgba(255,255,255,0.1);border-radius:8px;font-size:13px;cursor:pointer;">
-            Close
-          </button>
-        </div>
-      </div>`;
-
-    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-    document.addEventListener('keydown', function escClose(e) {
-      if (e.key === 'Escape') { modal.remove(); document.removeEventListener('keydown', escClose); }
-    });
-    document.body.appendChild(modal);
+  const open = () => {
+    $("profileMenu").hidden = true;
+    $("profileBtn").setAttribute("aria-expanded", "false");
+    modal.hidden = false;
+    document.body.classList.add("no-scroll");
+    cancel.focus();
+  };
+  const close = () => {
+    modal.hidden = true;
+    if (!$("sidebar")?.classList.contains("open")) document.body.classList.remove("no-scroll");
+    $("profileBtn")?.focus();
   };
 
-  /* ── EVENT LISTENERS ── */
-  document.getElementById('repoSearch')?.addEventListener('input', e => {
-    search = e.target.value.toLowerCase();
-    render();
-  });
-  document.getElementById('courseFilter')?.addEventListener('change', e => {
-    course = e.target.value;
-    render();
-  });
-  document.getElementById('yearFilter')?.addEventListener('change', e => {
-    year = e.target.value;
-    render();
-  });
-  document.querySelector('.btn-signout')?.addEventListener('click', () => {
-    if (confirm('Sign out?')) window.location.href = '../user/login/login.html';
-  });
-
-  /* ── INIT ── */
-  populateFilters();
-  render();
-
-  /* ── Live sync if admin updates repo in another tab ── */
-  window.addEventListener('storage', e => {
-    if (e.key === 'aidea_repository') {
-      papers = getRepository();
-      populateFilters();
-      render();
+  $("signOutBtn")?.addEventListener("click", open);
+  cancel.addEventListener("click", close);
+  confirmBtn.addEventListener("click", performSignOut);
+  modal.addEventListener("click", e => { if (e.target === modal) close(); });
+  document.addEventListener("keydown", e => {
+    if (modal.hidden) return;
+    if (e.key === "Escape") { e.preventDefault(); close(); return; }
+    if (e.key === "Tab") {
+      if (e.shiftKey && document.activeElement === cancel) { e.preventDefault(); confirmBtn.focus(); }
+      else if (!e.shiftKey && document.activeElement === confirmBtn) { e.preventDefault(); cancel.focus(); }
     }
   });
+}
+
+function renderUserIdentity(user) {
+  const fullName = user.full_name || user.name
+    || [user.fname, user.lname].filter(Boolean).join(" ") || "Student";
+  const parts = fullName.trim().split(/\s+/);
+  const initials = (parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)).toUpperCase();
+
+  const q = s => document.querySelector(s);
+  if (q(".footer-avatar")) q(".footer-avatar").textContent = initials;
+  if (q(".footer-name")) q(".footer-name").textContent = fullName;
+  if (q(".footer-role")) q(".footer-role").textContent = user.course || "Student";
+}
+
+function getRepository() {
+  try {
+    const list = JSON.parse(localStorage.getItem(REPO_KEY) || "[]");
+    return Array.isArray(list) ? list : [];
+  } catch { return []; }
+}
+
+function formatDate(raw) {
+  const d = new Date(raw);
+  return raw && !isNaN(d)
+    ? d.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })
+    : "-";
+}
+
+function initRepository() {
+  const grid = $("repoGrid");
+  const modal = $("paperModal");
+  let papers = getRepository();
+  let visible = [];
+  let search = "", course = "", year = "";
+  let lastTrigger = null;
+
+  function populateFilters() {
+    const years = [...new Set(papers.map(p => p.year).filter(Boolean).map(String))].sort((a, b) => b - a);
+    const courses = [...new Set(papers.map(p => p.course).filter(Boolean))].sort();
+
+    $("yearFilter").innerHTML = '<option value="">All years</option>'
+      + years.map(y => `<option value="${escHtml(y)}"${y === year ? " selected" : ""}>${escHtml(y)}</option>`).join("");
+    $("courseFilter").innerHTML = '<option value="">All courses</option>'
+      + courses.map(c => `<option value="${escHtml(c)}"${c === course ? " selected" : ""}>${escHtml(c)}</option>`).join("");
+  }
+
+  const empty = (title, sub) =>
+    `<div class="repo-empty"><strong>${title}</strong><p>${sub}</p></div>`;
+
+  function render() {
+    visible = papers.filter(p => {
+      const matchSearch = !search
+        || (p.title || "").toLowerCase().includes(search)
+        || (p.authors || "").toLowerCase().includes(search)
+        || (p.abstract || "").toLowerCase().includes(search);
+      return matchSearch
+        && (!course || p.course === course)
+        && (!year || String(p.year) === year);
+    });
+
+    $("resultCount").textContent = papers.length
+      ? `Showing ${visible.length} of ${papers.length} ${papers.length === 1 ? "paper" : "papers"}`
+      : "\u00a0";
+
+    if (!papers.length) {
+      grid.innerHTML = empty("No papers in the repository yet",
+        "Papers approved by the Research Office will appear here.");
+      return;
+    }
+    if (!visible.length) {
+      grid.innerHTML = empty("No papers match your search", "Try a different keyword or clear a filter.");
+      return;
+    }
+
+    grid.innerHTML = visible.map((p, i) => {
+      const url = safeUrl(p.fileUrl);
+      return `
+            <article class="repo-card">
+                <div class="repo-meta">
+                    <span class="repo-course">${escHtml(p.course || "-")}</span>
+                    <span class="repo-year">${escHtml(p.year || "-")}</span>
+                </div>
+                <h4 class="repo-title">${escHtml(p.title)}</h4>
+                <p class="repo-people"><strong>Authors:</strong> ${escHtml(p.authors || "Unknown")}</p>
+                ${p.adviser ? `<p class="repo-people"><strong>Adviser:</strong> ${escHtml(p.adviser)}</p>` : ""}
+                <p class="repo-abstract">${escHtml(p.abstract || "No abstract available.")}</p>
+                <div class="repo-footer">
+                    <span class="repo-added">Added ${formatDate(p.addedAt)}</span>
+                    <div class="repo-actions">
+                        <button class="btn-secondary btn-sm" type="button" data-i="${i}">Details</button>
+                        ${url
+          ? `<a class="btn-primary btn-sm" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">Read paper</a>`
+          : `<span class="btn-disabled" title="No file available">No file</span>`}
+                    </div>
+                </div>
+            </article>`;
+    }).join("");
+  }
+
+  function openModal(i, trigger) {
+    const p = visible[i];
+    if (!p) return;
+    lastTrigger = trigger;
+    const url = safeUrl(p.fileUrl);
+
+    $("paperTitle").textContent = p.title || "Paper details";
+    $("paperBody").innerHTML = `
+            <dl class="detail-list">
+                <dt>Course</dt><dd>${escHtml(p.course || "-")}</dd>
+                <dt>Year</dt><dd>${escHtml(p.year || "-")}</dd>
+                <dt>Authors</dt><dd>${escHtml(p.authors || "Unknown")}</dd>
+                <dt>Adviser</dt><dd>${escHtml(p.adviser || "-")}</dd>
+                <dt>Added</dt><dd>${formatDate(p.addedAt)}</dd>
+            </dl>
+            <div class="abstract-block">
+                <h4>Abstract</h4>
+                <p>${escHtml(p.abstract || "No abstract available.")}</p>
+            </div>
+            <div class="modal-foot">
+                <button class="btn-secondary" type="button" id="paperDone">Close</button>
+                ${url
+        ? `<a class="btn-primary" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">Read paper</a>`
+        : `<span class="btn-disabled">No file available</span>`}
+            </div>`;
+    $("paperDone").addEventListener("click", closeModal);
+
+    modal.hidden = false;
+    document.body.classList.add("no-scroll");
+    $("paperClose").focus();
+  }
+
+  function closeModal() {
+    modal.hidden = true;
+    if (!$("sidebar")?.classList.contains("open")) document.body.classList.remove("no-scroll");
+    lastTrigger?.focus?.();
+  }
+
+  grid.addEventListener("click", e => {
+    const btn = e.target.closest("button[data-i]");
+    if (btn) openModal(Number(btn.dataset.i), btn);
+  });
+  $("paperClose").addEventListener("click", closeModal);
+  modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !modal.hidden) closeModal(); });
+
+  $("repoSearch").addEventListener("input", e => { search = e.target.value.trim().toLowerCase(); render(); });
+  $("courseFilter").addEventListener("change", e => { course = e.target.value; render(); });
+  $("yearFilter").addEventListener("change", e => { year = e.target.value; render(); });
+
+  window.addEventListener("storage", e => {
+    if (e.key !== REPO_KEY) return;
+    papers = getRepository();
+    populateFilters();
+    render();
+  });
+
+  populateFilters();
+  render();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const user = getUser();
+  if (!getToken() || !user) {
+    window.location.href = LOGIN_URL;
+    return;
+  }
+
+  renderUserIdentity(user);
+  initTheme();
+  initDrawer();
+  initProfileMenu();
+  initSignOutModal();
+  initRepository();
 });
