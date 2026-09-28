@@ -84,6 +84,7 @@ class FeedbackController extends Controller
             'date'          => $f->created_at->format('M d, Y'),
             'student_name'  => trim(($f->user?->fname ?? '') . ' ' . ($f->user?->lname ?? '')) ?: 'Unknown',
             'student_email' => $f->user?->email ?? '-',
+            'student_avatar' => $f->user?->avatar_url,
         ];
     }
 }

@@ -393,7 +393,16 @@ function reviewNode(f) {
 
     const avatar = document.createElement('div');
     avatar.className = 'review-avatar';
-    avatar.textContent = maskedInitials(f.student_name);
+    if (f.student_avatar) {
+        const im = document.createElement('img');
+        im.src = f.student_avatar;
+        im.alt = '';
+        im.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;display:block';
+        avatar.style.overflow = 'hidden';
+        avatar.appendChild(im);
+    } else {
+        avatar.textContent = maskedInitials(f.student_name);
+    }
     wrap.appendChild(avatar);
 
     const body = document.createElement('div');
