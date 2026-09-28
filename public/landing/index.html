@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AIDEA – Norzagaray College Research Platform</title>
+    <link rel="stylesheet" href="aidea_styles.css" />
+</head>
+
+<body>
+
+    <!-- ════════════════════════════════════════
+     NAVBAR
+════════════════════════════════════════ -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <div class="brand-logo">AI</div>
+                <div>
+                    <div class="brand-name">AIDEA</div>
+                    <div class="brand-sub">Norzagaray College</div>
+                </div>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#home" class="active">Home</a></li>
+                <li><a href="#repository">Repository</a></li>
+                <li><a href="#services">Services</a></li>
+                <li><a href="#about">About</a></li>
+            </ul>
+            <div class="nav-actions">
+                <button class="btn btn-secondary btn-sm" onclick="openModal('loginModal')">Sign In</button>
+                <button class="btn btn-primary btn-sm" onclick="openModal('registerModal')">Get Started</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ════════════════════════════════════════
+     HERO
+════════════════════════════════════════ -->
+    <section class="hero" id="home">
+        <div class="hero-bg-layer" id="heroBgLayer"></div>
+        <div class="hero-overlay"></div>
+        <div class="container">
+            <div class="hero-grid">
+                <div class="hero-content">
+                    <div class="hero-eyebrow">🎓 Norzagaray College — Official Research Platform</div>
+                    <h1>
+                        AI-Powered<br />
+                        <span class="accent">Research &</span><br />
+                        Thesis Management
+                    </h1>
+                    <p>
+                        AIDEA is the official academic research management system of Norzagaray College —
+                        submit, validate, analyze, and explore thesis works with AI-assisted tools,
+                        plagiarism detection and formatting checks.
+                    </p>
+                    <div class="hero-actions">
+                        <button class="btn btn-primary" onclick="openModal('registerModal')">
+                            📄 Submit Your Thesis
+                        </button>
+                        </button>
+                    </div>
+                </div>
+                <div class="hero-visual">
+                    <div class="hero-card-stack">
+                        <div class="hc">
+                            <div class="hc-icon">🤖</div>
+                            <div class="hc-label">AI Plagiarism Check</div>
+                            <div class="hc-value">Integrity Score: 97%</div>
+                        </div>
+                        <div class="hc">
+                            <div class="hc-icon">📊</div>
+                            <div class="hc-label">Data Analysis</div>
+                            <div class="hc-value">Statistical support ready</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════════════
+     STATS STRIP
+════════════════════════════════════════ -->
+    <section class="section" style="padding:3rem 0; background:#fff; border-bottom:1.5px solid #e8ecf4;">
+        <div class="container">
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-icon">📚</div>
+                    <div class="stat-value" id="statThesis">0</div>
+                    <div class="stat-label">Thesis in Repository</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🎓</div>
+                    <div class="stat-value" id="statStudents">0</div>
+                    <div class="stat-label">Registered Students</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-value" id="statChecks">0</div>
+                    <div class="stat-label">Validations Done</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⭐</div>
+                    <div class="stat-value" id="statRating">0</div>
+                    <div class="stat-label">Avg. Satisfaction</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════════════
+     SERVICES
+════════════════════════════════════════ -->
+    <section class="section" id="services">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-label">What We Offer</div>
+                <h2 class="section-title">Platform Services</h2>
+                <p class="section-sub">From free document validation to premium statistician support — all in one place.
+                </p>
+            </div>
+
+            <div style="margin-bottom:1rem;">
+                <h3
+                    style="font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--nc-teal);margin-bottom:.85rem;">
+                    ✅ FREE Services
+                </h3>
+                <div class="services-grid" id="freeServicesGrid">
+                    <!-- injected by JS -->
+                </div>
+            </div>
+
+            <div style="margin-top:2.5rem;">
+                <h3
+                    style="font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--nc-gold);margin-bottom:.85rem;">
+                    💳 PAID Services
+                </h3>
+                <div class="services-grid" id="paidServicesGrid">
+                    <!-- injected by JS -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════════════
+     REPOSITORY PREVIEW
+════════════════════════════════════════ -->
+    <section class="section" id="repository" style="background:#fff;">
+        <div class="container">
+            <div class="section-header"
+                style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:1rem;">
+                <div>
+                    <div class="section-label">Browse Thesis Works</div>
+                    <h2 class="section-title">Thesis Repository</h2>
+                    <p class="section-sub" style="margin-bottom:0;">All approved thesis submissions from Norzagaray
+                        College students.</p>
+                </div>
+                <div style="display:flex;gap:.6rem;align-items:center;">
+                    <input id="repoSearch" placeholder="🔍 Search title, author, keyword..." style="max-width:260px;"
+                        oninput="filterRepo()" />
+                    <select id="repoYear" onchange="filterRepo()" style="max-width:120px;">
+                        <option value="">All Years</option>
+                        <option>2026</option>
+                        <option>2025</option>
+                        <option>2024</option>
+                        <option>2023</option>
+                        <option>2022</option>
+                        <option>2021</option>
+                        <option>2020</option>
+                        <option>2019</option>
+                        <option>2018</option>
+                        <option>2017</option>
+                        <option>2016</option>
+                        <option>2015</option>
+                        <option>2014</option>
+                        <option>2013</option>
+                        <option>2012</option>
+                        <option>2011</option>
+                        <option>2010</option>
+                        <option>2009</option>
+                        <option>2008</option>
+                        <option>2007</option>
+
+                    </select>
+                </div>
+            </div>
+            <div class="repo-grid" id="repoGrid" style="margin-top:2rem;">
+                <!-- injected by JS -->
+            </div>
+            <div style="text-align:center;margin-top:2rem;">
+                <button class="btn btn-navy" onclick="openModal('loginModal')">View Full Repository →</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════════════
+     SUBMISSION STEPS
+    ════════════════════════════════════════ -->
+    <section class="section" id="about" style="background:#fff;">
+        <div class="container">
+            <div class="section-header" style="text-align:center;">
+                <div class="section-label">How It Works</div>
+                <h2 class="section-title">Thesis Submission Process</h2>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;max-width:900px;margin:0 auto;">
+                <div class="card" style="text-align:center;">
+                    <div style="font-size:2.5rem;margin-bottom:.75rem;">📝</div>
+                    <div style="font-weight:700;color:var(--nc-navy);margin-bottom:.4rem;">1. Submit</div>
+                    <p style="font-size:.85rem;color:var(--nc-gray);">Upload your Abstract, Whole Paper, and
+                        IMRAD-formatted document through your student account.</p>
+                </div>
+                <div class="card" style="text-align:center;">
+                    <div style="font-size:2.5rem;margin-bottom:.75rem;">🤖</div>
+                    <div style="font-weight:700;color:var(--nc-navy);margin-bottom:.4rem;">2. AI Evaluation</div>
+                    <p style="font-size:.85rem;color:var(--nc-gray);">AIDEA runs automated formatting validation,
+                        plagiarism check, grammar review, and integrity assessment.</p>
+                </div>
+                <div class="card" style="text-align:center;">
+                    <div style="font-size:2.5rem;margin-bottom:.75rem;">✅</div>
+                    <div style="font-weight:700;color:var(--nc-navy);margin-bottom:.4rem;">3. Approval & Archive</div>
+                    <p style="font-size:.85rem;color:var(--nc-gray);">Once approved, your thesis is published to the
+                        Norzagaray College Thesis Repository for future students.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════ -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <div style="display:flex;align-items:center;gap:.6rem;">
+                        <div
+                            style="width:36px;height:36px;border-radius:8px;background:var(--nc-gold);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:900;color:var(--nc-navy);">
+                            AI</div>
+                        <span style="font-family:var(--font-display);font-size:1.2rem;color:#fff;">AIDEA</span>
+                    </div>
+                    <p>AI-Powered Research Management and Academic Document Evaluation Platform — Norzagaray College.
+                    </p>
+                </div>
+                <div>
+                    <h4>Platform</h4>
+                    <ul>
+                        <li><a href="#">Thesis Repository</a></li>
+                        <li><a href="#">Submit Thesis</a></li>
+                        <li><a href="#">Services</a></li>
+                        <li><a href="#">Events</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>Services</h4>
+                    <ul>
+                        <li><a href="#">Data Analysis</a></li>
+                        <li><a href="#">Grammarian</a></li>
+                        <li><a href="#">AI & Plagiarism</a></li>
+                        <li><a href="#">Statistician</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>Contact</h4>
+                    <ul>
+                        <li><a href="#">Norzagaray College</a></li>
+                        <li><a href="#">Municipal Compound, Norzagaray, Bulacan</a></li>
+                        <li><a href="mailto:aidea@norzagaray.edu.ph">aidea@norzagaray.edu.ph</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span>© 2025 AIDEA – Norzagaray College. All rights reserved.</span>
+                <span>Built for Academic Excellence 🎓</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ════════════════════════════════════════
+     MODALS
+════════════════════════════════════════ -->
+
+    <!-- LOGIN MODAL -->
+    <div class="modal-overlay hidden" id="loginModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Sign In to AIDEA</h3>
+                <button class="modal-close" onclick="closeModal('loginModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex;gap:.5rem;margin-bottom:1.5rem;">
+                    <button class="btn btn-navy btn-sm" onclick="setLoginType('student')" id="btnStudent"
+                        style="flex:1;border-radius:var(--nc-radius-sm);">Student</button>
+                    <button class="btn btn-secondary btn-sm" onclick="setLoginType('guest')" id="btnGuest"
+                        style="flex:1;border-radius:var(--nc-radius-sm);">Guest</button>
+                    <button class="btn btn-secondary btn-sm" onclick="setLoginType('admin')" id="btnAdmin"
+                        style="flex:1;border-radius:var(--nc-radius-sm);">Admin</button>
+                </div>
+                <div class="form-group" style="margin-bottom:1rem;">
+                    <label class="form-label" id="loginFieldLabel">Student Number</label>
+                    <input type="text" id="loginID" placeholder="e.g. NC-2023-0001" />
+                </div>
+                <div class="form-group" id="loginEmailGroup" style="margin-bottom:1rem;display:none;">
+                    <label class="form-label">Name</label>
+                    <input type="text" id="loginName" placeholder="Full Name" />
+                </div>
+                <div class="form-group" id="loginPassGroup" style="margin-bottom:1.25rem;">
+                    <label class="form-label">Password</label>
+                    <input type="password" id="loginPass" placeholder="Enter password" />
+                </div>
+                <button class="btn btn-primary btn-block" onclick="handleLogin()">Sign In →</button>
+                <p style="text-align:center;margin-top:1rem;font-size:.83rem;color:var(--nc-gray);">
+                    No account? <a href="#" onclick="closeModal('loginModal');openModal('registerModal');"
+                        style="color:var(--nc-gold);font-weight:600;">Register here</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- REGISTER MODAL -->
+    <div class="modal-overlay hidden" id="registerModal">
+        <div class="modal" style="max-width:600px;">
+            <div class="modal-header">
+                <h3>Create Student Account</h3>
+                <button class="modal-close" onclick="closeModal('registerModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" placeholder="Juan Dela Cruz" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Student Number</label>
+                        <input type="text" placeholder="NC-2024-0001" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email Address</label>
+                        <input type="email" placeholder="student@norzagaray.edu.ph" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Course</label>
+                        <select>
+                            <option>-- Select Course --</option>
+                            <option>BS Information Technology</option>
+                            <option>BS Computer Science</option>
+                            <option>BS Education</option>
+                            <option>BS Business Administration</option>
+                            <option>BS Nursing</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Year Level</label>
+                        <select>
+                            <option>1st Year</option>
+                            <option>2nd Year</option>
+                            <option>3rd Year</option>
+                            <option>4th Year</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Section</label>
+                        <input type="text" placeholder="e.g. BSIT-4A" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" placeholder="Create strong password" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Confirm Password</label>
+                        <input type="password" placeholder="Repeat password" />
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-block" style="margin-top:1.25rem;" onclick="handleRegister()">
+                    Create Account →
+                </button>
+                <p style="text-align:center;margin-top:.9rem;font-size:.83rem;color:var(--nc-gray);">
+                    Already have an account? <a href="#" onclick="closeModal('registerModal');openModal('loginModal');"
+                        style="color:var(--nc-gold);font-weight:600;">Sign in</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="landing.js?v=2"></script>
+</body>
+
+</html>

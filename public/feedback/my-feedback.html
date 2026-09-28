@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AIDEA – My Feedback</title>
+    <link rel="stylesheet" href="my-feedback.css" />
+</head>
+
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon">AI</div>
+                <div class="logo-text">
+                    <h2>AIDEA</h2>
+                    <p>Norzagaray College</p>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-group">
+                    <span class="nav-label">MAIN</span>
+                    <a href="../dashboard/dashboard.html" class="nav-item"><span class="nav-icon">🏠</span>
+                        Dashboard</a>
+                    <a href="../profile/my-profile.html" class="nav-item"><span class="nav-icon">👤</span> My
+                        Profile</a>
+                    <a href="../submit thesis/submit-thesis.html" class="nav-item"><span class="nav-icon">📄</span>
+                        Submit Thesis</a>
+                    <a href="../my submission/my-submissions.html" class="nav-item"><span class="nav-icon">📋</span> My
+                        Submissions</a>
+                </div>
+                <div class="nav-group">
+                    <span class="nav-label">SERVICES</span>
+                    <a href="../repository/repository.html" class="nav-item"><span class="nav-icon">🔍</span>
+                        Repository</a>
+                    <a href="../avail services/avail-services.html" class="nav-item"><span class="nav-icon">🛠️</span>
+                        Avail Services</a>
+                    <a href="../payments reciepts/payments-reciepts.html" class="nav-item"><span
+                            class="nav-icon">💳</span> Payments & Receipts</a>
+                </div>
+                <div class="nav-group">
+                    <span class="nav-label">EVENTS</span>
+                    <a href="../events dashboard/events-dashboard.html" class="nav-item"><span
+                            class="nav-icon">📅</span> Events Dashboard</a>
+                    <a href="../my-feedback.html" class="nav-item active"><span class="nav-icon">⭐</span> My
+                        Feedback</a>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="../profile/my-profile.html" class="user-card">
+                    <div class="user-avatar">JD</div>
+                    <div class="user-info">
+                        <h4>Juan Dela Cruz</h4>
+                        <p>BSIT STUDENT</p>
+                    </div>
+                </a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="topbar">
+                <div>
+                    <h1>My Feedback</h1>
+                    <p class="subtitle">Rate and review your academic experiences</p>
+                </div>
+                <div class="topbar-right">
+                    <span class="status-badge"><span class="dot"></span> Online</span>
+                    <a href="../landing/index.html" class="btn-ghost">← BACK TO HOME</a>
+                    <button class="btn-signout">Sign Out</button>
+                </div>
+            </div>
+
+            <div class="feedback-layout">
+                <!-- Give Feedback Form -->
+                <div class="feedback-form-card">
+                    <h3>⭐ Give Feedback</h3>
+                    <p class="form-hint">Share your experience to help improve the system and services.</p>
+
+                    <div class="form-group">
+                        <label>Feedback Type</label>
+                        <select id="feedbackType">
+                            <option value="">— Select type —</option>
+                            <option value="Thesis Submission">Thesis Submission Process</option>
+                            <option value="Availed Service">Availed Service</option>
+                            <option value="Event">Event Attended</option>
+                            <option value="System">System / Platform</option>
+                            <option value="Adviser">Adviser / Faculty</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Reference / Subject</label>
+                        <input type="text" id="feedbackRef" placeholder="e.g. Thesis title, service name, event..." />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Your Rating</label>
+                        <div class="star-rating" id="starRating">
+                            <span class="star" data-val="1">★</span>
+                            <span class="star" data-val="2">★</span>
+                            <span class="star" data-val="3">★</span>
+                            <span class="star" data-val="4">★</span>
+                            <span class="star" data-val="5">★</span>
+                        </div>
+                        <span class="rating-label" id="ratingLabel">Click to rate</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Comments</label>
+                        <textarea id="feedbackComment" rows="5"
+                            placeholder="Share your detailed feedback here..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Would you recommend this to others?</label>
+                        <div class="radio-group">
+                            <label class="radio-label"><input type="radio" name="recommend" value="yes" /> Yes,
+                                definitely</label>
+                            <label class="radio-label"><input type="radio" name="recommend" value="maybe" />
+                                Maybe</label>
+                            <label class="radio-label"><input type="radio" name="recommend" value="no" /> No</label>
+                        </div>
+                    </div>
+
+                    <button class="btn-submit-fb" id="submitFeedbackBtn">📤 Submit Feedback</button>
+                </div>
+
+                <!-- Right Panel -->
+                <div class="right-fb-panel">
+                    <!-- Summary -->
+                    <div class="fb-summary-card">
+                        <h4>📊 My Feedback Summary</h4>
+                        <div class="fb-stat"><span class="fb-stat-num">4</span><span class="fb-stat-label">Total
+                                Feedbacks</span></div>
+                        <div class="avg-rating">
+                            <span class="avg-num">4.8</span>
+                            <div class="avg-stars">★★★★★</div>
+                            <span class="avg-label">Average Rating Given</span>
+                        </div>
+                    </div>
+
+                    <!-- Previous Feedbacks -->
+                    <div class="prev-fb-card">
+                        <h4>📋 Previous Feedbacks</h4>
+                        <div id="prevFeedbacks">
+                            <div class="prev-fb-item">
+                                <div class="prev-fb-header">
+                                    <strong>Thesis Submission Process</strong>
+                                    <div class="prev-stars">★★★★★</div>
+                                </div>
+                                <p class="prev-fb-ref">Impact of Social Media...</p>
+                                <p class="prev-fb-comment">"Very smooth submission process. The system is easy to
+                                    navigate."</p>
+                                <span class="prev-fb-date">Jan 20, 2025</span>
+                            </div>
+                            <div class="prev-fb-item">
+                                <div class="prev-fb-header">
+                                    <strong>Plagiarism Check Service</strong>
+                                    <div class="prev-stars">★★★★☆</div>
+                                </div>
+                                <p class="prev-fb-ref">Availed Service</p>
+                                <p class="prev-fb-comment">"Quick results. Could improve the detailed report format."
+                                </p>
+                                <span class="prev-fb-date">Jan 22, 2025</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="my-feedback.js"></script>
+</body>
+
+</html>
