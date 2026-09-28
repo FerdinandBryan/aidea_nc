@@ -812,3 +812,99 @@ body {
         flex-basis: 100%;
     }
 }
+
+/* ── Buttons: secondary ── */
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 40px;
+    padding: 0 18px;
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color .15s;
+}
+
+.btn-secondary:hover {
+    background: var(--hover);
+}
+
+.btn-sm.btn-secondary {
+    height: 34px;
+    padding: 0 13px;
+    font-size: 12.5px;
+    border-radius: 9px;
+}
+
+/* ── Details modal: wider, close button top-right ── */
+.modal.modal-wide {
+    width: min(760px, calc(100vw - 32px));
+    max-width: none;
+    max-height: calc(100dvh - 40px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    text-align: left;
+}
+
+.modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.modal-head .modal-title {
+    margin: 0;
+    text-align: left;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+}
+
+.modal-head .icon-btn {
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.detail-list {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr);
+    gap: 10px 16px;
+    margin: 0;
+    font-size: 13.5px;
+}
+
+.detail-list dt {
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.detail-list dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.modal-foot .btn-primary,
+.modal-foot .btn-secondary,
+.modal-foot .btn-disabled {
+    justify-content: center;
+    white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+    .detail-list {
+        grid-template-columns: 1fr;
+        gap: 2px;
+    }
+
+    .detail-list dd {
+        margin-bottom: 10px;
+    }
+}
