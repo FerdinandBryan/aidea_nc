@@ -272,6 +272,6 @@ window.AideaSession = {
     _loginPath() {
         /* Works regardless of how deep the current page is */
         const depth = window.location.pathname.split('/').filter(Boolean).length;
-        return '../'.repeat(Math.max(depth - 1, 1)) + 'login/login.html';
+        return '../login/login.html';
     },
 };
