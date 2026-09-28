@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
@@ -172,4 +172,3 @@ Route::middleware(['auth:sanctum', 'reviewer'])->prefix('reviewer')->group(funct
 // My Profile routes
 require __DIR__ . '/profile.php';
 
-Route::get('/whoami', fn () => response('ROOT-APP'));
