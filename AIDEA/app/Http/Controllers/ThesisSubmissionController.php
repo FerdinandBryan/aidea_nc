@@ -99,12 +99,17 @@ class ThesisSubmissionController extends Controller
         return response()->json([
             'data' => $theses->map(function ($t) {
                 return [
+                    'id' => $t->id,
                     'title' => $t->title,
                     'author' => $t->user->full_name ?? $t->authors ?? 'N/A',
+                    'authors' => $t->authors,
+                    'adviser' => $t->adviser_name,
                     'course' => $t->course,
                     'academic_year' => $t->academic_year,
                     'abstract' => $t->abstract,
                     'status' => $t->status,
+                    'created_at' => optional($t->created_at)->toDateString(),
+                    'has_file' => !empty($t->file_path),
                 ];
             })
         ]);
