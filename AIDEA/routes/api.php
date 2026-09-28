@@ -167,3 +167,4 @@ Route::middleware(['auth:sanctum', 'reviewer'])->prefix('reviewer')->group(funct
     Route::post('assignments/{id}/complete', [App\Http\Controllers\Reviewer\AssignmentController::class, 'complete']);
     Route::post('assignments/{id}/resend', [App\Http\Controllers\Reviewer\AssignmentController::class, 'resend']);
 });
+Route::get('/whoami', fn () => response('NESTED-APP'));

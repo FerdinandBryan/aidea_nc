@@ -171,3 +171,5 @@ Route::middleware(['auth:sanctum', 'reviewer'])->prefix('reviewer')->group(funct
 
 // My Profile routes
 require __DIR__ . '/profile.php';
+
+Route::get('/whoami', fn () => response('ROOT-APP'));
