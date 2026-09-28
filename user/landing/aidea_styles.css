@@ -909,3 +909,24 @@ textarea:focus {
     overflow-wrap: break-word;
     word-break: break-word;
 }
+
+/* Landing repository cards: fixed height, clamp long abstracts */
+.repo-card {
+    display: flex;
+    flex-direction: column;
+    height: 300px;
+    overflow: hidden;
+}
+
+.repo-card .repo-abstract {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+    line-clamp: 5;
+    overflow: hidden;
+}
+
+.repo-card .btn {
+    margin-top: auto !important;
+    align-self: flex-start;
+}
