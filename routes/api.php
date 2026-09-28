@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
@@ -16,7 +16,6 @@ use App\Http\Controllers\Admin\FeedbackController as AdminFeedbackController;
 use App\Http\Controllers\Admin\AccountController as AdminAccountController;
 use App\Http\Controllers\Student\FeedbackController as StudentFeedbackController;
 
-require __DIR__.'/profile.php';
 
 
 
@@ -121,7 +120,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::patch('feedbacks/{feedback}/read', [AdminFeedbackController::class, 'markRead']);
     Route::delete('feedbacks/{feedback}', [AdminFeedbackController::class, 'destroy']);
 
-    // Dashboard stats ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â matches the /api/admin/stats URL dashboard.js calls
+    // Dashboard stats ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â matches the /api/admin/stats URL dashboard.js calls
     // Uses adminStats() (aggregated across all students), NOT stats()
     // (which is scoped to the logged-in user and would show zeros for an admin)
     Route::get('stats', [DashboardController::class, 'adminStats']);
