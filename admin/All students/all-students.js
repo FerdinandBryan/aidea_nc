@@ -276,7 +276,7 @@ function render() {
             <td data-label="No.">${start + i + 1}</td>
             <td data-label="Name">
                 <div class="avatar-cell">
-                    <span class="avatar" aria-hidden="true">${escHtml(initials(s))}</span>
+                    <span class="avatar" aria-hidden="true" style="overflow:hidden">${s.avatar_url ? `<img src="${escHtml(s.avatar_url)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">` : escHtml(initials(s))}</span>
                     <strong>${escHtml(fullName(s))}</strong>
                 </div>
             </td>
