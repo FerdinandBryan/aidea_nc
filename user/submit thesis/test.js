@@ -3,6 +3,7 @@
 
 const THEME_KEY = 'aidea_user_theme'; // shared with the student dashboard
 const SUBMIT_URL = 'https://aideanc-production.up.railway.app/api/thesis/submit';
+const LOGIN_URL = '../login/login.html';
 const MAX_SIZE = 20 * 1024 * 1024;
 const ALLOWED_EXTS = ['.pdf', '.docx'];
 
