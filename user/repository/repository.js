@@ -1,11 +1,11 @@
-// repository.js — Repository (student side)
-// Self-contained (like dashboard.js): reads the session from localStorage.
-// Papers come from the admin's approved-thesis store in localStorage ('aidea_repository').
+// repository.js - Repository (student side)
+// Papers are loaded from the backend: GET /api/public/thesis
+// (approved + visible_in_repo). "Read paper" streams the file from
+// /api/thesis/file/{id} using the student's login token.
 
 const API_BASE = 'https://aideanc-production.up.railway.app/api';
 const LOGIN_URL = '../login/login.html';
 const THEME_KEY = 'aidea_user_theme'; // shared with the other student pages
-const REPO_KEY = 'aidea_repository';
 
 const $ = id => document.getElementById(id);
 
@@ -15,18 +15,7 @@ function escHtml(str) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// Only allow normal file links (blocks javascript: and similar)
-function safeUrl(u) {
-  if (!u) return null;
-  try {
-    const url = new URL(u, window.location.href);
-    const ok = ['http:', 'https:', 'blob:', 'file:'].includes(url.protocol)
-      || /^data:application\//i.test(url.href);
-    return ok ? url.href : null;
-  } catch { return null; }
-}
-
-// ── Session ────────────────────────────────────────────────────────────────
+// -- Session --
 
 const getToken = () => localStorage.getItem('auth_token') || null;
 
@@ -50,7 +39,7 @@ async function performSignOut() {
   window.location.href = LOGIN_URL;
 }
 
-// ── Theme ──────────────────────────────────────────────────────────────────
+// -- Theme --
 
 const currentTheme = () => document.documentElement.getAttribute('data-theme') || 'light';
 
@@ -73,7 +62,7 @@ function initTheme() {
   });
 }
 
-// ── Drawer, profile menu, sign-out modal ───────────────────────────────────
+// -- Drawer, profile menu, sign-out modal --
 
 function initDrawer() {
   const sidebar = $('sidebar'), scrim = $('scrim'), btn = $('menuBtn');
@@ -147,43 +136,90 @@ function renderUserIdentity(user) {
   if (q('.footer-role')) q('.footer-role').textContent = user.course || 'Student';
 }
 
-// ── Repository ─────────────────────────────────────────────────────────────
+// -- Repository data (from the backend) --
 
-function getRepository() {
+async function fetchPapers() {
+  const headers = { 'Accept': 'application/json' };
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}/public/thesis`, { headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  const json = await res.json();
+  const rows = Array.isArray(json) ? json : (json.data || []);
+
+  return rows.map(t => ({
+    id: t.id,
+    title: t.title || 'Untitled',
+    authors: t.authors || t.author || '',
+    adviser: t.adviser || t.adviser_name || '',
+    course: t.course || '',
+    year: t.academic_year || t.year || '',
+    abstract: t.abstract || '',
+    addedAt: t.created_at || '',
+    hasFile: Boolean(t.has_file) && t.id != null,
+  }));
+}
+
+// Streams the file with the student's token, then opens it in a new tab.
+async function openPaperFile(id, btn) {
+  const token = getToken();
+  if (!token) { window.location.href = LOGIN_URL; return; }
+
+  const label = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Opening...'; }
+  const win = window.open('', '_blank'); // open synchronously so popup blockers allow it
+
   try {
-    const list = JSON.parse(localStorage.getItem(REPO_KEY) || '[]');
-    return Array.isArray(list) ? list : [];
-  } catch { return []; }
+    const res = await fetch(`${API_BASE}/thesis/file/${encodeURIComponent(id)}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Accept': '*/*' },
+    });
+    if (res.status === 401) { win?.close(); window.location.href = LOGIN_URL; return; }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    if (win) win.location.href = url; else window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch {
+    win?.close();
+    alert('Sorry, this paper could not be opened right now. Please try again later.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+  }
 }
 
 function formatDate(raw) {
   const d = new Date(raw);
   return raw && !isNaN(d)
     ? d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
-    : '—';
+    : '\u2014';
 }
 
-function initRepository() {
+// -- Repository UI --
+
+async function initRepository() {
   const grid = $('repoGrid');
   const modal = $('paperModal');
-  let papers = getRepository();
+  let papers = [];
   let visible = [];
   let search = '', course = '', year = '';
   let lastTrigger = null;
 
+  const empty = (title, sub) =>
+    `<div class="repo-empty"><strong>${title}</strong>${sub ? `<p>${sub}</p>` : ''}</div>`;
+
   function populateFilters() {
-    const years = [...new Set(papers.map(p => p.year).filter(Boolean).map(String))].sort((a, b) => b - a);
+    const years = [...new Set(papers.map(p => p.year).filter(Boolean).map(String))]
+      .sort((a, b) => b.localeCompare(a));
     const courses = [...new Set(papers.map(p => p.course).filter(Boolean))].sort();
 
-    // keep the current selection if it still exists
     $('yearFilter').innerHTML = '<option value="">All years</option>'
       + years.map(y => `<option value="${escHtml(y)}"${y === year ? ' selected' : ''}>${escHtml(y)}</option>`).join('');
     $('courseFilter').innerHTML = '<option value="">All courses</option>'
       + courses.map(c => `<option value="${escHtml(c)}"${c === course ? ' selected' : ''}>${escHtml(c)}</option>`).join('');
   }
-
-  const empty = (title, sub) =>
-    `<div class="repo-empty"><strong>${title}</strong><p>${sub}</p></div>`;
 
   function render() {
     visible = papers.filter(p => {
@@ -210,13 +246,11 @@ function initRepository() {
       return;
     }
 
-    grid.innerHTML = visible.map((p, i) => {
-      const url = safeUrl(p.fileUrl);
-      return `
+    grid.innerHTML = visible.map((p, i) => `
             <article class="repo-card">
                 <div class="repo-meta">
-                    <span class="repo-course">${escHtml(p.course || '—')}</span>
-                    <span class="repo-year">${escHtml(p.year || '—')}</span>
+                    <span class="repo-course">${escHtml(p.course || '\u2014')}</span>
+                    <span class="repo-year">${escHtml(p.year || '\u2014')}</span>
                 </div>
                 <h4 class="repo-title">${escHtml(p.title)}</h4>
                 <p class="repo-people"><strong>Authors:</strong> ${escHtml(p.authors || 'Unknown')}</p>
@@ -226,29 +260,27 @@ function initRepository() {
                     <span class="repo-added">Added ${formatDate(p.addedAt)}</span>
                     <div class="repo-actions">
                         <button class="btn-secondary btn-sm" type="button" data-i="${i}">Details</button>
-                        ${url
-          ? `<a class="btn-primary btn-sm" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">Read paper</a>`
-          : `<span class="btn-disabled" title="No file available">No file</span>`}
+                        ${p.hasFile
+        ? `<button class="btn-primary btn-sm" type="button" data-read="${escHtml(p.id)}">Read paper</button>`
+        : `<span class="btn-disabled" title="No file available">No file</span>`}
                     </div>
                 </div>
-            </article>`;
-    }).join('');
+            </article>`).join('');
   }
 
-  // — details modal —
+  // -- details modal --
   function openModal(i, trigger) {
     const p = visible[i];
     if (!p) return;
     lastTrigger = trigger;
-    const url = safeUrl(p.fileUrl);
 
     $('paperTitle').textContent = p.title || 'Paper details';
     $('paperBody').innerHTML = `
             <dl class="detail-list">
-                <dt>Course</dt><dd>${escHtml(p.course || '—')}</dd>
-                <dt>Year</dt><dd>${escHtml(p.year || '—')}</dd>
+                <dt>Course</dt><dd>${escHtml(p.course || '\u2014')}</dd>
+                <dt>Year</dt><dd>${escHtml(p.year || '\u2014')}</dd>
                 <dt>Authors</dt><dd>${escHtml(p.authors || 'Unknown')}</dd>
-                <dt>Adviser</dt><dd>${escHtml(p.adviser || '—')}</dd>
+                <dt>Adviser</dt><dd>${escHtml(p.adviser || '\u2014')}</dd>
                 <dt>Added</dt><dd>${formatDate(p.addedAt)}</dd>
             </dl>
             <div class="abstract-block">
@@ -257,8 +289,8 @@ function initRepository() {
             </div>
             <div class="modal-foot">
                 <button class="btn-secondary" type="button" id="paperDone">Close</button>
-                ${url
-        ? `<a class="btn-primary" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">Read paper</a>`
+                ${p.hasFile
+        ? `<button class="btn-primary" type="button" data-read="${escHtml(p.id)}">Read paper</button>`
         : `<span class="btn-disabled">No file available</span>`}
             </div>`;
     $('paperDone').addEventListener('click', closeModal);
@@ -275,31 +307,43 @@ function initRepository() {
   }
 
   grid.addEventListener('click', e => {
-    const btn = e.target.closest('button[data-i]');
-    if (btn) openModal(Number(btn.dataset.i), btn);
+    const readBtn = e.target.closest('button[data-read]');
+    if (readBtn) { openPaperFile(readBtn.dataset.read, readBtn); return; }
+    const detailsBtn = e.target.closest('button[data-i]');
+    if (detailsBtn) openModal(Number(detailsBtn.dataset.i), detailsBtn);
+  });
+  $('paperBody').addEventListener('click', e => {
+    const readBtn = e.target.closest('button[data-read]');
+    if (readBtn) openPaperFile(readBtn.dataset.read, readBtn);
   });
   $('paperClose').addEventListener('click', closeModal);
   modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
 
-  // — filters —
+  // -- filters --
   $('repoSearch').addEventListener('input', e => { search = e.target.value.trim().toLowerCase(); render(); });
   $('courseFilter').addEventListener('change', e => { course = e.target.value; render(); });
   $('yearFilter').addEventListener('change', e => { year = e.target.value; render(); });
 
-  // live sync when the admin updates the repository in another tab
-  window.addEventListener('storage', e => {
-    if (e.key !== REPO_KEY) return;
-    papers = getRepository();
-    populateFilters();
-    render();
-  });
+  // -- load from the backend --
+  async function load() {
+    grid.innerHTML = empty('Loading papers...', '');
+    try {
+      papers = await fetchPapers();
+      populateFilters();
+      render();
+    } catch {
+      $('resultCount').textContent = '\u00a0';
+      grid.innerHTML = empty('Could not load the repository',
+        'Please check your connection and <a href="#" id="repoRetry">try again</a>.');
+      $('repoRetry')?.addEventListener('click', e => { e.preventDefault(); load(); });
+    }
+  }
 
-  populateFilters();
-  render();
+  await load();
 }
 
-// ── Boot ───────────────────────────────────────────────────────────────────
+// -- Boot --
 
 document.addEventListener('DOMContentLoaded', () => {
   const user = getUser();
