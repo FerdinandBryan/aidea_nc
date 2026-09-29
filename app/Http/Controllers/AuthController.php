@@ -34,12 +34,22 @@ class AuthController extends Controller
             now()->addMinutes(60),
             ["id" => $user->getKey(), "hash" => sha1($user->email)]
         );
-        $user->notify(new \App\Notifications\VerifyEmailNotification($verificationUrl));
+
+        $emailSent = true;
+        try {
+            $user->notify(new \App\Notifications\VerifyEmailNotification($verificationUrl));
+        } catch (\Throwable $e) {
+            $emailSent = false;
+            \Illuminate\Support\Facades\Log::error("Verification email failed to send: " . $e->getMessage());
+        }
 
         return response()->json([
             "success" => true,
-            "message" => "Account created! Please check your email to verify your account.",
+            "message" => $emailSent
+                ? "Account created! Please check your email to verify your account."
+                : "Account created! We could not send the verification email right now, please try resending it later.",
             "user" => $user,
+            "email_sent" => $emailSent,
         ], 201);
     }
 
