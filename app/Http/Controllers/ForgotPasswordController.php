@@ -31,10 +31,14 @@ class ForgotPasswordController extends Controller
         );
 
         // Send email with the plain code
-        Mail::send('emails.reset-password', ['code' => $code], function ($message) use ($request) {
-            $message->to($request->email)
-                ->subject('AIDEA - Your Password Reset Code');
-        });
+        try {
+            Mail::send('emails.reset-password', ['code' => $code], function ($message) use ($request) {
+                $message->to($request->email)
+                    ->subject('AIDEA - Your Password Reset Code');
+            });
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Password reset email failed to send: ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,
