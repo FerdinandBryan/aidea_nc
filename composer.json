@@ -9,7 +9,9 @@
         "laravel/framework": "^11.0",
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^2.9",
-        "resend/resend-laravel": "^1.5"
+        "resend/resend-laravel": "^1.5",
+        "symfony/brevo-mailer": "^8.1",
+        "symfony/http-client": "^8.1"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
