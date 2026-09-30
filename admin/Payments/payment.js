@@ -362,7 +362,7 @@
 
             const svcName = String(p.service || '').toLowerCase();
             const reviewerRole = /grammar/.test(svcName) ? 'grammarian' : (/data analysis|statistic/.test(svcName) ? 'statistician' : '');
-            if (reviewerRole) {
+            if (reviewerRole && p.status !== 'Cancelled' && p.status !== 'Rejected') {
                 actions += '<button type="button" class="btn-action" onclick="AideaPayments.sendReviewer(' + p.id + ',\'' + reviewerRole + '\')">' + (reviewerRole === 'grammarian' ? 'Grammarian' : 'Statistician') + '</button>';
             }
         return '<tr class="' + (isPending(p) ? 'row-pending' : '') + '">' +
@@ -652,6 +652,7 @@ function openViewModal(i) {
         const p = allPayments.find(function (x) { return String(x.id) === String(id); });
         if (!p) return;
 
+        if (p.status === 'Cancelled' || p.status === 'Rejected') { alert('Cancelled requests cannot be sent to a reviewer.'); return; }
         const label = role === 'statistician' ? 'Statistician' : 'Grammarian';
 
         const opener = document.activeElement;
