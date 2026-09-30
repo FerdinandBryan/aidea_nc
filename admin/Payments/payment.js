@@ -597,6 +597,35 @@ function openViewModal(i) {
         return f.type === 'application/pdf' || f.type.indexOf('image/') === 0;
     }
     function isDoneStatus(p) { return p.status === 'Completed' || p.status === 'Paid'; }
+    function dataUrlToFile(dataUrl, name) {
+        try {
+            const comma = String(dataUrl).indexOf(',');
+            if (comma < 0) return null;
+            const meta = dataUrl.slice(5, comma);
+            if (meta.indexOf(';base64') < 0) return null;
+            const mime = meta.split(';')[0] || 'application/octet-stream';
+            const bin = atob(dataUrl.slice(comma + 1));
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            return new File([bytes], name, { type: mime });
+        } catch (e) { return null; }
+    }
+
+    function getResearchFiles(p) {
+        const out = [];
+        try {
+            const raw = p.research_items;
+            const items = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (!Array.isArray(items)) return out;
+            items.forEach(function (item, idx) {
+                if (!item || !item.file_base64 || (item.type !== 'file' && item.type !== 'image')) return;
+                const name = item.file_name || ((item.label || 'file') + '-' + (idx + 1));
+                const f = dataUrlToFile(item.file_base64, name);
+                if (f) out.push({ name: name, label: item.label || name, file: f });
+            });
+        } catch (e) { /* ignore bad research data */ }
+        return out;
+    }
     function buildReviewerNote(p, userNote) {
         const lines = [];
         if (userNote) { lines.push(userNote); lines.push(''); }
@@ -641,7 +670,9 @@ function openViewModal(i) {
         const select = document.createElement('select');
         select.className = 'form-control';
         select.innerHTML = '<option value="" disabled selected>Loading ' + label.toLowerCase() + 's...</option>';
-        body.appendChild(select);
+                body.appendChild(select);
+        const rFiles = getResearchFiles(p);
+        body.appendChild(el('p', 'vm-muted', rFiles.length ? ('Files sent with this request: ' + rFiles.map(function (f) { return f.name; }).join(', ')) : 'No uploaded file in this request.'));
 
         const note = document.createElement('textarea');
         note.className = 'form-control msg-input';
@@ -711,7 +742,19 @@ function openViewModal(i) {
                 fd.append('note', buildReviewerNote(p, note.value.trim()));
                 fd.append('title', (p.service || 'Request') + ' - ' + (p.student || ''));
                 fd.append('student_name', p.student || '');
-                await uploadFetch('/admin/assignments', fd);
+                if (!rFiles.length) {
+                    await uploadFetch('/admin/assignments', fd);
+                } else {
+                    for (let i = 0; i < rFiles.length; i++) {
+                        const one = new FormData();
+                        one.append('reviewer_id', select.value);
+                        one.append('note', buildReviewerNote(p, note.value.trim()));
+                        one.append('title', (p.service || 'Request') + ' - ' + (p.student || '') + (rFiles.length > 1 ? ' - ' + rFiles[i].label : ''));
+                        one.append('student_name', p.student || '');
+                        one.append('file', rFiles[i].file);
+                        await uploadFetch('/admin/assignments', one);
+                    }
+                }
                 close();
                 showToast('Sent to the ' + label.toLowerCase() + '.', 'success');
             } catch (err) {
