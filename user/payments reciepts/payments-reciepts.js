@@ -396,23 +396,26 @@ function secureUrl(u) {
     return String(u || '').replace(/^http:\/\/(?=[^\/]*\.up\.railway\.app)/i, 'https://');
 }
 
-async function downloadCert(id) {
+function downloadCert(id) {
     const p = certItems.find(x => x.id === id);
     if (!p) return;
+    const c = p.certificate;
+    const url = secureUrl(c.url);
+    let href = url;
     try {
-        const res = await fetch(secureUrl(p.certificate.url));
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const blob = await res.blob();
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = p.certificate.name;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    } catch {
-        window.open(secureUrl(p.certificate.url), '_blank', 'noopener');
-    }
+        const u = new URL(url);
+        const m = u.pathname.match(/\/storage\/payment-files\/(.+)$/);
+        if (m) {
+            const segs = decodeURIComponent(m[1]).split('/').map(encodeURIComponent).join('/');
+            const base = decodeURIComponent(u.pathname.split('/').pop());
+            href = u.origin + '/api/download/payment-files/' + segs + '?name=' + encodeURIComponent(c.name || base);
+        }
+    } catch (e) { }
+    const a = document.createElement('a');
+    a.href = href;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
 }
 
 function viewCert(id) {

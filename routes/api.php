@@ -182,3 +182,14 @@ require __DIR__ . '/profile.php';
     if ($name === '' || $name === null) { $name = $file; }
     return response()->download($disk->path($path), $name);
 })->where('file', '[A-Za-z0-9._\-]+');
+
+// Forces a real download for payment files and certificates (student Payments & Receipts)
+\Illuminate\Support\Facades\Route::get('/download/payment-files/{path}', function (\Illuminate\Http\Request $request, string $path) {
+    abort_if(str_contains($path, '..'), 404);
+    $rel = 'payment-files/' . ltrim($path, '/');
+    $disk = \Illuminate\Support\Facades\Storage::disk('public');
+    abort_unless($disk->exists($rel), 404);
+    $name = preg_replace('/[^\w\s.\-()]/u', '', (string) $request->query('name', basename($rel)));
+    if ($name === '' || $name === null) { $name = basename($rel); }
+    return response()->download($disk->path($rel), $name);
+})->where('path', '.+');
