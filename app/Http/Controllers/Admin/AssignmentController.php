@@ -26,7 +26,9 @@ class AssignmentController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'thesis_id' => ['required', 'exists:thesis_submissions,id'],
+            'thesis_id' => ['nullable', 'exists:thesis_submissions,id'],
+            'title' => ['nullable', 'string', 'max:255'],
+            'student_name' => ['nullable', 'string', 'max:255'],
             'reviewer_id' => ['required', 'exists:users,id'],
             'note' => ['nullable', 'string'],
             'file' => ['required', 'file', 'max:20480'],
@@ -40,6 +42,8 @@ class AssignmentController extends Controller
 
         $assignment = ThesisAssignment::create([
             'thesis_submission_id' => $request->input('thesis_id'),
+            'title' => $request->input('title'),
+            'student_name' => $request->input('student_name'),
             'reviewer_id' => $request->input('reviewer_id'),
             'file_path' => $path,
             'status' => 'pending',

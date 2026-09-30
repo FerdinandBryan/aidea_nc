@@ -9,6 +9,8 @@ class ThesisAssignment extends Model
 {
     protected $fillable = [
         'thesis_submission_id',
+        'title',
+        'student_name',
         'reviewer_id',
         'file_path',
         'reviewed_file_path',

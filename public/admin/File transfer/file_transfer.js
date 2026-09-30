@@ -247,19 +247,43 @@ const ICON_CHECK = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" 
 
 // ── Populate the send form's dropdowns ──────────────────────────────────────
 
+let paymentFileOptions = {};
+
+function dataUrlToFile(dataUrl, name) {
+    const parts = String(dataUrl).split(',');
+    const m = parts[0].match(/:(.*?);/);
+    const mime = m ? m[1] : 'application/octet-stream';
+    const bin = atob(parts[1] || '');
+    const arr = new Uint8Array(bin.length);
+    for (let k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
+    return new File([arr], name, { type: mime });
+}
+
 async function loadThesisOptions() {
     const select = document.getElementById('sendThesis');
     try {
-        const res = await fetch(`${ADMIN_API}/thesis/list`, { headers: authHeaders() });
+        const res = await fetch(`${ADMIN_API}/payments`, { headers: authHeaders() });
         if (res.status === 401) { clearSession(); window.location.href = LOGIN_URL; return; }
         if (!res.ok) throw new Error();
-        const items = asList(await res.json());
+        const payments = asList(await res.json());
 
-        select.innerHTML = '<option value="" disabled selected>Select a thesis…</option>' + items.map(t => `
-            <option value="${t.id}">${escHtml(t.title || 'Untitled thesis')} — ${escHtml(t.user?.name ?? t.student_name ?? '—')}</option>
-        `).join('');
+        paymentFileOptions = {};
+        let html = '<option value="" disabled selected>Select a file from Payments\u2026</option>';
+        payments.forEach(p => {
+            let items = p.research_items;
+            try { if (typeof items === 'string') items = JSON.parse(items); } catch { items = []; }
+            if (!Array.isArray(items)) return;
+            items.forEach((it, idx) => {
+                if ((it.type === 'file' || it.type === 'image') && it.file_base64) {
+                    const key = p.id + ':' + idx;
+                    paymentFileOptions[key] = { payment: p, item: it };
+                    html += `<option value="${key}">${escHtml(p.student || 'Student')} \u2014 ${escHtml(it.label || 'File')} (${escHtml(it.file_name || 'file')})</option>`;
+                }
+            });
+        });
+        select.innerHTML = html;
     } catch {
-        select.innerHTML = '<option value="" disabled selected>Couldn\u2019t load theses</option>';
+        select.innerHTML = '<option value="" disabled selected>Couldn\u2019t load payments</option>';
     }
 }
 
@@ -446,10 +470,15 @@ function initSendForm() {
         showMsg('sendMsg', '', null);
 
         const body = new FormData();
-        body.append('thesis_id', thesisId);
+        const opt = paymentFileOptions[thesisId];
+        if (opt) {
+            body.append('title', (opt.item.label || 'File') + ' - ' + (opt.item.file_name || 'file'));
+            body.append('student_name', opt.payment.student || '');
+        }
         body.append('reviewer_id', reviewerId);
         body.append('note', document.getElementById('sendNote').value.trim());
         if (selectedFile) body.append('file', selectedFile);
+        else if (opt) body.append('file', dataUrlToFile(opt.item.file_base64, opt.item.file_name || 'file'));
 
         try {
             const res = await fetch(`${ADMIN_API}/admin/assignments`, {
