@@ -46,7 +46,7 @@ class ServiceController extends Controller
                 ],
                 'is_qr_valid' => 'nullable|boolean',
                 'requires_research_info' => 'nullable|boolean',
-                'research_requirement_text' => 'nullable|string|max:2000',
+                'research_requirement_text' => 'nullable|string|max:10000',
             ]);
         } catch (ValidationException $e) {
             return response()->json(['errors' => $e->errors()], 422);
@@ -91,7 +91,7 @@ class ServiceController extends Controller
                 ],
                 'is_qr_valid' => 'nullable|boolean',
                 'requires_research_info' => 'nullable|boolean',
-                'research_requirement_text' => 'nullable|string|max:2000',
+                'research_requirement_text' => 'nullable|string|max:10000',
             ]);
         } catch (ValidationException $e) {
             return response()->json(['errors' => $e->errors()], 422);

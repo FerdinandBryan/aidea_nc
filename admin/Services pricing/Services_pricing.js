@@ -858,7 +858,7 @@ const ITEM_TYPE_META = {
     text: { label: 'Text' },           // student types an answer
     file: { label: 'File' },           // student uploads a document (PDF/DOC/etc.)
     image: { label: 'Image' },         // student uploads a photo/image
-    checkbox: { label: 'Checkbox' },   // student ticks one or more choices; a ticked choice can reveal a nested sub-title field
+    checkbox: { label: 'Checkbox' }, link: { label: 'Link' }, excel: { label: 'Excel' },   // student ticks one or more choices; a ticked choice can reveal a nested sub-title field
 };
 
 function cloneDefaultResearchItems() {
@@ -903,7 +903,7 @@ function parseResearchItems(raw) {
                     text: item.text || '',
                     type: ITEM_TYPE_META[type] ? type : 'text',
                     optional: !!item.optional,
-                    options: normalizeOptions(item.options),
+                    options: normalizeOptions(item.options), url: String(item.url || ''),
                 };
             }
             return null;
@@ -940,6 +940,10 @@ function renderResearchItems() {
                     `).join('')}
                     <button type="button" class="btn-add-item research-choice-add" data-idx="${i}">Add checkbox</button>
                 </div>
+            ` : ''}
+            ${(item.type === 'link' || item.type === 'excel') ? `
+                <input type="url" class="form-control research-item-url" data-idx="${i}"
+                    value="${escHtml(item.url || '')}" placeholder="${item.type === 'excel' ? 'Excel / Google Sheets link (https://...)' : 'Link (https://...)'}" style="margin:6px 0;" />
             ` : ''}
             <label class="research-item-optional">
                 <input type="checkbox" class="research-item-optional-cb" data-idx="${i}" ${item.optional ? 'checked' : ''} />
@@ -992,6 +996,12 @@ function renderResearchItems() {
             syncResearchTextarea();
             const labels = document.querySelectorAll(`.research-choice-label[data-idx="${this.dataset.idx}"]`);
             if (labels.length) labels[labels.length - 1].focus();
+        });
+    });
+    list.querySelectorAll('.research-item-url').forEach(input => {
+        input.addEventListener('input', function () {
+            researchItems[parseInt(this.dataset.idx, 10)].url = this.value;
+            syncResearchTextarea();
         });
     });
     list.querySelectorAll('.research-item-optional-cb').forEach(cb => {
@@ -1242,3 +1252,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
+
+// ---- Link / Excel items: keep each item's url when the list is saved ----
+const _syncResearchBase = syncResearchTextarea;
+syncResearchTextarea = function () {
+    _syncResearchBase.apply(this, arguments);
+    const ta = document.getElementById('editResearchRequirementText');
+    if (!ta || !ta.value) return;
+    let arr;
+    try { arr = JSON.parse(ta.value); } catch (e) { return; }
+    if (!Array.isArray(arr)) return;
+    let k = 0;
+    arr.forEach(function (o) {
+        if (!o || typeof o !== 'object') return;
+        if (o.type !== 'link' && o.type !== 'excel') return;
+        for (let j = k; j < researchItems.length; j++) {
+            const r = researchItems[j];
+            if (r.type === o.type && String(r.text).trim() === String(o.text || '').trim()) {
+                o.url = String(r.url || '').trim();
+                k = j + 1;
+                break;
+            }
+        }
+    });
+    ta.value = JSON.stringify(arr);
+};

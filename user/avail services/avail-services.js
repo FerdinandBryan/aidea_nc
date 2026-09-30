@@ -35,7 +35,7 @@ const ITEM_TYPE_META = {
     text: { icon: '📝', label: 'Text' },
     file: { icon: '📎', label: 'File' },
     image: { icon: '🖼️', label: 'Image' },
-    checkbox: { icon: '☑️', label: 'Checkbox' },
+    checkbox: { icon: '☑️', label: 'Checkbox' }, link: { icon: '🔗', label: 'Link' }, excel: { icon: '📊', label: 'Excel' },
 };
 
 let currentResearchItems = [];   // [{ text, type, optional, options }] for the open service
@@ -250,8 +250,8 @@ function parseResearchItems(raw) {
                 return {
                     text: item.text || '',
                     type: ITEM_TYPE_META[type] ? type : 'text',
-                    optional: !!item.optional,
-                    options: normalizeOptions(item.options),
+                    optional: (type === 'link' || type === 'excel') ? true : !!item.optional,
+                    options: normalizeOptions(item.options), url: String(item.url || ''),
                 };
             }
             return null;
@@ -478,6 +478,19 @@ function renderResearchFields(items) {
                         accept="${isImage ? 'image/*' : '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'}"
                         style="display:none;" />
                     <div class="gm-file-status ri-dyn-status" data-idx="${i}"></div>
+                </div>`;
+        }
+
+        if (item.type === 'link' || item.type === 'excel') {
+            let href = String(item.url || '').trim();
+            if (href && !/^https?:\/\//i.test(href)) href = 'https://' + href;
+            const tag = item.type === 'excel' ? ' <span style="font-size:.7rem;font-weight:700;color:var(--muted);">(Excel)</span>' : '';
+            return `
+                <div class="form-group">
+                    ${href
+                        ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"
+                              style="color:var(--primary);font-weight:700;text-decoration:underline;word-break:break-all;">${escapeHtml(item.text)}</a>${tag}`
+                        : `<span style="font-size:.85rem;color:var(--muted);">${escapeHtml(item.text)} (no link set)</span>`}
                 </div>`;
         }
 
