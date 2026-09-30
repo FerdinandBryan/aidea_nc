@@ -362,7 +362,7 @@
 
             actions += '<a class="btn-action" style="text-decoration:none;" href="../File%20transfer/file_transfer.html?tab=send&role=grammarian">Grammarian</a>' +
                    '<a class="btn-action" style="text-decoration:none;" href="../File%20transfer/file_transfer.html?tab=send&role=statistician">Statistician</a>';
-        actions += '<a class="btn-action" style="text-decoration:none;" href="../formatting/formatting.html">Check format</a>';
+        actions += '<button type="button" class="btn-action" onclick="window.openDocValidationModalForFile && window.openDocValidationModalForFile(null, \'Format Check\', \'\')">Check format</button>';
         return '<tr class="' + (isPending(p) ? 'row-pending' : '') + '">' +
                 '<td data-label="Student"><strong>' + escHtml(p.student) + '</strong>' +
                 (p.student_id || p.studentId ? '<small>' + escHtml(p.student_id || p.studentId) + '</small>' : '') + '</td>' +
