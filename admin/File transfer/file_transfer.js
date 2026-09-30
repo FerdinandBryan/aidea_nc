@@ -275,15 +275,20 @@ function guessFilename(res, url, fallback) {
 function handleFile(url, mode, fallbackName) {
     if (!url) return;
     if (mode === 'view') {
-        // Direct link: no fetch, so no CORS problem. PDFs and images preview in the new tab.
         window.open(url, '_blank', 'noopener');
         return;
     }
+    let href = url;
+    try {
+        const u = new URL(url, location.href);
+        const base = decodeURIComponent(u.pathname.split('/').pop());
+        const ext = base.indexOf('.') > -1 ? base.slice(base.lastIndexOf('.')) : '';
+        let name = fallbackName || 'thesis-file';
+        if (ext && !name.toLowerCase().endsWith(ext.toLowerCase())) name += ext;
+        href = u.origin + '/download/assignments/' + encodeURIComponent(base) + '?name=' + encodeURIComponent(name);
+    } catch (e) { }
     const a = document.createElement('a');
-    a.href = url;
-    a.download = fallbackName || 'thesis-file';
-    a.target = '_blank';
-    a.rel = 'noopener';
+    a.href = href;
     document.body.appendChild(a);
     a.click();
     a.remove();
