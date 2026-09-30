@@ -33,7 +33,7 @@ class CertificateController extends Controller
             $f = $files[0];
 
             $out[$id] = [
-                'url'  => url('/storage/' . str_replace('%2F', '/', rawurlencode($f))),
+                'url'  => secure_url('/storage/' . str_replace('%2F', '/', rawurlencode($f))),
                 'name' => basename($f),
             ];
         }

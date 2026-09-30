@@ -99,7 +99,7 @@ class PaymentController extends Controller
             ];
 
             if (!$firstUrl) {
-                $firstUrl = Storage::disk('public')->url($stored);
+                $firstUrl = preg_replace('#^http://#i', 'https://', Storage::disk('public')->url($stored));
                 $firstName = $f->getClientOriginalName();
             }
         }
@@ -127,7 +127,7 @@ class PaymentController extends Controller
             ->get(['id', 'certificate_url', 'certificate_name', 'certificate_type'])
             ->mapWithKeys(function ($p) {
                 return [$p->id => [
-                    'url'  => $p->certificate_url,
+                    'url'  => preg_replace('#^http://#i', 'https://', (string) $p->certificate_url),
                     'name' => $p->certificate_name,
                     'type' => $p->certificate_type,
                 ]];
