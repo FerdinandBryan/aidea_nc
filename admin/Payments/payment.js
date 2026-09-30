@@ -360,8 +360,8 @@
                     '<span class="none">—</span>';
             }
 
-            actions += '<a class="btn-action" style="text-decoration:none;" href="../File%20transfer/file_transfer.html?tab=send&role=grammarian">Grammarian</a>' +
-                   '<a class="btn-action" style="text-decoration:none;" href="../File%20transfer/file_transfer.html?tab=send&role=statistician">Statistician</a>';
+            actions += '<button type="button" class="btn-action" onclick="AideaPayments.sendReviewer(' + p.id + ',\'grammarian\')">Grammarian</button>' +
+                   '<button type="button" class="btn-action" onclick="AideaPayments.sendReviewer(' + p.id + ',\'statistician\')">Statistician</button>';
         return '<tr class="' + (isPending(p) ? 'row-pending' : '') + '">' +
                 '<td data-label="Student"><strong>' + escHtml(p.student) + '</strong>' +
                 (p.student_id || p.studentId ? '<small>' + escHtml(p.student_id || p.studentId) + '</small>' : '') + '</td>' +
@@ -594,6 +594,164 @@ function openViewModal(i) {
         return f.type === 'application/pdf' || f.type.indexOf('image/') === 0;
     }
     function isDoneStatus(p) { return p.status === 'Completed' || p.status === 'Paid'; }
+    function openReviewerDialog(id, role) {
+        const p = allPayments.find(function (x) { return String(x.id) === String(id); });
+        if (!p) return;
+
+        const label = role === 'statistician' ? 'Statistician' : 'Grammarian';
+        let files = [];
+
+        const opener = document.activeElement;
+        const overlay = el('div', 'modal-backdrop');
+        const box = el('div', 'modal');
+        box.setAttribute('role', 'dialog');
+        box.setAttribute('aria-modal', 'true');
+
+        const head = el('div', 'modal-head');
+        head.appendChild(el('h3', 'modal-title', 'Send to ' + label));
+        box.appendChild(head);
+
+        const body = el('div', 'modal-body');
+        body.appendChild(el('p', 'vm-muted', 'Student: ' + p.student + ' - ' + p.service));
+
+        const select = document.createElement('select');
+        select.className = 'form-control';
+        select.innerHTML = '<option value="" disabled selected>Loading ' + label.toLowerCase() + 's...</option>';
+        body.appendChild(select);
+
+        const zone = el('label', 'dropzone');
+        zone.appendChild(el('strong', '', 'Choose files'));
+        zone.appendChild(el('small', '', 'PDF, DOC or DOCX \u00B7 max ' + MAX_FILE_MB + ' MB each'));
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.pdf,.doc,.docx';
+        input.multiple = true;
+        input.hidden = true;
+        zone.appendChild(input);
+        body.appendChild(zone);
+
+        const list = el('ul', 'file-list');
+        body.appendChild(list);
+
+        const note = document.createElement('textarea');
+        note.className = 'form-control msg-input';
+        note.rows = 3;
+        note.placeholder = 'Note (optional)';
+        body.appendChild(note);
+        box.appendChild(body);
+
+        const actions = el('div', 'modal-actions');
+        const cancel = el('button', 'modal-btn modal-btn-cancel', 'Cancel');
+        cancel.type = 'button';
+        const send = el('button', 'modal-btn modal-btn-primary', 'Send');
+        send.type = 'button';
+        send.disabled = true;
+        actions.appendChild(cancel);
+        actions.appendChild(send);
+        box.appendChild(actions);
+
+        function refreshSend() { send.disabled = !(files.length && select.value); }
+
+        function renderList() {
+            list.innerHTML = '';
+            files.forEach(function (f, idx) {
+                const li = el('li', 'file-item');
+                li.appendChild(el('span', 'file-name', f.name));
+                li.appendChild(el('span', 'vm-muted', (f.size / 1024 / 1024).toFixed(2) + ' MB'));
+                const x = el('button', 'file-remove', '\u2715');
+                x.type = 'button';
+                x.setAttribute('aria-label', 'Remove ' + f.name);
+                x.addEventListener('click', function () { files.splice(idx, 1); renderList(); });
+                li.appendChild(x);
+                list.appendChild(li);
+            });
+            refreshSend();
+        }
+
+        input.addEventListener('change', function () {
+            const picked = Array.prototype.slice.call(input.files);
+            input.value = '';
+            picked.forEach(function (f) {
+                if (!/\.(pdf|docx?)$/i.test(f.name)) { showToast(f.name + ': only PDF, DOC or DOCX files.', 'error'); return; }
+                if (f.size > MAX_FILE_MB * 1024 * 1024) { showToast(f.name + ' is over ' + MAX_FILE_MB + ' MB.', 'error'); return; }
+                files.push(f);
+            });
+            renderList();
+        });
+        select.addEventListener('change', refreshSend);
+
+        (async function loadReviewers() {
+            try {
+                const token = getToken();
+                const res = await fetch(API_BASE + '/admin/reviewers', {
+                    headers: Object.assign({ Accept: 'application/json' }, token ? { Authorization: 'Bearer ' + token } : {})
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const json = await res.json();
+                const all = Array.isArray(json) ? json : (json.data || json.reviewers || []);
+                const mine = all.filter(function (r) { return r && r.role === role; });
+                if (!mine.length) {
+                    console.warn('[Requests] No reviewers with role', role, all);
+                    select.innerHTML = '<option value="" disabled selected>No ' + label.toLowerCase() + ' accounts found</option>';
+                    return;
+                }
+                select.innerHTML = '<option value="" disabled selected>Choose a ' + label.toLowerCase() + '</option>' +
+                    mine.map(function (r) {
+                        return '<option value="' + escHtml(String(r.id)) + '">' + escHtml(r.name || r.full_name || r.email || ('#' + r.id)) + '</option>';
+                    }).join('');
+            } catch (err) {
+                console.error(err);
+                select.innerHTML = '<option value="" disabled selected>Couldn\u2019t load ' + label.toLowerCase() + 's</option>';
+            }
+        })();
+
+        function close() {
+            document.removeEventListener('keydown', onKey);
+            overlay.remove();
+            document.body.classList.remove('no-scroll');
+            if (opener && opener.focus && document.contains(opener)) opener.focus();
+        }
+        function onKey(e) { if (e.key === 'Escape') close(); }
+
+        cancel.addEventListener('click', close);
+        overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) close(); });
+        document.addEventListener('keydown', onKey);
+
+        send.addEventListener('click', async function () {
+            if (!files.length || !select.value) return;
+            send.disabled = true;
+            cancel.disabled = true;
+            send.textContent = 'Sending...';
+            let sent = 0;
+            try {
+                while (files.length) {
+                    const f = files[0];
+                    const fd = new FormData();
+                    fd.append('reviewer_id', select.value);
+                    fd.append('note', note.value.trim());
+                    fd.append('title', f.name);
+                    fd.append('student_name', p.student || '');
+                    fd.append('file', f);
+                    await uploadFetch('/admin/assignments', fd);
+                    files.shift();
+                    sent++;
+                    renderList();
+                }
+                close();
+                showToast('Sent ' + sent + (sent === 1 ? ' file' : ' files') + ' to the ' + label.toLowerCase() + '.', 'success');
+            } catch (err) {
+                console.error(err);
+                send.textContent = 'Send';
+                cancel.disabled = false;
+                refreshSend();
+                showToast((sent ? ('Sent ' + sent + ' so far. ') : '') + (err && err.message ? err.message : 'Could not send. Try again.'), 'error');
+            }
+        });
+
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+        document.body.classList.add('no-scroll');
+    }
     function sendCell(p) {
         return isDoneStatus(p)
             ? '<button class="btn-action btn-send" onclick="AideaPayments.sendFiles(' + p.id + ')">Send files</button>'
@@ -767,6 +925,7 @@ function openViewModal(i) {
         approveFromView: approveFromView,
         rejectFromView: rejectFromView,
         sendFiles: function (id) { openSendDialog(id, 'files'); },
+        sendReviewer: function (id, role) { openReviewerDialog(id, role); },
         sendCertificate: function (id) { openSendDialog(id, 'certificate'); },
     };
 
