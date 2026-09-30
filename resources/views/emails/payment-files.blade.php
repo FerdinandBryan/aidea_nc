@@ -67,7 +67,7 @@
     @php
       $__p = data_get($__f, 'path', is_string($__f) ? $__f : null);
     @endphp
-    @if ($__p && preg_match('/\.(jpe?g|png|webp)$/i', $__p))
+    @if (false)
       <img src="{{ $message->embed(\Illuminate\Support\Facades\Storage::disk('public')->path($__p)) }}" alt="Certificate" style="display:block;width:100%;max-width:520px;height:auto;margin:16px 0;border-radius:8px;border:1px solid #e5e7eb;">
     @endif
   @endforeach
