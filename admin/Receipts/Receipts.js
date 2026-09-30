@@ -248,8 +248,8 @@ function render() { updateTabs();
   if (filtered.length === 0) {
     grid.innerHTML = `
             <div class="receipts-empty">
-                <strong>No receipts found</strong>
-                <div>Receipts appear here once a certificate has been sent.</div>
+                <strong>No Certificate/Files found</strong>
+                <div>Certificates/Files will appear here once they have been sent.</div>
             </div>`;
     return;
   }
