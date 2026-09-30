@@ -351,6 +351,13 @@ function renderAdminNote(raw) {
     }
     return '<div class="rn-wrap">' + html + '</div>';
 }
+function splitReviewTitle(t) {
+    const title = String((t && t.title) || '');
+    if (t && t.file_label) return { title: title, label: t.file_label };
+    const m = title.match(/^(.+?)\s[-\u2013\u2014]\s(.+?)\s[-\u2013\u2014]\s(.+)$/);
+    if (m) return { title: m[1] + ' - ' + m[2], label: m[3] };
+    return { title: title, label: '' };
+}
 function renderFileLabel(label) {
     if (!label) return '';
     if (!document.getElementById('fl-styles')) {
@@ -385,7 +392,7 @@ async function loadThesisOptions() {
 
         items.sort((a, b) => (a.id || 0) - (b.id || 0));
         select.innerHTML = items.map((t, i) => `
-            <option value="${t.id}"${i === 0 ? ' selected' : ''}>${escHtml(t.title || 'Untitled thesis')} \u2014 ${escHtml(t.student_name || t.student?.name || '\u2014')}${i === 0 ? ' (next in line)' : ''}</option>
+            <option value="${t.id}"${i === 0 ? ' selected' : ''}>${escHtml(splitReviewTitle(t).title || 'Untitled thesis')} \u2014 ${escHtml(t.student_name || t.student?.name || '\u2014')}${i === 0 ? ' (next in line)' : ''}</option>
         `).join('');
     } catch {
         select.innerHTML = '<option value="" disabled selected>Couldn\u2019t load your assignments</option>';
@@ -453,7 +460,7 @@ async function loadSent() {
                 <div class="review-card-body">
                     <div class="review-card-top">
                         <div>
-                            <div class="review-card-title">${escHtml(t.title || 'Untitled thesis')}</div>
+                            <div class="review-card-title">${escHtml(splitReviewTitle(t).title || 'Untitled thesis')}</div>
                             <div class="review-card-meta">
                                 <span>${escHtml(t.student_name || t.student?.name || '\u2014')}</span>
                                 <span>&middot;</span>
@@ -510,7 +517,7 @@ async function loadReceived() {
                 <div class="review-card-body">
                     <div class="review-card-top">
                         <div>
-                            <div class="review-card-title">${escHtml(t.title || 'Untitled thesis')}</div>
+                            <div class="review-card-title">${escHtml(splitReviewTitle(t).title || 'Untitled thesis')}</div>
                             <div class="review-card-meta">
                                 <span>${escHtml(t.student_name || t.student?.name || '\u2014')}</span>
                                 <span>&middot;</span>
@@ -529,7 +536,7 @@ async function loadReceived() {
                         <a class="file-chip" href="${escHtml(t.file_url)}" target="_blank" rel="noopener">
                             ${ICON_DOC} Original thesis file
                         </a>
-                        ${renderFileLabel(t.file_label)}
+                        ${renderFileLabel(splitReviewTitle(t).label)}
                     </div>` : ''}
 
                     
