@@ -272,31 +272,21 @@ function guessFilename(res, url, fallback) {
     return fallback;
 }
 
-async function handleFile(url, mode, fallbackName) {
-    // Open the tab synchronously so popup blockers allow it
-    const win = mode === 'view' ? window.open('', '_blank') : null;
-    try {
-        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${getToken()}` } });
-        if (res.status === 401) { clearSession(); window.location.href = LOGIN_URL; return; }
-        if (!res.ok) throw new Error();
-        const blob = await res.blob();
-        const objUrl = URL.createObjectURL(blob);
-
-        if (mode === 'view') {
-            if (win) win.location.href = objUrl; else window.open(objUrl, '_blank');
-        } else {
-            const a = document.createElement('a');
-            a.href = objUrl;
-            a.download = guessFilename(res, url, fallbackName);
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-        }
-        setTimeout(() => URL.revokeObjectURL(objUrl), 60000);
-    } catch {
-        if (win) win.close();
-        alert('Couldn\u2019t open that file. Please try again.');
+function handleFile(url, mode, fallbackName) {
+    if (!url) return;
+    if (mode === 'view') {
+        // Direct link: no fetch, so no CORS problem. PDFs and images preview in the new tab.
+        window.open(url, '_blank', 'noopener');
+        return;
     }
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fallbackName || 'thesis-file';
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
 }
 
 function initFileActions() {
