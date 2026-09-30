@@ -19,7 +19,7 @@ class PaymentFilesSent extends Notification
 
     public function via($notifiable): array
     {
-        return ['database', 'mail']; // in-system + Gmail
+        return ['database']; // email off: SMTP hangs on Railway. Re-enable with an HTTPS mail provider
     }
 
     public function toDatabase($notifiable): array
