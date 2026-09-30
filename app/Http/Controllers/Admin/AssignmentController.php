@@ -31,14 +31,14 @@ class AssignmentController extends Controller
             'student_name' => ['nullable', 'string', 'max:255'],
             'reviewer_id' => ['required', 'exists:users,id'],
             'note' => ['nullable', 'string'],
-            'file' => ['required', 'file', 'max:20480'],
+            'file' => ['nullable', 'file', 'max:20480'],
         ]);
 
         if ($validator->fails()) {
             return response()->json(['message' => $validator->errors()->first()], 422);
         }
 
-        $path = $request->file('file')->store('assignments', 'public');
+        $path = $request->hasFile('file') ? $request->file('file')->store('assignments', 'public') : null;
 
         $assignment = ThesisAssignment::create([
             'thesis_submission_id' => $request->input('thesis_id'),

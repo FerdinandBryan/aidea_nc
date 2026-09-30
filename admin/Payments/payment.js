@@ -624,7 +624,6 @@ function openViewModal(i) {
         if (!p) return;
 
         const label = role === 'statistician' ? 'Statistician' : 'Grammarian';
-        let files = [];
 
         const opener = document.activeElement;
         const overlay = el('div', 'modal-backdrop');
@@ -644,20 +643,6 @@ function openViewModal(i) {
         select.innerHTML = '<option value="" disabled selected>Loading ' + label.toLowerCase() + 's...</option>';
         body.appendChild(select);
 
-        const zone = el('label', 'dropzone');
-        zone.appendChild(el('strong', '', 'Choose files'));
-        zone.appendChild(el('small', '', 'PDF, DOC or DOCX \u00B7 max ' + MAX_FILE_MB + ' MB each'));
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.pdf,.doc,.docx';
-        input.multiple = true;
-        input.hidden = true;
-        zone.appendChild(input);
-        body.appendChild(zone);
-
-        const list = el('ul', 'file-list');
-        body.appendChild(list);
-
         const note = document.createElement('textarea');
         note.className = 'form-control msg-input';
         note.rows = 3;
@@ -675,34 +660,7 @@ function openViewModal(i) {
         actions.appendChild(send);
         box.appendChild(actions);
 
-        function refreshSend() { send.disabled = !(files.length && select.value); }
-
-        function renderList() {
-            list.innerHTML = '';
-            files.forEach(function (f, idx) {
-                const li = el('li', 'file-item');
-                li.appendChild(el('span', 'file-name', f.name));
-                li.appendChild(el('span', 'vm-muted', (f.size / 1024 / 1024).toFixed(2) + ' MB'));
-                const x = el('button', 'file-remove', '\u2715');
-                x.type = 'button';
-                x.setAttribute('aria-label', 'Remove ' + f.name);
-                x.addEventListener('click', function () { files.splice(idx, 1); renderList(); });
-                li.appendChild(x);
-                list.appendChild(li);
-            });
-            refreshSend();
-        }
-
-        input.addEventListener('change', function () {
-            const picked = Array.prototype.slice.call(input.files);
-            input.value = '';
-            picked.forEach(function (f) {
-                if (!/\.(pdf|docx?)$/i.test(f.name)) { showToast(f.name + ': only PDF, DOC or DOCX files.', 'error'); return; }
-                if (f.size > MAX_FILE_MB * 1024 * 1024) { showToast(f.name + ' is over ' + MAX_FILE_MB + ' MB.', 'error'); return; }
-                files.push(f);
-            });
-            renderList();
-        });
+        function refreshSend() { send.disabled = !select.value; }
         select.addEventListener('change', refreshSend);
 
         (async function loadReviewers() {
@@ -743,33 +701,25 @@ function openViewModal(i) {
         document.addEventListener('keydown', onKey);
 
         send.addEventListener('click', async function () {
-            if (!files.length || !select.value) return;
+            if (!select.value) return;
             send.disabled = true;
             cancel.disabled = true;
             send.textContent = 'Sending...';
-            let sent = 0;
             try {
-                while (files.length) {
-                    const f = files[0];
-                    const fd = new FormData();
-                    fd.append('reviewer_id', select.value);
-                    fd.append('note', buildReviewerNote(p, note.value.trim()));
-                    fd.append('title', f.name);
-                    fd.append('student_name', p.student || '');
-                    fd.append('file', f);
-                    await uploadFetch('/admin/assignments', fd);
-                    files.shift();
-                    sent++;
-                    renderList();
-                }
+                const fd = new FormData();
+                fd.append('reviewer_id', select.value);
+                fd.append('note', buildReviewerNote(p, note.value.trim()));
+                fd.append('title', (p.service || 'Request') + ' - ' + (p.student || ''));
+                fd.append('student_name', p.student || '');
+                await uploadFetch('/admin/assignments', fd);
                 close();
-                showToast('Sent ' + sent + (sent === 1 ? ' file' : ' files') + ' to the ' + label.toLowerCase() + '.', 'success');
+                showToast('Sent to the ' + label.toLowerCase() + '.', 'success');
             } catch (err) {
                 console.error(err);
                 send.textContent = 'Send';
                 cancel.disabled = false;
                 refreshSend();
-                showToast((sent ? ('Sent ' + sent + ' so far. ') : '') + (err && err.message ? err.message : 'Could not send. Try again.'), 'error');
+                showToast(err && err.message ? err.message : 'Could not send. Try again.', 'error');
             }
         });
 
