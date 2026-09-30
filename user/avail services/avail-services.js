@@ -250,7 +250,7 @@ function parseResearchItems(raw) {
                 return {
                     text: item.text || '',
                     type: ITEM_TYPE_META[type] ? type : 'text',
-                    optional: (type === 'link' || type === 'excel') ? true : !!item.optional,
+                    optional: ((type === 'link' || type === 'excel') && String(item.url || '').trim()) ? true : !!item.optional,
                     options: normalizeOptions(item.options), url: String(item.url || ''),
                 };
             }
@@ -483,14 +483,20 @@ function renderResearchFields(items) {
 
         if (item.type === 'link' || item.type === 'excel') {
             let href = String(item.url || '').trim();
-            if (href && !/^https?:\/\//i.test(href)) href = 'https://' + href;
-            const tag = item.type === 'excel' ? ' <span style="font-size:.7rem;font-weight:700;color:var(--muted);">(Excel)</span>' : '';
+            const isExcel = item.type === 'excel';
+            if (href) {
+                if (!/^https?:\/\//i.test(href)) href = 'https://' + href;
+                const tag = isExcel ? ' <span style="font-size:.7rem;font-weight:700;color:var(--muted);">(Excel)</span>' : '';
+                return `
+                <div class="form-group">
+                    <a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"
+                       style="color:var(--primary);font-weight:700;text-decoration:underline;word-break:break-all;">${escapeHtml(item.text)}</a>${tag}
+                </div>`;
+            }
             return `
                 <div class="form-group">
-                    ${href
-                        ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"
-                              style="color:var(--primary);font-weight:700;text-decoration:underline;word-break:break-all;">${escapeHtml(item.text)}</a>${tag}`
-                        : `<span style="font-size:.85rem;color:var(--muted);">${escapeHtml(item.text)} (no link set)</span>`}
+                    <label>${fieldLabelHtml(item)}</label>
+                    <input type="url" class="ri-dyn-input" data-idx="${i}" placeholder="Paste your ${isExcel ? 'Excel / Google Sheets ' : ''}link (https://...)" />
                 </div>`;
         }
 

@@ -943,7 +943,7 @@ function renderResearchItems() {
             ` : ''}
             ${(item.type === 'link' || item.type === 'excel') ? `
                 <input type="url" class="form-control research-item-url" data-idx="${i}"
-                    value="${escHtml(item.url || '')}" placeholder="${item.type === 'excel' ? 'Excel / Google Sheets link (https://...)' : 'Link (https://...)'}" style="margin:6px 0;" />
+                    value="${escHtml(item.url || '')}" placeholder="${item.type === 'excel' ? 'Excel / Sheets link (leave empty = student pastes their own)' : 'Link (leave empty = student pastes their own)'}" style="margin:6px 0;" />
             ` : ''}
             <label class="research-item-optional">
                 <input type="checkbox" class="research-item-optional-cb" data-idx="${i}" ${item.optional ? 'checked' : ''} />
