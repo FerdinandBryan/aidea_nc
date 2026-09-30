@@ -285,7 +285,7 @@ function handleFile(url, mode, fallbackName) {
         const ext = base.indexOf('.') > -1 ? base.slice(base.lastIndexOf('.')) : '';
         let name = fallbackName || 'thesis-file';
         if (ext && !name.toLowerCase().endsWith(ext.toLowerCase())) name += ext;
-        href = u.origin + '/download/assignments/' + encodeURIComponent(base) + '?name=' + encodeURIComponent(name);
+        href = ADMIN_API + '/download/assignments/' + encodeURIComponent(base) + '?name=' + encodeURIComponent(name);
     } catch (e) { }
     const a = document.createElement('a');
     a.href = href;
