@@ -727,10 +727,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }, function () { done('(could not load Tesseract, check your internet)'); });
     }
     /* ---- automatic protocol number: NC-YYYY-000 ---- */
-    function protoKey(yr) { return 'aidea_cert_seq_' + yr; }
-    function protoCount(yr) { try { return parseInt(localStorage.getItem(protoKey(yr)), 10) || 0; } catch (e) { return 0; } }
-    function protoPeek(yr) { return 'NC-' + yr + '-' + String(protoCount(yr) + 1).padStart(3, '0'); }
-    function protoCommit(yr) { try { localStorage.setItem(protoKey(yr), String(protoCount(yr) + 1)); } catch (e) {} }
+    function svcCode(s) {
+        s = String(s || '').toLowerCase();
+        if (/plagiar/.test(s)) return 'PLRSPA';
+        if (/data\s*analy/.test(s)) return 'RSDA';
+        if (/grammar/.test(s)) return 'RSE';
+        if (/ncrc/.test(s)) return 'RSREC';
+        return '';
+    }
+    function protoKey(yr, svc) { var c = svcCode(svc); return 'aidea_cert_seq_' + (c ? c + '_' : '') + yr; }
+    function protoCount(yr, svc) { try { return parseInt(localStorage.getItem(protoKey(yr, svc)), 10) || 0; } catch (e) { return 0; } }
+    function protoPeek(yr, svc) {
+        var n = String(protoCount(yr, svc) + 1).padStart(3, '0'), c = svcCode(svc);
+        return c ? c + '-' + n + '-' + yr : 'NC-' + yr + '-' + n;
+    }
+    function protoCommit(yr, svc) { try { localStorage.setItem(protoKey(yr, svc), String(protoCount(yr, svc) + 1)); } catch (e) {} }
 
     function openChooser() {
         var m = modal(
@@ -838,7 +849,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function q(s) { return o.querySelector(s); }
 
         function data() {
-            st.scale = (Number(q('#cgScale').value) || 100) / 100; if (!st.locked) q('#cgProto').value = protoPeek((q('#cgDate').value || today).slice(0, 4)); if (isTpl) { var oc = q('#cgOcr'); st.on = !!(oc && oc.checked); var bm = q('#cgBgMode'); st.bg = !!(bm && bm.checked); }
+            st.scale = (Number(q('#cgScale').value) || 100) / 100; if (!st.locked) q('#cgProto').value = protoPeek((q('#cgDate').value || today).slice(0, 4), q('#cgRole').value); if (isTpl) { var oc = q('#cgOcr'); st.on = !!(oc && oc.checked); var bm = q('#cgBgMode'); st.bg = !!(bm && bm.checked); }
             st.pal = { bg: q('#cgBg').value, primary: q('#cgPrimary').value, accent: q('#cgAccent').value, text: q('#cgText').value };
             return {
                 title: q('#cgTitle').value.trim(), proto: q('#cgProto').value.trim(),
@@ -846,7 +857,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }
         function redraw() { draw(canvas, data(), st); }
-        function issue() { if (st.locked) return; var yr = (q('#cgDate').value || today).slice(0, 4); st.locked = q('#cgProto').value; protoCommit(yr); }
+        function issue() { if (st.locked) return; var yr = (q('#cgDate').value || today).slice(0, 4); st.locked = q('#cgProto').value; protoCommit(yr, q('#cgRole').value); }
         function setPal(p) { q('#cgBg').value = p.bg; q('#cgPrimary').value = p.primary; q('#cgAccent').value = p.accent; q('#cgText').value = p.text; }
         redraw();
         o.addEventListener('input', redraw); if (isTpl) runOcr(st, q, redraw);
