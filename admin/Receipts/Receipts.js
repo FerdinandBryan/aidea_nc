@@ -524,24 +524,54 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function strip(ctx, x, y0, n) {
+        x = Math.max(1, Math.min(W - 2, x));
+        var d = ctx.getImageData(x - 1, y0, 3, n).data, out = [];
+        for (var i = 0; i < n; i++) {
+            var o = i * 12, r = 0, g = 0, b = 0;
+            for (var j = 0; j < 3; j++) { r += d[o + j * 4]; g += d[o + j * 4 + 1]; b += d[o + j * 4 + 2]; }
+            out.push([Math.round(r / 3), Math.round(g / 3), Math.round(b / 3)]);
+        }
+        return out;
+    }
+    function eraseBoxes(ctx, st) {
+        if (!st.on) return;
+        var hh = ctx.canvas.height;
+        Object.keys(st.tpl).forEach(function (k) {
+            var b = st.tpl[k].box;
+            if (!b) return;
+            var x0 = Math.max(0, Math.floor(b.x0 * W - 10)), x1 = Math.min(W - 1, Math.ceil(b.x1 * W + 10));
+            var y0 = Math.max(0, Math.floor(b.y0 * hh - 6)), y1 = Math.min(hh - 1, Math.ceil(b.y1 * hh + 6));
+            var n = y1 - y0 + 1;
+            if (n < 1 || x1 - x0 < 2) return;
+            var L = strip(ctx, x0 - 7, y0, n), R = strip(ctx, x1 + 7, y0, n);
+            for (var i = 0; i < n; i++) {
+                var g = ctx.createLinearGradient(x0, 0, x1, 0);
+                g.addColorStop(0, 'rgb(' + L[i].join(',') + ')');
+                g.addColorStop(1, 'rgb(' + R[i].join(',') + ')');
+                ctx.fillStyle = g; ctx.fillRect(x0, y0 + i, x1 - x0, 1);
+            }
+        });
+    }
+
     /* ---- draw the certificate in the SYSTEM layout ---- */
     function draw(canvas, d, st) {
         var pal = st.pal, role = ROLES[d.role] || ROLES.analyst;
-        canvas.width = W; canvas.height = H;
+        var BG = !!(st.bg && st.img); var H = BG ? Math.round(W * st.img.naturalHeight / st.img.naturalWidth) : 1131; canvas.width = W; canvas.height = H;
         var ctx = canvas.getContext('2d');
-        ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, W, H);
+        if (BG) { ctx.drawImage(st.img, 0, 0, W, H); eraseBoxes(ctx, st); } else { ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, W, H); }
         var boxes = [];
 
-        ctx.strokeStyle = pal.primary; ctx.lineWidth = 14; ctx.strokeRect(40, 40, W - 80, H - 80);
-        ctx.strokeStyle = pal.accent; ctx.lineWidth = 4; ctx.strokeRect(68, 68, W - 136, H - 136);
+        if (!BG) { ctx.strokeStyle = pal.primary; ctx.lineWidth = 14; ctx.strokeRect(40, 40, W - 80, H - 80); }
+        if (!BG) { ctx.strokeStyle = pal.accent; ctx.lineWidth = 4; ctx.strokeRect(68, 68, W - 136, H - 136); }
         ctx.textAlign = 'center';
         ctx.fillStyle = pal.primary; ctx.font = 'bold 34px Arial';
-        ctx.fillText('NORZAGARAY COLLEGE', W / 2, 170);
+        var S1 = st.on && st.tpl.school; if (S1) ctx.font = 'bold ' + Math.round(S1.size) + 'px Arial'; if (S1 || !BG) ctx.fillText(S1 ? S1.text : 'NORZAGARAY COLLEGE', S1 ? S1.x * W : W / 2, S1 ? S1.y * H : 170);
         ctx.fillStyle = pal.text; ctx.font = '22px Arial';
-        ctx.fillText('AIDEA', W / 2, 208);
+        var S2 = st.on && st.tpl.sub; if (S2) ctx.font = Math.round(S2.size) + 'px Arial'; if (BG ? S2 : (!S1 || S2)) ctx.fillText(S2 ? S2.text : 'AIDEA', S2 ? S2.x * W : W / 2, S2 ? S2.y * H : 208);
 
         function put(key, text, size, style, fam, col, align, dx, dy) {
-            var p = st.pos[key] || { x: dx, y: dy };
+            var T = st.on && st.tpl[key]; var p = st.pos[key] || (T ? { x: T.x, y: T.y } : { x: dx, y: dy }); if (T) { if (T.keep && T.text) text = T.text; if (T.size) size = T.size; } if (BG && !T && !st.pos[key] && (key === 'head' || key === 'intro1' || key === 'intro2')) return { x: p.x * W, y: p.y * H };
             var x = p.x * W, y = p.y * H, px = Math.round(size * st.scale);
             ctx.font = style + ' ' + px + 'px ' + fam;
             ctx.fillStyle = col; ctx.textAlign = align;
@@ -552,7 +582,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return { x: x, y: y };
         }
 
-        if (st.logo) {
+        if (st.logo && !BG) {
             var lp = st.pos.logo || { x: 0.15, y: 0.17 };
             var lh = Math.round(130 * st.scale), lw = lh * st.logo.width / st.logo.height;
             var lx = lp.x * W, ly = lp.y * H;
@@ -561,10 +591,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         var h = put('head', role.head, 60, 'bold', SERIF, pal.primary, 'center', 0.5, 0.292);
-        ctx.fillStyle = pal.accent; ctx.fillRect(h.x - 180, h.y + 30, 360, 5);
+        if (!BG) { ctx.fillStyle = pal.accent; ctx.fillRect(h.x - 180, h.y + 30, 360, 5); }
         put('intro1', 'This is to certify that the manuscript entitled', 28, 'italic', SERIF, pal.text, 'center', 0.5, 0.398);
 
-        var tp = st.pos.title || { x: 0.5, y: 0.473 };
+        var tp = st.pos.title || (st.on && st.tpl.title) || { x: 0.5, y: 0.473 };
         var tx = tp.x * W, ty = tp.y * H, tpx = Math.round(46 * st.scale);
         ctx.font = 'bold ' + tpx + 'px ' + SERIF;
         ctx.fillStyle = pal.primary; ctx.textAlign = 'center';
@@ -577,7 +607,7 @@ document.addEventListener('DOMContentLoaded', () => {
         put('date', 'Date: ' + (fmtDate(d.date) || '\u2014'), 26, 'normal', SANS, pal.text, 'right', 0.875, 0.77);
         var n = put('name', d.name || 'Name', 34, 'bold', SERIF, pal.primary, 'center', 0.5, 0.853);
         ctx.strokeStyle = pal.text; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(n.x - 230, n.y + 20); ctx.lineTo(n.x + 230, n.y + 20); ctx.stroke();
+        if (!BG) { ctx.beginPath(); ctx.moveTo(n.x - 230, n.y + 20); ctx.lineTo(n.x + 230, n.y + 20); ctx.stroke(); }
         put('role', role.label, 24, 'normal', SANS, pal.text, 'center', 0.5, 0.906);
         st.boxes = boxes;
     }
@@ -615,6 +645,66 @@ document.addEventListener('DOMContentLoaded', () => {
             '<span style="font-size:12.5px;color:#475569">' + text + '</span></button>';
     }
 
+    /* ---- read the text of the template with Tesseract.js (free, in-browser) ---- */
+    function loadTess(ok, fail) {
+        if (window.Tesseract) return ok();
+        var s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+        s.onload = ok; s.onerror = fail;
+        document.head.appendChild(s);
+    }
+    function mapLines(lines, img) {
+        var sx = 1 / img.naturalWidth, sy = 1 / img.naturalHeight, k = W / img.naturalWidth;
+        var L = lines.filter(function (l) { return l.text && l.text.trim().length > 1 && l.confidence > 40; }).map(function (l) {
+            var b = l.bbox, h = b.y1 - b.y0;
+            return { t: l.text.trim(), cx: (b.x0 + b.x1) / 2 * sx, x0: b.x0 * sx, x1: b.x1 * sx, y0: b.y0 * sy, y1: b.y1 * sy, y: (b.y1 - h * 0.2) * sy, size: Math.max(14, h * k * 0.85) };
+        }).sort(function (a, b) { return a.y - b.y; });
+        var out = {};
+        function bx(l) { return { x0: l.x0, x1: l.x1, y0: l.y0, y1: l.y1 }; }
+        function find(rx, key, keep, align) {
+            for (var i = 0; i < L.length; i++) {
+                var l = L[i];
+                if (!l.used && rx.test(l.t)) {
+                    l.used = true;
+                    out[key] = { text: l.t, x: align === 'left' ? l.x0 : (align === 'right' ? l.x1 : l.cx), y: l.y, size: l.size, keep: keep, box: bx(l) };
+                    return l;
+                }
+            }
+            return null;
+        }
+        var head = find(/certificate/i, 'head', true, 'center');
+        var i1 = find(/to certify|\bcertify\b|entitled/i, 'intro1', true, 'center');
+        var i2 = find(/reviewed|finalized|undersigned|hereby/i, 'intro2', true, 'center');
+        var pr = find(/protocol/i, 'proto', false, 'left');
+        if (pr && /date/i.test(pr.t)) { out.date = { x: pr.x1, y: pr.y, size: pr.size, keep: false }; }
+        else find(/date/i, 'date', false, 'right');
+        var ro = find(/data analyst|grammarian|analyst/i, 'role', false, 'center');
+        if (ro) out.name = { x: ro.cx, y: ro.y - 0.053 };
+        if (i1 && i2) out.title = { x: (i1.cx + i2.cx) / 2, y: i1.y + 0.29 * (i2.y - i1.y) };
+        if (head) {
+            var top = L.filter(function (l) { return !l.used && l.y < head.y - 0.01 && /[A-Za-z]{3}/.test(l.t); });
+            if (top[0]) out.school = { text: top[0].t, x: top[0].cx, y: top[0].y, size: top[0].size, box: bx(top[0]) };
+            if (top[1]) out.sub = { text: top[1].t, x: top[1].cx, y: top[1].y, size: top[1].size, box: bx(top[1]) };
+        }
+        return out;
+    }
+    function runOcr(st, q, redraw) {
+        var img = st.img, status = q('#cgOcrStatus'), box = q('#cgOcr');
+        function say(m) { if (status) status.textContent = m; }
+        function done(m) { say(m); if (box) box.disabled = false; redraw(); }
+        if (box) box.disabled = true;
+        say('(reading template, first time may take a while...)');
+        loadTess(function () {
+            window.Tesseract.recognize(img.src, 'eng', {
+                logger: function (m) { if (m.status === 'recognizing text') say('(reading ' + Math.round(m.progress * 100) + '%)'); }
+            }).then(function (r) {
+                if (st.img !== img) return;
+                st.tpl = mapLines(r.data.lines || [], img);
+                var n = Object.keys(st.tpl).length;
+                done(n ? '(found ' + n + ' items)' : '(no text found, using defaults)');
+            }).catch(function () { done('(could not read the image, using defaults)'); });
+        }, function () { done('(could not load Tesseract, check your internet)'); });
+    }
     function openChooser() {
         var m = modal(
             '<div style="width:min(580px,100%);background:#fff;color:#111827;border-radius:14px;padding:22px">' +
@@ -682,7 +772,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function openGenerator(init) {
-        var st = { mode: init.mode, img: init.img || null, pal: Object.assign({}, init.pal || DEF), logo: null, pos: {}, scale: 1, boxes: [], drag: null };
+        var st = { bg: init.mode === 'template', on: false, tpl: {}, mode: init.mode, img: init.img || null, pal: Object.assign({}, init.pal || DEF), logo: null, pos: {}, scale: 1, boxes: [], drag: null };
         var isTpl = st.mode === 'template';
         var today = new Date().toISOString().slice(0, 10);
         function clr(id, label, val) { return '<label style="font-size:13px">' + label + ' <input id="' + id + '" type="color" value="' + val + '" style="vertical-align:middle"></label>'; }
@@ -703,7 +793,7 @@ document.addEventListener('DOMContentLoaded', () => {
             (isTpl ? '<img id="cgThumb" src="' + st.img.src + '" alt="Your template" title="Your template (reference)" style="height:56px;border:1px solid #cbd5e1;border-radius:6px">' : '') +
             clr('cgBg', 'Background', st.pal.bg) + clr('cgPrimary', 'Main', st.pal.primary) +
             clr('cgAccent', 'Accent', st.pal.accent) + clr('cgText', 'Text', st.pal.text) +
-            '<label style="font-size:13px">Text size <input id="cgScale" type="range" min="70" max="150" value="100" style="vertical-align:middle"></label>' +
+            (isTpl ? '<label style="font-size:13px"><input id="cgBgMode" type="checkbox" checked style="vertical-align:middle"> Copy design exactly</label><label style="font-size:13px"><input id="cgOcr" type="checkbox" checked disabled style="vertical-align:middle"> Copy text from template <span id="cgOcrStatus" style="color:#64748b"></span></label>' : '') + '<label style="font-size:13px">Text size <input id="cgScale" type="range" min="70" max="150" value="100" style="vertical-align:middle"></label>' +
             '<span style="font-size:12px;color:#64748b">Drag any text or the logo on the preview to move it.</span></div>' +
             '<canvas id="cgCanvas" style="width:100%;height:auto;border:1px solid #d1d5db;border-radius:8px;touch-action:none"></canvas>' +
             '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap">' +
@@ -721,7 +811,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function q(s) { return o.querySelector(s); }
 
         function data() {
-            st.scale = (Number(q('#cgScale').value) || 100) / 100;
+            st.scale = (Number(q('#cgScale').value) || 100) / 100; if (isTpl) { var oc = q('#cgOcr'); st.on = !!(oc && oc.checked); var bm = q('#cgBgMode'); st.bg = !!(bm && bm.checked); }
             st.pal = { bg: q('#cgBg').value, primary: q('#cgPrimary').value, accent: q('#cgAccent').value, text: q('#cgText').value };
             return {
                 title: q('#cgTitle').value.trim(), proto: q('#cgProto').value.trim(),
@@ -731,7 +821,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function redraw() { draw(canvas, data(), st); }
         function setPal(p) { q('#cgBg').value = p.bg; q('#cgPrimary').value = p.primary; q('#cgAccent').value = p.accent; q('#cgText').value = p.text; }
         redraw();
-        o.addEventListener('input', redraw);
+        o.addEventListener('input', redraw); if (isTpl) runOcr(st, q, redraw);
         o.addEventListener('change', redraw);
 
         function pt(e) { var r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height }; }
@@ -772,7 +862,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadImage(f2.files[0], function (im) {
                     st.img = im; st.logo = null; st.pos = {};
                     q('#cgThumb').src = im.src;
-                    setPal(analyze(im)); redraw();
+                    setPal(analyze(im)); st.tpl = {}; runOcr(st, q, redraw); redraw();
                 });
             });
         }
