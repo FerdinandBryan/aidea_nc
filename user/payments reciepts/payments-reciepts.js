@@ -1,7 +1,7 @@
 // payments-reciepts.js — Student side
 // Same shell behavior as dashboard.js / avail-services.js (session, theme,
 // drawer, profile menu, sign-out modal) plus:
-//   - Payment history table, read from GET /api/payments?student=<name>
+//   - Requests history table, read from GET /api/payments?student=<name>
 //     (Status: Pending | Paid | Rejected)
 //   - "My certificates & files" — whatever the admin has sent for a
 //     completed payment, read from GET /api/certificates -> { <payment_id>:
