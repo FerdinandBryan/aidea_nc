@@ -746,16 +746,16 @@ function openViewModal(i) {
                 if (!rFiles.length) {
                     await uploadFetch('/admin/assignments', fd);
                 } else {
-                    for (let i = 0; i < rFiles.length; i++) {
-                        const one = new FormData();
-                        one.append('reviewer_id', select.value);
-                        one.append('note', buildReviewerNote(p, note.value.trim()));
-                        one.append('title', (p.service || 'Request') + ' - ' + (p.student || '') + (rFiles.length > 1 ? ' (' + (i + 1) + '/' + rFiles.length + ')' : ''));
-                        one.append('student_name', p.student || '');
-                        one.append('file', rFiles[i].file);
-                        one.append('file_label', rFiles[i].label);
-                        await uploadFetch('/admin/assignments', one);
-                    }
+                    const many = new FormData();
+                    many.append('reviewer_id', select.value);
+                    many.append('note', buildReviewerNote(p, note.value.trim()));
+                    many.append('title', (p.service || 'Request') + ' - ' + (p.student || ''));
+                    many.append('student_name', p.student || '');
+                    rFiles.forEach(function (rf) {
+                        many.append('files[]', rf.file);
+                        many.append('file_labels[]', rf.label);
+                    });
+                    await uploadFetch('/admin/assignments', many);
                 }
                 close();
                 showToast('Sent to the ' + label.toLowerCase() + '.', 'success');
