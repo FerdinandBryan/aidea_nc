@@ -627,6 +627,17 @@ document.addEventListener('DOMContentLoaded', () => {
         o.addEventListener('mousedown', function (e) { if (e.target === o) close(); });
         o.addEventListener('click', function (e) { if (e.target.closest('[data-cg-close]')) close(); });
         document.body.appendChild(o);
+        Array.prototype.forEach.call(o.querySelectorAll('[data-cg-close]'), function (x) {
+            if (x.textContent.trim() === '\u2715') x.style.display = 'none';
+        });
+        var cb = document.createElement('button');
+        cb.type = 'button';
+        cb.textContent = '\u2715 Close';
+        cb.title = 'Close (Esc)';
+        cb.setAttribute('aria-label', 'Close');
+        cb.style.cssText = 'position:fixed;top:16px;right:24px;z-index:10000;padding:10px 16px;border:0;border-radius:999px;background:#ef4444;color:#fff;font:inherit;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.35)';
+        cb.addEventListener('click', close);
+        o.appendChild(cb);
         return { o: o, close: close };
     }
 
