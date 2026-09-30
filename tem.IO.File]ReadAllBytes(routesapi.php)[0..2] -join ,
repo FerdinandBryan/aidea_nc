@@ -1,0 +1,16 @@
+warning: in the working copy of 'routes/api.php', CRLF will be replaced by LF the next time Git touches it
+[1mdiff --git a/routes/api.php b/routes/api.php[m
+[1mindex 80e3caf..5308dc0 100644[m
+[1m--- a/routes/api.php[m
+[1m+++ b/routes/api.php[m
+[36m@@ -1,4 +1,4 @@[m
+[31m-﻿<?php[m
+[32m+[m[32m<?php[m
+ [m
+ use Illuminate\Support\Facades\Route;[m
+ use App\Http\Controllers\AuthController;[m
+[36m@@ -172,4 +172,3 @@[m
+ // My Profile routes[m
+ require __DIR__ . '/profile.php';[m
+ [m
+[31m-Route::get('/whoami', fn () => response('ROOT-APP'));[m
