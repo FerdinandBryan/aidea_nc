@@ -462,6 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 /* == Certificate template generator ======================================= */
 (function () {
+    var W = 1600, SERIF = 'Georgia, serif', SANS = 'Arial';
     var ROLES = {
         analyst:    { label: 'Data Analyst', head: 'CERTIFICATE OF DATA ANALYSIS' },
         grammarian: { label: 'Grammarian',   head: 'CERTIFICATE OF GRAMMAR REVIEW' }
@@ -481,76 +482,177 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cur) lines.push(cur);
         return lines;
     }
-    function draw(canvas, d) {
-        var W = 1600, H = 1131, role = ROLES[d.role] || ROLES.analyst;
+
+    function draw(canvas, d, st) {
+        var img = st.mode === 'template' ? st.img : null;
+        var H = img ? Math.round(W * img.naturalHeight / img.naturalWidth) : 1131;
+        var role = ROLES[d.role] || ROLES.analyst;
         canvas.width = W; canvas.height = H;
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
-        ctx.strokeStyle = '#0f3d6e'; ctx.lineWidth = 14; ctx.strokeRect(40, 40, W - 80, H - 80);
-        ctx.strokeStyle = '#e0a82e'; ctx.lineWidth = 4; ctx.strokeRect(68, 68, W - 136, H - 136);
-        ctx.textAlign = 'center';
+        var boxes = [];
+        var main = img ? st.color : '#0f3d6e';
+        var soft = img ? st.color : '#333333';
 
-        ctx.fillStyle = '#0f3d6e'; ctx.font = 'bold 34px Arial';
-        ctx.fillText('NORZAGARAY COLLEGE', W / 2, 170);
-        ctx.fillStyle = '#666'; ctx.font = '22px Arial';
-        ctx.fillText('AIDEA', W / 2, 208);
+        if (img) {
+            ctx.drawImage(img, 0, 0, W, H);
+        } else {
+            ctx.strokeStyle = '#0f3d6e'; ctx.lineWidth = 14; ctx.strokeRect(40, 40, W - 80, H - 80);
+            ctx.strokeStyle = '#e0a82e'; ctx.lineWidth = 4; ctx.strokeRect(68, 68, W - 136, H - 136);
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#0f3d6e'; ctx.font = 'bold 34px Arial';
+            ctx.fillText('NORZAGARAY COLLEGE', W / 2, 170);
+            ctx.fillStyle = '#666'; ctx.font = '22px Arial';
+            ctx.fillText('AIDEA', W / 2, 208);
+        }
 
-        ctx.fillStyle = '#0f3d6e'; ctx.font = 'bold 60px Georgia, serif';
-        ctx.fillText(role.head, W / 2, 330);
-        ctx.fillStyle = '#e0a82e'; ctx.fillRect(W / 2 - 180, 360, 360, 5);
+        function put(key, text, size, style, fam, col, align, dx, dy) {
+            var p = st.pos[key] || { x: dx, y: dy };
+            var x = p.x * W, y = p.y * H, px = Math.round(size * st.scale);
+            ctx.font = style + ' ' + px + 'px ' + fam;
+            ctx.fillStyle = col; ctx.textAlign = align;
+            ctx.fillText(text, x, y);
+            var w = ctx.measureText(text).width;
+            var x0 = align === 'center' ? x - w / 2 : (align === 'left' ? x : x - w);
+            boxes.push({ key: key, ax: x, ay: y, x0: x0 - 12, x1: x0 + w + 12, y0: y - px, y1: y + px * 0.3 });
+            return { x: x, y: y };
+        }
 
-        ctx.fillStyle = '#333'; ctx.font = 'italic 28px Georgia, serif';
-        ctx.fillText('This is to certify that the manuscript entitled', W / 2, 450);
+        var full = !img || st.extras;
 
-        ctx.fillStyle = '#0f3d6e'; ctx.font = 'bold 46px Georgia, serif';
-        var lines = wrap(ctx, d.title || 'Title of the document', 1200).slice(0, 3);
-        var y = 535;
-        lines.forEach(function (ln) { ctx.fillText(ln, W / 2, y); y += 62; });
+        if (full) {
+            var h = put('head', role.head, 60, 'bold', SERIF, main, 'center', 0.5, 0.292);
+            if (!img) { ctx.fillStyle = '#e0a82e'; ctx.fillRect(h.x - 180, h.y + 30, 360, 5); }
+            put('intro1', 'This is to certify that the manuscript entitled', 28, 'italic', SERIF, soft, 'center', 0.5, 0.398);
+        }
 
-        ctx.fillStyle = '#333'; ctx.font = 'italic 28px Georgia, serif';
-        ctx.fillText('has been reviewed and finalized by the undersigned.', W / 2, y + 30);
+        // Title (may wrap to several lines)
+        var titleText = d.title || (img ? '' : 'Title of the document');
+        if (titleText) {
+            var tp = st.pos.title || { x: 0.5, y: 0.473 };
+            var tx = tp.x * W, ty = tp.y * H, tpx = Math.round(46 * st.scale);
+            ctx.font = 'bold ' + tpx + 'px ' + SERIF;
+            ctx.fillStyle = main; ctx.textAlign = 'center';
+            var lines = wrap(ctx, titleText, 1200).slice(0, 3), gap = Math.round(62 * st.scale), maxw = 0;
+            lines.forEach(function (ln, i) { ctx.fillText(ln, tx, ty + i * gap); maxw = Math.max(maxw, ctx.measureText(ln).width); });
+            boxes.push({ key: 'title', ax: tx, ay: ty, x0: tx - maxw / 2 - 12, x1: tx + maxw / 2 + 12, y0: ty - tpx, y1: ty + (lines.length - 1) * gap + tpx * 0.3 });
+        }
 
-        ctx.font = '26px Arial'; ctx.fillStyle = '#222';
-        ctx.textAlign = 'left';
-        ctx.fillText('Protocol No.: ' + (d.proto || '\u2014'), 200, 870);
-        ctx.textAlign = 'right';
-        ctx.fillText('Date: ' + (fmtDate(d.date) || '\u2014'), W - 200, 870);
+        if (full) put('intro2', 'has been reviewed and finalized by the undersigned.', 28, 'italic', SERIF, soft, 'center', 0.5, 0.66);
 
-        ctx.textAlign = 'center';
-        ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(W / 2 - 230, 985); ctx.lineTo(W / 2 + 230, 985); ctx.stroke();
-        ctx.fillStyle = '#0f3d6e'; ctx.font = 'bold 34px Georgia, serif';
-        ctx.fillText(d.name || 'Name', W / 2, 965);
-        ctx.fillStyle = '#555'; ctx.font = '24px Arial';
-        ctx.fillText(role.label, W / 2, 1025);
+        var protoVal = d.proto || (img ? '' : '\u2014');
+        var dateVal = fmtDate(d.date) || (img ? '' : '\u2014');
+        if (full || protoVal) put('proto', (full ? 'Protocol No.: ' : '') + protoVal, 26, 'normal', SANS, '#222222', 'left', 0.125, 0.77);
+        if (full || dateVal) put('date', (full ? 'Date: ' : '') + dateVal, 26, 'normal', SANS, '#222222', 'right', 0.875, 0.77);
+
+        var nameVal = d.name || (img ? '' : 'Name');
+        if (nameVal) {
+            var n = put('name', nameVal, 34, 'bold', SERIF, main, 'center', 0.5, 0.853);
+            if (!img) {
+                ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(n.x - 230, n.y + 20); ctx.lineTo(n.x + 230, n.y + 20); ctx.stroke();
+            }
+        }
+        put('role', role.label, 24, 'normal', SANS, img ? st.color : '#555555', 'center', 0.5, 0.906);
+        st.boxes = boxes;
     }
 
-    function openGenerator() {
-        var today = new Date().toISOString().slice(0, 10);
+    function inp() { return 'width:100%;padding:9px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#111827;font:inherit;box-sizing:border-box'; }
+    function btn(bg, fg) { return 'padding:10px 16px;border:0;border-radius:10px;background:' + bg + ';color:' + fg + ';font:inherit;font-weight:600;cursor:pointer'; }
+    function field(label, control) { return '<label style="display:block;font-size:12px;font-weight:600;color:#475569">' + label + '<div style="margin-top:4px">' + control + '</div></label>'; }
+
+    function modal(html) {
         var o = document.createElement('div');
         o.style.cssText = 'position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:16px;background:rgba(15,23,42,.6);overflow:auto';
-        o.innerHTML =
-            '<div style="width:min(980px,100%);max-height:94vh;overflow:auto;background:#fff;color:#111827;border-radius:14px;padding:20px;font-family:inherit">' +
-            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
+        o.innerHTML = html;
+        var onKey = function (e) { if (e.key === 'Escape') close(); };
+        function close() { document.removeEventListener('keydown', onKey); o.remove(); }
+        document.addEventListener('keydown', onKey);
+        o.addEventListener('mousedown', function (e) { if (e.target === o) close(); });
+        o.addEventListener('click', function (e) { if (e.target.closest('[data-cg-close]')) close(); });
+        document.body.appendChild(o);
+        return { o: o, close: close };
+    }
+
+    function loadImage(file, done) {
+        if (!file) return;
+        if (!/^image\//.test(file.type)) { alert('Please choose an image (PNG, JPG or WebP).'); return; }
+        var url = URL.createObjectURL(file);
+        var im = new Image();
+        im.onload = function () { done(im); };
+        im.onerror = function () { alert('Could not read that image.'); };
+        im.src = url;
+    }
+
+    function choice(id, title, text) {
+        return '<button type="button" data-choice="' + id + '" style="text-align:left;padding:16px;border:1.5px solid #cbd5e1;border-radius:12px;background:#f8fafc;color:#111827;font:inherit;cursor:pointer">' +
+            '<strong style="display:block;font-size:15px;margin-bottom:6px">' + title + '</strong>' +
+            '<span style="font-size:12.5px;color:#475569">' + text + '</span></button>';
+    }
+
+    function openChooser() {
+        var m = modal(
+            '<div style="width:min(580px,100%);background:#fff;color:#111827;border-radius:14px;padding:22px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
             '<h3 style="margin:0;font-size:18px">Generate certificate</h3>' +
             '<button type="button" data-cg-close style="border:0;background:transparent;font-size:20px;cursor:pointer">\u2715</button></div>' +
-            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:14px">' +
-            cgField('Title', '<input id="cgTitle" type="text" placeholder="Title of the document" style="' + inp() + '">') +
-            cgField('Protocol No.', '<input id="cgProto" type="text" placeholder="e.g. NC-2026-001" style="' + inp() + '">') +
-            cgField('Date', '<input id="cgDate" type="date" value="' + today + '" style="' + inp() + '">') +
-            cgField('Role', '<select id="cgRole" style="' + inp() + '"><option value="analyst">Data Analyst</option><option value="grammarian">Grammarian</option></select>') +
-            cgField('Name', '<input id="cgName" type="text" placeholder="Name of the Data Analyst / Grammarian" style="' + inp() + '">') +
+            '<p style="margin:0 0 16px;font-size:13px;color:#475569">Which template do you want to use?</p>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px">' +
+            choice('sys', 'System template', 'Use the built-in AIDEA certificate design.') +
+            choice('new', 'New template', 'Choose your own certificate image. The system uses it as the design reference.') +
             '</div>' +
-            '<canvas id="cgCanvas" style="width:100%;height:auto;border:1px solid #d1d5db;border-radius:8px"></canvas>' +
+            '<input type="file" id="cgFile" accept="image/png,image/jpeg,image/webp" hidden>' +
+            '<p style="margin:14px 0 0;font-size:12px;color:#64748b">A new template must be an image (PNG, JPG or WebP). For a PDF, export it as an image first.</p>' +
+            '</div>');
+        var file = m.o.querySelector('#cgFile');
+        m.o.addEventListener('click', function (e) {
+            var c = e.target.closest('[data-choice]');
+            if (!c) return;
+            if (c.getAttribute('data-choice') === 'sys') { m.close(); openGenerator({ mode: 'system' }); }
+            else file.click();
+        });
+        file.addEventListener('change', function () {
+            loadImage(file.files[0], function (im) { m.close(); openGenerator({ mode: 'template', img: im }); });
+        });
+    }
+
+    function openGenerator(init) {
+        var st = { mode: init.mode, img: init.img || null, pos: {}, scale: 1, color: '#1f2937', extras: init.mode === 'system', boxes: [], drag: null };
+        var isTpl = st.mode === 'template';
+        var today = new Date().toISOString().slice(0, 10);
+
+        var m = modal(
+            '<div style="width:min(980px,100%);max-height:94vh;overflow:auto;background:#fff;color:#111827;border-radius:14px;padding:20px;font-family:inherit">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
+            '<h3 style="margin:0;font-size:18px">Generate certificate \u00B7 ' + (isTpl ? 'New template' : 'System template') + '</h3>' +
+            '<button type="button" data-cg-close style="border:0;background:transparent;font-size:20px;cursor:pointer">\u2715</button></div>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px">' +
+            field('Title', '<input id="cgTitle" type="text" placeholder="Title of the document" style="' + inp() + '">') +
+            field('Protocol No.', '<input id="cgProto" type="text" placeholder="e.g. NC-2026-001" style="' + inp() + '">') +
+            field('Date', '<input id="cgDate" type="date" value="' + today + '" style="' + inp() + '">') +
+            field('Role', '<select id="cgRole" style="' + inp() + '"><option value="analyst">Data Analyst</option><option value="grammarian">Grammarian</option></select>') +
+            field('Name', '<input id="cgName" type="text" placeholder="Name of the Data Analyst / Grammarian" style="' + inp() + '">') +
+            '</div>' +
+            '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-bottom:10px;font-size:13px;color:#334155">' +
+            '<label>Text size <input id="cgScale" type="range" min="70" max="150" value="100" style="vertical-align:middle"></label>' +
+            (isTpl ? '<label>Text color <input id="cgColor" type="color" value="#1f2937" style="vertical-align:middle"></label>' +
+                '<label><input id="cgExtras" type="checkbox" style="vertical-align:middle"> Include heading, sentence and labels</label>' : '') +
+            '<span style="color:#64748b">Tip: drag any text on the preview to move it.</span></div>' +
+            '<canvas id="cgCanvas" style="width:100%;height:auto;border:1px solid #d1d5db;border-radius:8px;touch-action:none"></canvas>' +
             '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap">' +
+            (isTpl ? '<button type="button" id="cgChange" style="' + btn('#e5e7eb', '#111827') + '">Change template</button>' : '') +
+            '<button type="button" id="cgReset" style="' + btn('#e5e7eb', '#111827') + '">Reset positions</button>' +
             '<button type="button" data-cg-close style="' + btn('#e5e7eb', '#111827') + '">Close</button>' +
             '<button type="button" id="cgPrint" style="' + btn('#e5e7eb', '#111827') + '">Print / PDF</button>' +
             '<button type="button" id="cgDl" style="' + btn('#1d4ed8', '#fff') + '">Download PNG</button>' +
-            '</div></div>';
-        document.body.appendChild(o);
+            '</div>' +
+            (isTpl ? '<input type="file" id="cgFile2" accept="image/png,image/jpeg,image/webp" hidden>' : '') +
+            '</div>');
+        var o = m.o, canvas = o.querySelector('#cgCanvas');
 
-        var canvas = o.querySelector('#cgCanvas');
         function data() {
+            st.scale = (Number(o.querySelector('#cgScale').value) || 100) / 100;
+            if (isTpl) { st.color = o.querySelector('#cgColor').value; st.extras = o.querySelector('#cgExtras').checked; }
             return {
                 title: o.querySelector('#cgTitle').value.trim(),
                 proto: o.querySelector('#cgProto').value.trim(),
@@ -559,16 +661,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 name:  o.querySelector('#cgName').value.trim()
             };
         }
-        function redraw() { draw(canvas, data()); }
+        function redraw() { draw(canvas, data(), st); }
         redraw();
         o.addEventListener('input', redraw);
         o.addEventListener('change', redraw);
 
-        var onKey = function (e) { if (e.key === 'Escape') close(); };
-        function close() { document.removeEventListener('keydown', onKey); o.remove(); }
-        document.addEventListener('keydown', onKey);
-        o.addEventListener('mousedown', function (e) { if (e.target === o) close(); });
-        o.addEventListener('click', function (e) { if (e.target.closest('[data-cg-close]')) close(); });
+        // drag text on the preview
+        function pt(e) { var r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height }; }
+        function hit(p) {
+            for (var i = st.boxes.length - 1; i >= 0; i--) {
+                var b = st.boxes[i];
+                if (p.x >= b.x0 && p.x <= b.x1 && p.y >= b.y0 && p.y <= b.y1) return b;
+            }
+            return null;
+        }
+        canvas.addEventListener('pointerdown', function (e) {
+            var p = pt(e), b = hit(p);
+            if (!b) return;
+            st.drag = { key: b.key, ox: p.x - b.ax, oy: p.y - b.ay };
+            try { canvas.setPointerCapture(e.pointerId); } catch (x) {}
+            e.preventDefault();
+        });
+        canvas.addEventListener('pointermove', function (e) {
+            var p = pt(e);
+            if (st.drag) {
+                st.pos[st.drag.key] = { x: (p.x - st.drag.ox) / canvas.width, y: (p.y - st.drag.oy) / canvas.height };
+                redraw();
+            } else {
+                canvas.style.cursor = hit(p) ? 'move' : 'default';
+            }
+        });
+        function endDrag() { st.drag = null; }
+        canvas.addEventListener('pointerup', endDrag);
+        canvas.addEventListener('pointercancel', endDrag);
+
+        o.querySelector('#cgReset').addEventListener('click', function () { st.pos = {}; redraw(); });
+        if (isTpl) {
+            var f2 = o.querySelector('#cgFile2');
+            o.querySelector('#cgChange').addEventListener('click', function () { f2.click(); });
+            f2.addEventListener('change', function () { loadImage(f2.files[0], function (im) { st.img = im; redraw(); }); });
+        }
 
         o.querySelector('#cgDl').addEventListener('click', function () {
             var d = data();
@@ -588,9 +720,6 @@ document.addEventListener('DOMContentLoaded', () => {
             w.onload = function () { w.focus(); w.print(); };
         });
     }
-    function inp() { return 'width:100%;padding:9px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#111827;font:inherit;box-sizing:border-box'; }
-    function btn(bg, fg) { return 'padding:10px 16px;border:0;border-radius:10px;background:' + bg + ';color:' + fg + ';font:inherit;font-weight:600;cursor:pointer'; }
-    function cgField(label, control) { return '<label style="display:block;font-size:12px;font-weight:600;color:#475569">' + label + '<div style="margin-top:4px">' + control + '</div></label>'; }
 
     var tabs = document.getElementById('certTabs');
     if (tabs) {
@@ -598,7 +727,7 @@ document.addEventListener('DOMContentLoaded', () => {
         b.type = 'button';
         b.textContent = '+ Generate certificate';
         b.style.cssText = 'margin-left:12px;margin-bottom:14px;padding:10px 16px;border:0;border-radius:999px;background:#2f6bff;color:#fff;font:inherit;font-weight:600;cursor:pointer;vertical-align:top';
-        b.addEventListener('click', openGenerator);
+        b.addEventListener('click', openChooser);
         tabs.insertAdjacentElement('afterend', b);
     }
 })();
