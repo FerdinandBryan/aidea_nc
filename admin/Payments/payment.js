@@ -12,6 +12,23 @@
     let filtered = [];
     let searchTerm = '';
     let statusFilter = '';
+    let serviceFilter = '';
+    function fillServiceOptions() {
+        const sv = document.getElementById('filterService');
+        if (!sv) return;
+        const names = [];
+        allPayments.forEach(function (p) {
+            const s = String(p.service || '').trim();
+            if (s && names.indexOf(s) < 0) names.push(s);
+        });
+        names.sort();
+        if (sv.options.length === names.length + 1) return;
+        const cur = sv.value;
+        sv.innerHTML = '<option value="">All services</option>' + names.map(function (n) {
+            return '<option value="' + escHtml(n) + '">' + escHtml(n) + '</option>';
+        }).join('');
+        sv.value = cur;
+    }
 
     // ── Session helpers (same keys as the dashboard) ───────────────────────
     function getToken() {
@@ -324,13 +341,15 @@
     // ── Render table ─────────────────────────────────────────────────────────
     function render() {
         const q = searchTerm.toLowerCase();
+        fillServiceOptions();
         filtered = allPayments.filter(function (p) {
             const matchQ = !q || p.student.toLowerCase().includes(q) ||
                 (p.gcash_ref || p.gcashRef || '').toLowerCase().includes(q) ||
                 (p.ref || '').toLowerCase().includes(q);
             const normStatus = p.status === 'Paid' ? 'Completed' : p.status === 'Rejected' ? 'Cancelled' : p.status;
             const matchSt = !statusFilter || normStatus === statusFilter;
-            return matchQ && matchSt;
+            const matchSv = !serviceFilter || String(p.service || '') === serviceFilter;
+            return matchQ && matchSt && matchSv;
         });
 
         const isPending = function (p) { return p.status === 'Pending'; };
@@ -962,7 +981,15 @@ function openViewModal(i) {
             searchTerm = e.target.value;
             render();
         });
-        document.getElementById('filterStatus').addEventListener('change', function (e) {
+        const svSel = document.getElementById('filterService');
+    if (svSel) svSel.addEventListener('change', function (e) {
+        serviceFilter = e.target.value;
+        const st = document.getElementById('filterStatus');
+        st.style.display = serviceFilter ? '' : 'none';
+        if (!serviceFilter) st.value = '';
+        st.dispatchEvent(new Event('change'));
+    });
+    document.getElementById('filterStatus').addEventListener('change', function (e) {
             statusFilter = e.target.value;
             render();
         });
