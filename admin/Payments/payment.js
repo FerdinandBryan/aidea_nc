@@ -951,6 +951,22 @@ function openViewModal(i) {
         zone.appendChild(input);
         body.appendChild(zone);
 
+        const genBtn = el('button', 'modal-btn', 'Generate certificate');
+        genBtn.type = 'button';
+        genBtn.style.margin = '10px 0 0';
+        genBtn.addEventListener('click', function () {
+            if (!window.AideaCertGen) { alert('The certificate generator did not load. Hard-refresh the page (Ctrl+Shift+R).'); return; }
+            window.AideaCertGen.open({
+                service: p.service,
+                onDone: function (file) {
+                    files = isCert ? [file] : files.concat([file]);
+                    renderList();
+                    send.disabled = false;
+                }
+            });
+        });
+        body.appendChild(genBtn);
+
         const list = el('ul', 'file-list');
         body.appendChild(list);
 
