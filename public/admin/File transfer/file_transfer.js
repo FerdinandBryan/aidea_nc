@@ -78,6 +78,24 @@ function initSignOutModal() {
 
 // ── Utilities ──────────────────────────────────────────────────────────────
 
+function reviewedUrlsOf(t) {
+    return (Array.isArray(t.reviewed_file_urls) && t.reviewed_file_urls.length)
+        ? t.reviewed_file_urls
+        : (t.reviewed_file_url ? [t.reviewed_file_url] : []);
+}
+function reviewedChips(t, label) {
+    const urls = reviewedUrlsOf(t);
+    return urls.map(function (u, i) {
+        return '<a class="file-chip" href="' + escHtml(u) + '" target="_blank" rel="noopener">' + ICON_DOC + ' ' + label + (urls.length > 1 ? ' ' + (i + 1) : '') + '</a>';
+    }).join('');
+}
+function reviewedDownloads(t) {
+    const urls = reviewedUrlsOf(t);
+    return urls.map(function (u, i) {
+        return '<a class="action-btn action-btn-primary" href="' + escHtml(u) + '" download>' + ICON_CHECK + ' Download reviewed file' + (urls.length > 1 ? ' ' + (i + 1) : '') + '</a>';
+    }).join('');
+}
+
 function escHtml(str) {
     return String(str ?? '')
         .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -402,12 +420,12 @@ async function loadReceived() {
 
                     <div class="review-card-files">
                         ${t.file_url ? `<a class="file-chip" href="${escHtml(t.file_url)}" target="_blank" rel="noopener">${ICON_DOC} Original file</a>` : ''}
-                        ${t.reviewed_file_url ? `<a class="file-chip" href="${escHtml(t.reviewed_file_url)}" target="_blank" rel="noopener">${ICON_DOC} Reviewed file</a>` : ''}
+                        ${reviewedChips(t, 'Reviewed file')}
                     </div>
 
                     ${t.reviewed_file_url ? `
                     <div class="review-card-actions">
-                        <a class="action-btn action-btn-primary" href="${escHtml(t.reviewed_file_url)}" download>${ICON_CHECK} Download reviewed file</a>
+                        ${reviewedDownloads(t)}
                     </div>` : ''}
                 </div>
             </article>

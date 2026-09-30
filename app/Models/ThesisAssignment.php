@@ -14,10 +14,15 @@ class ThesisAssignment extends Model
         'reviewer_id',
         'file_path',
         'reviewed_file_path',
+        'reviewed_files',
         'status',
     ];
 
-    protected $appends = ['file_url', 'reviewed_file_url'];
+    protected $appends = ['file_url', 'reviewed_file_url', 'reviewed_file_urls'];
+
+    protected $casts = [
+        'reviewed_files' => 'array',
+    ];
 
     public function thesis()
     {
@@ -27,6 +32,15 @@ class ThesisAssignment extends Model
     public function reviewer()
     {
         return $this->belongsTo(User::class, 'reviewer_id');
+    }
+
+    public function getReviewedFileUrlsAttribute()
+    {
+        $paths = $this->reviewed_files ?: ($this->reviewed_file_path ? [$this->reviewed_file_path] : []);
+
+        return array_values(array_map(function ($p) {
+            return Storage::disk('public')->url($p);
+        }, $paths));
     }
 
     public function getFileUrlAttribute()

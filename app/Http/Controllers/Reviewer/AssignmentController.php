@@ -33,7 +33,9 @@ class AssignmentController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'reviewed_file' => ['required', 'file', 'max:20480'],
+            'reviewed_file' => ['required_without:reviewed_files', 'file', 'max:20480'],
+            'reviewed_files' => ['required_without:reviewed_file', 'array', 'max:5'],
+            'reviewed_files.*' => ['file', 'max:20480'],
             'note' => ['nullable', 'string'],
         ]);
 
@@ -41,10 +43,19 @@ class AssignmentController extends Controller
             return response()->json(['message' => $validator->errors()->first()], 422);
         }
 
-        $path = $request->file('reviewed_file')->store('assignments', 'public');
+        $paths = [];
+        if ($request->hasFile('reviewed_files')) {
+            foreach ((array) $request->file('reviewed_files') as $f) {
+                $paths[] = $f->store('assignments', 'public');
+            }
+        } elseif ($request->hasFile('reviewed_file')) {
+            $paths[] = $request->file('reviewed_file')->store('assignments', 'public');
+        }
+        $path = $paths[0] ?? null;
 
         $assignment->update([
             'reviewed_file_path' => $path,
+            'reviewed_files' => $paths,
             'reviewer_note' => $request->input('note'),
             'status' => 'completed',
         ]);
@@ -66,6 +77,7 @@ class AssignmentController extends Controller
         $assignment->update([
             'status' => 'pending',
             'reviewed_file_path' => null,
+            'reviewed_files' => null,
             'reviewer_note' => null,
         ]);
 

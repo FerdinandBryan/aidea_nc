@@ -461,7 +461,7 @@ async function loadReceived() {
                     ${t.reviewer_note ? `<div class="review-card-note"><span>Reviewer's note:</span> ${escHtml(t.reviewer_note)}</div>` : ''}
 
                     ${fileRow(t.file_url, 'Original file', 'thesis-original')}
-                    ${fileRow(t.reviewed_file_url, 'Reviewed file', 'thesis-reviewed')}
+                    ${reviewedRows(t, 'Reviewed file', 'thesis-reviewed')}
                 </div>
             </article>
         `).join('');
@@ -638,3 +638,12 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSent();
     loadReceived();
 });
+
+function reviewedRows(t, label, name) {
+    const urls = (Array.isArray(t.reviewed_file_urls) && t.reviewed_file_urls.length)
+        ? t.reviewed_file_urls
+        : (t.reviewed_file_url ? [t.reviewed_file_url] : []);
+    return urls.map(function (u, i) {
+        return fileRow(u, urls.length > 1 ? label + ' ' + (i + 1) : label, name + (urls.length > 1 ? '-' + (i + 1) : ''));
+    }).join('');
+}

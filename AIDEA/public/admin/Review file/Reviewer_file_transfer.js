@@ -80,6 +80,18 @@ function initSignOutModal() {
 
 // Utilities
 
+function reviewedUrlsOf(t) {
+    return (Array.isArray(t.reviewed_file_urls) && t.reviewed_file_urls.length)
+        ? t.reviewed_file_urls
+        : (t.reviewed_file_url ? [t.reviewed_file_url] : []);
+}
+function reviewedChips(t, label) {
+    const urls = reviewedUrlsOf(t);
+    return urls.map(function (u, i) {
+        return '<a class="file-chip" href="' + escHtml(u) + '" target="_blank" rel="noopener">' + ICON_DOC + ' ' + label + (urls.length > 1 ? ' ' + (i + 1) : '') + '</a>';
+    }).join('');
+}
+
 function escHtml(str) {
     return String(str ?? '')
         .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -403,7 +415,7 @@ async function loadSent() {
 
                     <div class="review-card-files">
                         ${t.file_url ? `<a class="file-chip" href="${escHtml(t.file_url)}" target="_blank" rel="noopener">${ICON_DOC} Original file</a>` : ''}
-                        ${t.reviewed_file_url ? `<a class="file-chip" href="${escHtml(t.reviewed_file_url)}" target="_blank" rel="noopener">${ICON_DOC} Your reviewed file</a>` : ''}
+                        ${reviewedChips(t, 'Your reviewed file')}
                     </div>
 
                     <div class="review-card-actions">
@@ -489,11 +501,58 @@ async function loadReceived() {
 // Send form
 
 let selectedFile = null;
+let sendQueue = [];
+const MAX_REVIEW_FILES = 5;
+const MAX_REVIEW_MB = 20;
+
+function renderQueue() {
+    const list = document.getElementById('sendQueue');
+    if (!list) return;
+    list.innerHTML = '';
+    sendQueue.forEach(function (f, idx) {
+        const li = document.createElement('li');
+        li.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;';
+        const span = document.createElement('span');
+        span.textContent = f.name;
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.textContent = '\u2715';
+        x.setAttribute('aria-label', 'Remove');
+        x.style.cssText = 'border:0;background:none;cursor:pointer;font-size:14px;color:inherit;';
+        x.addEventListener('click', function () { sendQueue.splice(idx, 1); renderQueue(); });
+        li.appendChild(span);
+        li.appendChild(x);
+        list.appendChild(li);
+    });
+    const dropLabel = document.getElementById('fileDropLabel');
+    if (sendQueue.length) {
+        dropLabel.classList.add('has-file');
+        setText('fileDropText', sendQueue.length + (sendQueue.length === 1 ? ' file' : ' files') + ' attached \u2014 click to add more');
+    } else {
+        resetFileDrop();
+    }
+}
+
+function addFiles(files) {
+    for (const f of files) {
+        if (sendQueue.length >= MAX_REVIEW_FILES) {
+            showMsg('sendMsg', 'You can attach up to ' + MAX_REVIEW_FILES + ' files.', 'error');
+            break;
+        }
+        if (f.size > MAX_REVIEW_MB * 1024 * 1024) {
+            showMsg('sendMsg', f.name + ' is over ' + MAX_REVIEW_MB + ' MB.', 'error');
+            continue;
+        }
+        const dup = sendQueue.some(function (q) { return q.name === f.name && q.size === f.size; });
+        if (!dup) sendQueue.push(f);
+    }
+    renderQueue();
+}
 
 function resetFileDrop() {
     const label = document.getElementById('fileDropLabel');
     label.classList.remove('has-file', 'is-dragover');
-    setText('fileDropText', 'Click to choose a file, or drag it here');
+    setText('fileDropText', 'Click to choose files, or drag them here');
 }
 
 function initSendForm() {
@@ -501,13 +560,8 @@ function initSendForm() {
     const dropLabel = document.getElementById('fileDropLabel');
 
     fileInput.addEventListener('change', () => {
-        selectedFile = fileInput.files[0] || null;
-        if (selectedFile) {
-            dropLabel.classList.add('has-file');
-            setText('fileDropText', selectedFile.name);
-        } else {
-            resetFileDrop();
-        }
+        addFiles(Array.prototype.slice.call(fileInput.files));
+        fileInput.value = '';
     });
 
     ['dragover', 'dragenter'].forEach(evt =>
@@ -515,13 +569,7 @@ function initSendForm() {
     ['dragleave', 'drop'].forEach(evt =>
         dropLabel.addEventListener(evt, e => { e.preventDefault(); dropLabel.classList.remove('is-dragover'); }));
     dropLabel.addEventListener('drop', e => {
-        const file = e.dataTransfer.files[0];
-        if (file) {
-            fileInput.files = e.dataTransfer.files;
-            selectedFile = file;
-            dropLabel.classList.add('has-file');
-            setText('fileDropText', file.name);
-        }
+        addFiles(Array.prototype.slice.call(e.dataTransfer.files));
     });
 
     document.getElementById('sendForm').addEventListener('submit', async e => {
@@ -532,6 +580,10 @@ function initSendForm() {
             showMsg('sendMsg', 'Choose which assigned thesis to send back first.', 'error');
             return;
         }
+        if (!sendQueue.length) {
+            showMsg('sendMsg', 'Attach at least one file first.', 'error');
+            return;
+        }
 
         const submitBtn = document.getElementById('sendSubmit');
         setBtnLoading(submitBtn, true);
@@ -539,7 +591,7 @@ function initSendForm() {
 
         const body = new FormData();
         body.append('note', document.getElementById('sendNote').value.trim());
-        if (selectedFile) body.append('reviewed_file', selectedFile);
+        sendQueue.forEach(f => body.append('reviewed_files[]', f));
 
         try {
             const res = await fetch(`${ADMIN_API}/reviewer/assignments/${assignmentId}/complete`, {
@@ -556,7 +608,8 @@ function initSendForm() {
 
             document.getElementById('sendForm').reset();
             selectedFile = null;
-            resetFileDrop();
+            sendQueue = [];
+            renderQueue();
             showMsg('sendMsg', 'Sent to admin!', 'success');
             await Promise.all([loadThesisOptions(), loadSent(), loadReceived()]);
         } catch (err) {
