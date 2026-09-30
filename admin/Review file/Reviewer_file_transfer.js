@@ -370,7 +370,7 @@ function renderFileRows(t) {
     return '<div class="review-card-files" style="display:flex;flex-direction:column;gap:8px">' + items.map(function (i, n) {
         const dl = items.length > 1 ? '<a class="action-btn" href="' + escHtml(i.url) + '" download>Download</a>' : '';
         const name = items.length > 1 ? 'View file' : 'Original thesis file';
-        return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px"><a class="file-chip" href="' + escHtml(i.url) + '" target="_blank" rel="noopener">' + ICON_DOC + ' ' + name + '</a>' + renderFileLabel(i.label) + dl + '</div>';
+        return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px"><a class="file-chip" href="' + escHtml(i.url) + '" target="_blank" rel="noopener">' + ICON_DOC + ' ' + name + '</a>' + dl + renderFileLabel(i.label) + '</div>';
     }).join('') + '</div>';
 }
 function stripStatusItem(html) {
