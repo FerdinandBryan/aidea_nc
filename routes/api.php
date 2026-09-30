@@ -193,3 +193,21 @@ require __DIR__ . '/profile.php';
     if ($name === '' || $name === null) { $name = basename($rel); }
     return response()->download($disk->path($rel), $name);
 })->where('path', '.+');
+
+// Format templates shared between admin and students (stored as one JSON list)
+\Illuminate\Support\Facades\Route::get('/format-templates', function () {
+    $row = \Illuminate\Support\Facades\DB::table('format_templates')->orderBy('id')->first();
+    return response()->json($row ? json_decode($row->data, true) : []);
+});
+\Illuminate\Support\Facades\Route::put('/format-templates', function (\Illuminate\Http\Request $request) {
+    $list = $request->input('templates', []);
+    abort_unless(is_array($list), 422);
+    $json = json_encode(array_values($list));
+    $row = \Illuminate\Support\Facades\DB::table('format_templates')->orderBy('id')->first();
+    if ($row) {
+        \Illuminate\Support\Facades\DB::table('format_templates')->where('id', $row->id)->update(['data' => $json, 'updated_at' => now()]);
+    } else {
+        \Illuminate\Support\Facades\DB::table('format_templates')->insert(['data' => $json, 'created_at' => now(), 'updated_at' => now()]);
+    }
+    return response()->json(['ok' => true]);
+})->middleware(['auth:sanctum', 'admin']);
