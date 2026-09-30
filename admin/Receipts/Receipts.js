@@ -825,6 +825,7 @@ document.addEventListener('DOMContentLoaded', () => {
             field('Protocol No. (automatic)', '<input id="cgProto" type="text" readonly title="Numbered automatically" style="' + inp() + '">') +
             field('Date', '<input id="cgDate" type="date" value="' + today + '" style="' + inp() + '">') +
             field('Service', '<select id="cgRole" style="' + inp() + '"><option value="analyst">Data Analyst</option><option value="grammarian">Grammarian</option></select>') +
+            field('Send to (paid users of this service)', '<select id="cgUser" style="' + inp() + '"><option value="">Loading...</option></select>') +
             field('Name', '<input id="cgName" type="text" placeholder="Name of the Data Analyst / Grammarian" style="' + inp() + '">') +
             '</div>' +
             '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-bottom:10px;color:#334155">' +
@@ -841,7 +842,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             
             '<button type="button" id="cgPrint" style="' + btn('#e5e7eb', '#111827') + '">Print / PDF</button>' +
-            '<button type="button" id="cgDl" style="' + btn('#1d4ed8', '#fff') + '">Download PNG</button>' +
+            '<button type="button" id="cgSend" style="' + btn('#16a34a', '#fff') + '">Send to user</button>' +
             '</div>' +
             (isTpl ? '<input type="file" id="cgFile2" accept="image/png,image/jpeg,image/webp" hidden>' : '') +
             '</div>');
@@ -920,7 +921,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        q('#cgDl').addEventListener('click', function () { issue();
+        document.createElement('button').addEventListener('click', function () { issue();
             var d = data();
             canvas.toBlob(function (blob) {
                 var a = document.createElement('a');
@@ -930,6 +931,65 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
             }, 'image/png');
         });
+        var CG_BASE = (typeof API_BASE !== 'undefined' ? API_BASE : 'https://aideanc-production.up.railway.app/api');
+        var cgPays = [];
+        function cgHeaders() { return { 'Accept': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') }; }
+        function cgFillUsers() {
+            var sel = q('#cgUser'); if (!sel) return;
+            var svc = String(q('#cgRole').value || '').trim().toLowerCase(), code = svcCode(svc), prev = sel.value;
+            var list = cgPays.filter(function (p) {
+                if (!p || !p.user_id || String(p.status || '').toLowerCase() !== 'paid') return false;
+                var pn = String(p.service || '').trim().toLowerCase();
+                return pn === svc || (code && svcCode(pn) === code);
+            });
+            sel.innerHTML = '';
+            var first = document.createElement('option'); first.value = '';
+            first.textContent = list.length ? 'Select a user...' : 'No paid users for this service';
+            sel.appendChild(first);
+            list.forEach(function (p) {
+                var op = document.createElement('option'); op.value = String(p.id);
+                op.textContent = (p.student || 'User') + ' \u00B7 ' + (p.ref || ('#' + p.id));
+                sel.appendChild(op);
+            });
+            if (prev) sel.value = prev;
+        }
+        function cgPick() {
+            var id = q('#cgUser').value;
+            for (var i = 0; i < cgPays.length; i++) { if (String(cgPays[i].id) === id) return cgPays[i]; }
+            return null;
+        }
+        fetch(CG_BASE + '/payments', { headers: cgHeaders() }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function (j) {
+            cgPays = Array.isArray(j) ? j : (j.data || j.payments || []);
+            cgFillUsers();
+        }).catch(function (e) { console.warn('Payments not loaded:', e); cgFillUsers(); });
+        new MutationObserver(function () { cgFillUsers(); }).observe(q('#cgRole'), { childList: true });
+        o.addEventListener('change', function (e) { if (e.target && e.target.id === 'cgRole') cgFillUsers(); });
+
+        q('#cgSend').addEventListener('click', function () {
+            var p = cgPick();
+            if (!p) { alert('Choose the user to send to first.'); return; }
+            if (!confirm('Send this certificate to ' + (p.student || 'this user') + ' by email and to their account?')) return;
+            var sb = q('#cgSend'), label = sb.textContent, d = data();
+            sb.disabled = true; sb.textContent = 'Sending...';
+            function done() { sb.disabled = false; sb.textContent = label; }
+            canvas.toBlob(function (blob) {
+                if (!blob) { alert('Could not render the certificate.'); done(); return; }
+                var fd = new FormData();
+                fd.append('type', 'certificate');
+                fd.append('files[]', blob, 'certificate-' + (d.proto || 'template').replace(/[^\w.-]+/g, '_') + '.png');
+                fetch(CG_BASE + '/payments/' + p.id + '/send-files', { method: 'POST', headers: cgHeaders(), body: fd }).then(function (r) {
+                    return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw j; return j; });
+                }).then(function () {
+                    issue(); st.locked = null; redraw();
+                    alert('Certificate sent to ' + (p.student || 'the user') + '.');
+                    done();
+                }).catch(function (e) {
+                    alert('Not sent: ' + ((e && (e.message || (e.errors && JSON.stringify(e.errors)))) || 'could not reach the server.'));
+                    done();
+                });
+            }, 'image/png');
+        });
+
         q('#cgPrint').addEventListener('click', function () { issue();
             var w = window.open('', '_blank');
             if (!w) { alert('Allow pop-ups to print, or use Download PNG.'); return; }
