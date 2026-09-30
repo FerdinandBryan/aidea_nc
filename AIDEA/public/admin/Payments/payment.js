@@ -433,7 +433,110 @@
         return '<div class="vm-section"><div class="vm-section-title">Research info</div>' + rows + '</div>';
     }
 
-    function openViewModal(i) {
+        // -- File viewer (second modal) --------------------------------------
+    var fileViewerUrl = null;
+
+    function getResearchItems(p) {
+        var raw = p && p.research_items;
+        if (!raw) return [];
+        try {
+            var items = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            return Array.isArray(items) ? items : [];
+        } catch (e) { return []; }
+    }
+
+    function renderResearchInfoV2(p, pi) {
+        var items = getResearchItems(p);
+        if (!items.length) return '';
+        var rows = items.map(function (item, ii) {
+            if (item.type === 'text') {
+                return '<div class="vm-row"><span class="vm-label">' + escHtml(item.label) + '</span>' +
+                    '<span class="vm-val">' + escHtml(item.value || '-') + '</span></div>';
+            }
+            if ((item.type === 'file' || item.type === 'image') && item.file_base64) {
+                return '<div class="vm-row"><span class="vm-label">' + escHtml(item.label) + '</span>' +
+                    '<button type="button" class="btn-action" onclick="AideaPayments.openFile(' + pi + ',' + ii + ')">' +
+                    escHtml(item.file_name || 'View file') + '</button></div>';
+            }
+            return '<div class="vm-row"><span class="vm-label">' + escHtml(item.label) + '</span>' +
+                '<span class="vm-val vm-muted">No data submitted</span></div>';
+        }).join('');
+        return '<div class="vm-section"><div class="vm-section-title">Research info</div>' + rows + '</div>';
+    }
+
+    function dataUrlToBlob(dataUrl) {
+        var parts = String(dataUrl).split(',');
+        var m = parts[0].match(/:(.*?);/);
+        var mime = m ? m[1] : 'application/octet-stream';
+        var bin = atob(parts[1] || '');
+        var arr = new Uint8Array(bin.length);
+        for (var k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
+        return new Blob([arr], { type: mime });
+    }
+
+    function closeFileViewer() {
+        var m = document.getElementById('fileModal');
+        if (m) m.hidden = true;
+        var b = document.getElementById('fileModalBody');
+        if (b) b.innerHTML = '';
+        if (fileViewerUrl) { URL.revokeObjectURL(fileViewerUrl); fileViewerUrl = null; }
+    }
+
+    function ensureFileModal() {
+        var m = document.getElementById('fileModal');
+        if (m) return m;
+        m = document.createElement('div');
+        m.className = 'modal-backdrop';
+        m.id = 'fileModal';
+        m.hidden = true;
+        m.innerHTML =
+            '<div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="fileModalTitle">' +
+            '<div class="modal-head"><h3 class="modal-title" id="fileModalTitle">File</h3>' +
+            '<button class="modal-x" type="button" id="fileModalClose" aria-label="Close">&#10005;</button></div>' +
+            '<div class="modal-body" id="fileModalBody"></div></div>';
+        document.body.appendChild(m);
+        document.getElementById('fileModalClose').addEventListener('click', closeFileViewer);
+        m.addEventListener('click', function (e) { if (e.target === m) closeFileViewer(); });
+        document.addEventListener('keydown', function (e) {
+            var fm = document.getElementById('fileModal');
+            if (e.key === 'Escape' && fm && !fm.hidden) { e.stopPropagation(); closeFileViewer(); }
+        }, true);
+        return m;
+    }
+
+    function openFileViewer(pi, ii) {
+        var p = filtered[pi];
+        var item = getResearchItems(p)[ii];
+        if (!item || !item.file_base64) return;
+
+        var m = ensureFileModal();
+        if (fileViewerUrl) { URL.revokeObjectURL(fileViewerUrl); fileViewerUrl = null; }
+
+        var blob;
+        try { blob = dataUrlToBlob(item.file_base64); }
+        catch (e) { showToast('Could not open this file.', 'error'); return; }
+        fileViewerUrl = URL.createObjectURL(blob);
+
+        var name = item.file_name || 'file';
+        var isImage = blob.type.indexOf('image/') === 0;
+        var isPdf = blob.type === 'application/pdf';
+        var preview;
+        if (isImage) {
+            preview = '<img class="vm-image" src="' + fileViewerUrl + '" alt="' + escHtml(name) + '" />';
+        } else if (isPdf) {
+            preview = '<iframe src="' + fileViewerUrl + '" title="' + escHtml(name) + '" style="width:100%;height:65vh;border:0;"></iframe>';
+        } else {
+            preview = '<p class="vm-muted">Preview is not available for this file type. Use Download.</p>';
+        }
+
+        document.getElementById('fileModalTitle').textContent = item.label || 'File';
+        document.getElementById('fileModalBody').innerHTML =
+            '<div class="vm-row"><span class="vm-label">File</span><span class="vm-val">' + escHtml(name) + '</span></div>' +
+            preview +
+            '<div class="vm-actions"><a class="btn-action btn-approve" href="' + fileViewerUrl + '" download="' + escHtml(name) + '">Download</a></div>';
+        m.hidden = false;
+    }
+function openViewModal(i) {
         const p = filtered[i];
         if (!p) return;
 
@@ -450,7 +553,7 @@
             '<div class="vm-row"><span class="vm-label">GCash ref #</span><span class="vm-val"><code>' + escHtml(gcashRef) + '</code></span></div>' +
             '<div class="vm-row"><span class="vm-label">Date</span><span class="vm-val">' + escHtml(p.date || p.date_iso || p.dateISO || '—') + '</span></div>' +
             '<div class="vm-row"><span class="vm-label">Status</span><span class="vm-val">' + statusBadge(p.status) + '</span></div>' +
-            renderResearchInfo(p) +
+            renderResearchInfoV2(p, i) +
             (proofSrc
                 ? '<div class="vm-section"><div class="vm-section-title">Payment proof</div><img class="vm-image" src="' + proofSrc + '" alt="Payment proof" /></div>'
                 : '<div class="vm-row"><span class="vm-label">Payment proof</span><span class="vm-val vm-muted">No image uploaded</span></div>') +
@@ -656,6 +759,7 @@
     // ── Public bridge for inline handlers in generated markup ──────────────
     window.AideaPayments = {
         openView: openViewModal,
+        openFile: openFileViewer,
         approve: approvePayment,
         reject: rejectPayment,
         approveFromView: approveFromView,
