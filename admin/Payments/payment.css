@@ -1351,3 +1351,45 @@ td.empty {
     background: var(--bad-bg);
     color: var(--bad-fg);
 }
+
+/* Keep colored action buttons readable on hover and focus */
+.btn-action.btn-receipt:hover,
+.btn-action.btn-receipt:focus,
+.btn-action.btn-receipt:active {
+    background: var(--primary);
+    color: var(--primary-contrast);
+    border-color: transparent;
+    filter: brightness(1.08);
+}
+
+.btn-action.btn-send:hover,
+.btn-action.btn-send:focus,
+.btn-action.btn-send:active {
+    background: var(--accent);
+    color: #0a1a3f;
+    border-color: transparent;
+    filter: brightness(1.06);
+}
+
+.btn-action.btn-approve:hover,
+.btn-action.btn-approve:focus,
+.btn-action.btn-approve:active {
+    background: var(--ok-solid);
+    color: #fff;
+    border-color: transparent;
+    filter: brightness(1.08);
+}
+
+.btn-action.btn-reject:hover,
+.btn-action.btn-reject:focus,
+.btn-action.btn-reject:active {
+    background: var(--bad-solid);
+    color: #fff;
+    border-color: transparent;
+    filter: brightness(1.08);
+}
+
+.btn-action:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
