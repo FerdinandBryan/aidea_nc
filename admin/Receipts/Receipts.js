@@ -705,6 +705,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }).catch(function () { done('(could not read the image, using defaults)'); });
         }, function () { done('(could not load Tesseract, check your internet)'); });
     }
+    /* ---- automatic protocol number: NC-YYYY-000 ---- */
+    function protoKey(yr) { return 'aidea_cert_seq_' + yr; }
+    function protoCount(yr) { try { return parseInt(localStorage.getItem(protoKey(yr)), 10) || 0; } catch (e) { return 0; } }
+    function protoPeek(yr) { return 'NC-' + yr + '-' + String(protoCount(yr) + 1).padStart(3, '0'); }
+    function protoCommit(yr) { try { localStorage.setItem(protoKey(yr), String(protoCount(yr) + 1)); } catch (e) {} }
+
     function openChooser() {
         var m = modal(
             '<div style="width:min(580px,100%);background:#fff;color:#111827;border-radius:14px;padding:22px">' +
@@ -784,7 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
             '<button type="button" data-cg-close style="border:0;background:transparent;font-size:20px;cursor:pointer">\u2715</button></div>' +
             '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px">' +
             field('Title', '<input id="cgTitle" type="text" placeholder="Title of the document" style="' + inp() + '">') +
-            field('Protocol No.', '<input id="cgProto" type="text" placeholder="e.g. NC-2026-001" style="' + inp() + '">') +
+            field('Protocol No. (automatic)', '<input id="cgProto" type="text" readonly title="Numbered automatically" style="' + inp() + '">') +
             field('Date', '<input id="cgDate" type="date" value="' + today + '" style="' + inp() + '">') +
             field('Role', '<select id="cgRole" style="' + inp() + '"><option value="analyst">Data Analyst</option><option value="grammarian">Grammarian</option></select>') +
             field('Name', '<input id="cgName" type="text" placeholder="Name of the Data Analyst / Grammarian" style="' + inp() + '">') +
@@ -811,7 +817,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function q(s) { return o.querySelector(s); }
 
         function data() {
-            st.scale = (Number(q('#cgScale').value) || 100) / 100; if (isTpl) { var oc = q('#cgOcr'); st.on = !!(oc && oc.checked); var bm = q('#cgBgMode'); st.bg = !!(bm && bm.checked); }
+            st.scale = (Number(q('#cgScale').value) || 100) / 100; if (!st.locked) q('#cgProto').value = protoPeek((q('#cgDate').value || today).slice(0, 4)); if (isTpl) { var oc = q('#cgOcr'); st.on = !!(oc && oc.checked); var bm = q('#cgBgMode'); st.bg = !!(bm && bm.checked); }
             st.pal = { bg: q('#cgBg').value, primary: q('#cgPrimary').value, accent: q('#cgAccent').value, text: q('#cgText').value };
             return {
                 title: q('#cgTitle').value.trim(), proto: q('#cgProto').value.trim(),
@@ -819,6 +825,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }
         function redraw() { draw(canvas, data(), st); }
+        function issue() { if (st.locked) return; var yr = (q('#cgDate').value || today).slice(0, 4); st.locked = q('#cgProto').value; protoCommit(yr); }
         function setPal(p) { q('#cgBg').value = p.bg; q('#cgPrimary').value = p.primary; q('#cgAccent').value = p.accent; q('#cgText').value = p.text; }
         redraw();
         o.addEventListener('input', redraw); if (isTpl) runOcr(st, q, redraw);
@@ -867,7 +874,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        q('#cgDl').addEventListener('click', function () {
+        q('#cgDl').addEventListener('click', function () { issue();
             var d = data();
             canvas.toBlob(function (blob) {
                 var a = document.createElement('a');
@@ -877,7 +884,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
             }, 'image/png');
         });
-        q('#cgPrint').addEventListener('click', function () {
+        q('#cgPrint').addEventListener('click', function () { issue();
             var w = window.open('', '_blank');
             if (!w) { alert('Allow pop-ups to print, or use Download PNG.'); return; }
             w.document.write('<html><head><title>Certificate</title><style>@page{size:landscape;margin:0}body{margin:0}img{width:100%;display:block}</style></head><body><img src="' + canvas.toDataURL('image/png') + '"></body></html>');
