@@ -978,10 +978,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 fd.append('type', 'certificate');
                 fd.append('files[]', blob, 'certificate-' + (d.proto || 'template').replace(/[^\w.-]+/g, '_') + '.png');
                 fetch(CG_BASE + '/payments/' + p.id + '/send-files', { method: 'POST', headers: cgHeaders(), body: fd }).then(function (r) {
-                    return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw j; return j; });
+                    return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw j; sb.dataset.mail = String(j && j.mail); return j; });
                 }).then(function () {
                     issue(); st.locked = null; redraw();
-                    alert('Certificate sent to ' + (p.student || 'the user') + '.');
+                    alert(sb.dataset.mail === 'false' ? 'Certificate saved to ' + (p.student || 'the user') + '\u2019s account, but the email could not be sent.' : 'Certificate sent to ' + (p.student || 'the user') + '.');
                     done();
                 }).catch(function (e) {
                     alert('Not sent: ' + ((e && (e.message || (e.errors && JSON.stringify(e.errors)))) || 'could not reach the server.'));

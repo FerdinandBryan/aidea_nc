@@ -110,15 +110,26 @@ class PaymentController extends Controller
             'certificate_type' => $data['type'],
         ]);
 
-        $student->notify(new \App\Notifications\PaymentFilesSent(
+        $mailOk = $this->safeNotify($student, new \App\Notifications\PaymentFilesSent(
             $payment, $data['type'], $paths, $data['message'] ?? null
         ));
 
-        return response()->json(['ok' => true, 'certificate' => [
+        return response()->json(['ok' => true, 'mail' => $mailOk, 'certificate' => [
             'url'  => $firstUrl,
             'name' => $firstName,
             'type' => $data['type'],
         ]]);
+    }
+
+    private function safeNotify($user, $notification): bool
+    {
+        try {
+            $user->notify($notification);
+            return true;
+        } catch (\Throwable $e) {
+            report($e);
+            return false;
+        }
     }
 
     public function certificates()
