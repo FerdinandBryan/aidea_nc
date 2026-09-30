@@ -556,7 +556,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* ---- draw the certificate in the SYSTEM layout ---- */
     function draw(canvas, d, st) {
-        var pal = st.pal, role = ROLES[d.role] || ROLES.analyst;
+        var pal = st.pal, role = ROLES[d.role] || { label: d.role || '', head: 'CERTIFICATE OF ' + String(d.role || '').toUpperCase() };
         var BGP = { head: { x: 0.5, y: 0.235 }, intro1: { x: 0.5, y: 0.315 }, title: { x: 0.5, y: 0.405 }, intro2: { x: 0.5, y: 0.585 }, proto: { x: 0.17, y: 0.70 }, date: { x: 0.83, y: 0.70 }, name: { x: 0.5, y: 0.79 }, role: { x: 0.5, y: 0.85 } }; var BG = !!(st.bg && st.img); var H = BG ? Math.round(W * st.img.naturalHeight / st.img.naturalWidth) : 1131; canvas.width = W; canvas.height = H;
         var ctx = canvas.getContext('2d');
         if (BG) { ctx.drawImage(st.img, 0, 0, W, H); eraseBoxes(ctx, st); } else { ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, W, H); }
@@ -813,7 +813,7 @@ document.addEventListener('DOMContentLoaded', () => {
             field('Title', '<input id="cgTitle" type="text" placeholder="Title of the document" style="' + inp() + '">') +
             field('Protocol No. (automatic)', '<input id="cgProto" type="text" readonly title="Numbered automatically" style="' + inp() + '">') +
             field('Date', '<input id="cgDate" type="date" value="' + today + '" style="' + inp() + '">') +
-            field('Role', '<select id="cgRole" style="' + inp() + '"><option value="analyst">Data Analyst</option><option value="grammarian">Grammarian</option></select>') +
+            field('Service', '<select id="cgRole" style="' + inp() + '"><option value="analyst">Data Analyst</option><option value="grammarian">Grammarian</option></select>') +
             field('Name', '<input id="cgName" type="text" placeholder="Name of the Data Analyst / Grammarian" style="' + inp() + '">') +
             '</div>' +
             '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-bottom:10px;color:#334155">' +
@@ -851,6 +851,20 @@ document.addEventListener('DOMContentLoaded', () => {
         redraw();
         o.addEventListener('input', redraw); if (isTpl) runOcr(st, q, redraw);
         o.addEventListener('change', redraw);
+        fetch('/api/services').then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function (j) {
+            var a = Array.isArray(j) ? j : (j.services || j.data || j.items || j.results || []);
+            var seen = {}, names = [];
+            a.forEach(function (s) {
+                var nm = s && (s.name || s.title);
+                if (!nm || s.active === false || seen[nm]) return;
+                seen[nm] = 1; names.push(String(nm));
+            });
+            if (!names.length) return;
+            var sel = q('#cgRole');
+            sel.innerHTML = '';
+            names.forEach(function (nm) { var op = document.createElement('option'); op.value = nm; op.textContent = nm; sel.appendChild(op); });
+            redraw();
+        }).catch(function (e) { console.warn('Services not loaded, using defaults:', e); });
 
         function pt(e) { var r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height }; }
         function hit(p) {
