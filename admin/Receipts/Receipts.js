@@ -462,7 +462,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 /* == Certificate template generator ======================================= */
 (function () {
-    var W = 1600, SERIF = 'Georgia, serif', SANS = 'Arial';
+    var W = 1600, H = 1131, SERIF = 'Georgia, serif', SANS = 'Arial';
+    var DEF = { bg: '#ffffff', primary: '#0f3d6e', accent: '#e0a82e', text: '#333333' };
     var ROLES = {
         analyst:    { label: 'Data Analyst', head: 'CERTIFICATE OF DATA ANALYSIS' },
         grammarian: { label: 'Grammarian',   head: 'CERTIFICATE OF GRAMMAR REVIEW' }
@@ -483,28 +484,61 @@ document.addEventListener('DOMContentLoaded', () => {
         return lines;
     }
 
+    /* ---- read the design of the template image ---- */
+    function hexc(c) { return '#' + c.map(function (v) { return ('0' + Math.round(v).toString(16)).slice(-2); }).join(''); }
+    function dist(a, b) { return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2)); }
+    function lum(c) { return (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) / 255; }
+
+    function analyze(img) {
+        var w = 240, h = Math.max(1, Math.round(w * img.naturalHeight / img.naturalWidth));
+        var c = document.createElement('canvas'); c.width = w; c.height = h;
+        var x = c.getContext('2d'); x.drawImage(img, 0, 0, w, h);
+        var d = x.getImageData(0, 0, w, h).data, bins = {}, i;
+        for (i = 0; i < d.length; i += 4) {
+            if (d[i + 3] < 128) continue;
+            var k = (d[i] >> 5) * 64 + (d[i + 1] >> 5) * 8 + (d[i + 2] >> 5);
+            var b = bins[k] || (bins[k] = { n: 0, r: 0, g: 0, b: 0 });
+            b.n++; b.r += d[i]; b.g += d[i + 1]; b.b += d[i + 2];
+        }
+        var list = Object.keys(bins).map(function (k) {
+            var b = bins[k]; return { n: b.n, c: [b.r / b.n, b.g / b.n, b.b / b.n] };
+        }).sort(function (a, b) { return b.n - a.n; });
+        if (!list.length) return Object.assign({}, DEF);
+
+        var bg = list[0].c, total = d.length / 4, darkBg = lum(bg) < 0.45;
+        var rest = list.filter(function (e) { return dist(e.c, bg) > 70 && e.n > total * 0.003; });
+        var pool = darkBg ? rest.filter(function (e) { return lum(e.c) > 0.5; })
+                          : rest.filter(function (e) { return lum(e.c) < 0.6; });
+        var primary = (pool[0] || rest[0] || {}).c || null;
+        var accent = null;
+        for (i = 0; i < rest.length; i++) {
+            if (primary && dist(rest[i].c, primary) > 90) { accent = rest[i].c; break; }
+        }
+        var text = null;
+        if (!darkBg) pool.forEach(function (e) { if (!text || lum(e.c) < lum(text)) text = e.c; });
+        return {
+            bg: hexc(bg),
+            primary: primary ? hexc(primary) : (darkBg ? '#ffffff' : DEF.primary),
+            accent: accent ? hexc(accent) : DEF.accent,
+            text: darkBg ? '#ffffff' : (text && lum(text) < 0.35 ? hexc(text) : DEF.text)
+        };
+    }
+
+    /* ---- draw the certificate in the SYSTEM layout ---- */
     function draw(canvas, d, st) {
-        var img = st.mode === 'template' ? st.img : null;
-        var H = img ? Math.round(W * img.naturalHeight / img.naturalWidth) : 1131;
-        var role = ROLES[d.role] || ROLES.analyst;
+        var pal = st.pal, role = ROLES[d.role] || ROLES.analyst;
         canvas.width = W; canvas.height = H;
         var ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, W, H);
         var boxes = [];
-        var main = img ? st.color : '#0f3d6e';
-        var soft = img ? st.color : '#333333';
 
-        if (img) {
-            ctx.drawImage(img, 0, 0, W, H);
-        } else {
-            ctx.strokeStyle = '#0f3d6e'; ctx.lineWidth = 14; ctx.strokeRect(40, 40, W - 80, H - 80);
-            ctx.strokeStyle = '#e0a82e'; ctx.lineWidth = 4; ctx.strokeRect(68, 68, W - 136, H - 136);
-            ctx.textAlign = 'center';
-            ctx.fillStyle = '#0f3d6e'; ctx.font = 'bold 34px Arial';
-            ctx.fillText('NORZAGARAY COLLEGE', W / 2, 170);
-            ctx.fillStyle = '#666'; ctx.font = '22px Arial';
-            ctx.fillText('AIDEA', W / 2, 208);
-        }
+        ctx.strokeStyle = pal.primary; ctx.lineWidth = 14; ctx.strokeRect(40, 40, W - 80, H - 80);
+        ctx.strokeStyle = pal.accent; ctx.lineWidth = 4; ctx.strokeRect(68, 68, W - 136, H - 136);
+        ctx.textAlign = 'center';
+        ctx.fillStyle = pal.primary; ctx.font = 'bold 34px Arial';
+        ctx.fillText('NORZAGARAY COLLEGE', W / 2, 170);
+        ctx.fillStyle = pal.text; ctx.font = '22px Arial';
+        ctx.fillText('AIDEA', W / 2, 208);
 
         function put(key, text, size, style, fam, col, align, dx, dy) {
             var p = st.pos[key] || { x: dx, y: dy };
@@ -518,45 +552,37 @@ document.addEventListener('DOMContentLoaded', () => {
             return { x: x, y: y };
         }
 
-        var full = !img || st.extras;
-
-        if (full) {
-            var h = put('head', role.head, 60, 'bold', SERIF, main, 'center', 0.5, 0.292);
-            if (!img) { ctx.fillStyle = '#e0a82e'; ctx.fillRect(h.x - 180, h.y + 30, 360, 5); }
-            put('intro1', 'This is to certify that the manuscript entitled', 28, 'italic', SERIF, soft, 'center', 0.5, 0.398);
+        if (st.logo) {
+            var lp = st.pos.logo || { x: 0.15, y: 0.17 };
+            var lh = Math.round(130 * st.scale), lw = lh * st.logo.width / st.logo.height;
+            var lx = lp.x * W, ly = lp.y * H;
+            ctx.drawImage(st.logo, lx - lw / 2, ly - lh / 2, lw, lh);
+            boxes.push({ key: 'logo', ax: lx, ay: ly, x0: lx - lw / 2, x1: lx + lw / 2, y0: ly - lh / 2, y1: ly + lh / 2 });
         }
 
-        // Title (may wrap to several lines)
-        var titleText = d.title || (img ? '' : 'Title of the document');
-        if (titleText) {
-            var tp = st.pos.title || { x: 0.5, y: 0.473 };
-            var tx = tp.x * W, ty = tp.y * H, tpx = Math.round(46 * st.scale);
-            ctx.font = 'bold ' + tpx + 'px ' + SERIF;
-            ctx.fillStyle = main; ctx.textAlign = 'center';
-            var lines = wrap(ctx, titleText, 1200).slice(0, 3), gap = Math.round(62 * st.scale), maxw = 0;
-            lines.forEach(function (ln, i) { ctx.fillText(ln, tx, ty + i * gap); maxw = Math.max(maxw, ctx.measureText(ln).width); });
-            boxes.push({ key: 'title', ax: tx, ay: ty, x0: tx - maxw / 2 - 12, x1: tx + maxw / 2 + 12, y0: ty - tpx, y1: ty + (lines.length - 1) * gap + tpx * 0.3 });
-        }
+        var h = put('head', role.head, 60, 'bold', SERIF, pal.primary, 'center', 0.5, 0.292);
+        ctx.fillStyle = pal.accent; ctx.fillRect(h.x - 180, h.y + 30, 360, 5);
+        put('intro1', 'This is to certify that the manuscript entitled', 28, 'italic', SERIF, pal.text, 'center', 0.5, 0.398);
 
-        if (full) put('intro2', 'has been reviewed and finalized by the undersigned.', 28, 'italic', SERIF, soft, 'center', 0.5, 0.66);
+        var tp = st.pos.title || { x: 0.5, y: 0.473 };
+        var tx = tp.x * W, ty = tp.y * H, tpx = Math.round(46 * st.scale);
+        ctx.font = 'bold ' + tpx + 'px ' + SERIF;
+        ctx.fillStyle = pal.primary; ctx.textAlign = 'center';
+        var lines = wrap(ctx, d.title || 'Title of the document', 1200).slice(0, 3), gap = Math.round(62 * st.scale), maxw = 0;
+        lines.forEach(function (ln, i) { ctx.fillText(ln, tx, ty + i * gap); maxw = Math.max(maxw, ctx.measureText(ln).width); });
+        boxes.push({ key: 'title', ax: tx, ay: ty, x0: tx - maxw / 2 - 12, x1: tx + maxw / 2 + 12, y0: ty - tpx, y1: ty + (lines.length - 1) * gap + tpx * 0.3 });
 
-        var protoVal = d.proto || (img ? '' : '\u2014');
-        var dateVal = fmtDate(d.date) || (img ? '' : '\u2014');
-        if (full || protoVal) put('proto', (full ? 'Protocol No.: ' : '') + protoVal, 26, 'normal', SANS, '#222222', 'left', 0.125, 0.77);
-        if (full || dateVal) put('date', (full ? 'Date: ' : '') + dateVal, 26, 'normal', SANS, '#222222', 'right', 0.875, 0.77);
-
-        var nameVal = d.name || (img ? '' : 'Name');
-        if (nameVal) {
-            var n = put('name', nameVal, 34, 'bold', SERIF, main, 'center', 0.5, 0.853);
-            if (!img) {
-                ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
-                ctx.beginPath(); ctx.moveTo(n.x - 230, n.y + 20); ctx.lineTo(n.x + 230, n.y + 20); ctx.stroke();
-            }
-        }
-        put('role', role.label, 24, 'normal', SANS, img ? st.color : '#555555', 'center', 0.5, 0.906);
+        put('intro2', 'has been reviewed and finalized by the undersigned.', 28, 'italic', SERIF, pal.text, 'center', 0.5, 0.66);
+        put('proto', 'Protocol No.: ' + (d.proto || '\u2014'), 26, 'normal', SANS, pal.text, 'left', 0.125, 0.77);
+        put('date', 'Date: ' + (fmtDate(d.date) || '\u2014'), 26, 'normal', SANS, pal.text, 'right', 0.875, 0.77);
+        var n = put('name', d.name || 'Name', 34, 'bold', SERIF, pal.primary, 'center', 0.5, 0.853);
+        ctx.strokeStyle = pal.text; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(n.x - 230, n.y + 20); ctx.lineTo(n.x + 230, n.y + 20); ctx.stroke();
+        put('role', role.label, 24, 'normal', SANS, pal.text, 'center', 0.5, 0.906);
         st.boxes = boxes;
     }
 
+    /* ---- small UI helpers ---- */
     function inp() { return 'width:100%;padding:9px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#111827;font:inherit;box-sizing:border-box'; }
     function btn(bg, fg) { return 'padding:10px 16px;border:0;border-radius:10px;background:' + bg + ';color:' + fg + ';font:inherit;font-weight:600;cursor:pointer'; }
     function field(label, control) { return '<label style="display:block;font-size:12px;font-weight:600;color:#475569">' + label + '<div style="margin-top:4px">' + control + '</div></label>'; }
@@ -577,11 +603,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadImage(file, done) {
         if (!file) return;
         if (!/^image\//.test(file.type)) { alert('Please choose an image (PNG, JPG or WebP).'); return; }
-        var url = URL.createObjectURL(file);
         var im = new Image();
         im.onload = function () { done(im); };
         im.onerror = function () { alert('Could not read that image.'); };
-        im.src = url;
+        im.src = URL.createObjectURL(file);
     }
 
     function choice(id, title, text) {
@@ -599,7 +624,7 @@ document.addEventListener('DOMContentLoaded', () => {
             '<p style="margin:0 0 16px;font-size:13px;color:#475569">Which template do you want to use?</p>' +
             '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px">' +
             choice('sys', 'System template', 'Use the built-in AIDEA certificate design.') +
-            choice('new', 'New template', 'Choose your own certificate image. The system uses it as the design reference.') +
+            choice('new', 'New template', 'Attach your certificate image. The system copies its colors and logo, then rebuilds it in the system layout.') +
             '</div>' +
             '<input type="file" id="cgFile" accept="image/png,image/jpeg,image/webp" hidden>' +
             '<p style="margin:14px 0 0;font-size:12px;color:#64748b">A new template must be an image (PNG, JPG or WebP). For a PDF, export it as an image first.</p>' +
@@ -612,19 +637,60 @@ document.addEventListener('DOMContentLoaded', () => {
             else file.click();
         });
         file.addEventListener('change', function () {
-            loadImage(file.files[0], function (im) { m.close(); openGenerator({ mode: 'template', img: im }); });
+            loadImage(file.files[0], function (im) { m.close(); openGenerator({ mode: 'template', img: im, pal: analyze(im) }); });
+        });
+    }
+
+    /* ---- drag a box around the logo / seal on the template ---- */
+    function pickLogo(img, done) {
+        var cw = Math.min(820, window.innerWidth - 80), sc = cw / img.naturalWidth, ch = Math.round(img.naturalHeight * sc);
+        var m = modal(
+            '<div style="width:min(' + (cw + 40) + 'px,100%);background:#fff;color:#111827;border-radius:14px;padding:18px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+            '<h3 style="margin:0;font-size:17px">Select the logo or seal</h3>' +
+            '<button type="button" data-cg-close style="border:0;background:transparent;font-size:20px;cursor:pointer">\u2715</button></div>' +
+            '<p style="margin:0 0 10px;font-size:13px;color:#475569">Drag a box around the logo on your template.</p>' +
+            '<canvas id="lgCv" width="' + cw + '" height="' + ch + '" style="width:100%;height:auto;border:1px solid #d1d5db;border-radius:8px;touch-action:none;cursor:crosshair"></canvas>' +
+            '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">' +
+            '<button type="button" data-cg-close style="' + btn('#e5e7eb', '#111827') + '">Cancel</button>' +
+            '<button type="button" id="lgUse" style="' + btn('#1d4ed8', '#fff') + '">Use selection</button></div></div>');
+        var cv = m.o.querySelector('#lgCv'), x = cv.getContext('2d'), r = null, start = null;
+        function paint() {
+            x.drawImage(img, 0, 0, cv.width, cv.height);
+            if (r) {
+                x.fillStyle = 'rgba(29,78,216,.18)'; x.fillRect(r.x, r.y, r.w, r.h);
+                x.strokeStyle = '#1d4ed8'; x.lineWidth = 2; x.strokeRect(r.x, r.y, r.w, r.h);
+            }
+        }
+        function pt(e) { var b = cv.getBoundingClientRect(); return { x: (e.clientX - b.left) * cv.width / b.width, y: (e.clientY - b.top) * cv.height / b.height }; }
+        paint();
+        cv.addEventListener('pointerdown', function (e) { start = pt(e); r = { x: start.x, y: start.y, w: 0, h: 0 }; try { cv.setPointerCapture(e.pointerId); } catch (z) {} e.preventDefault(); });
+        cv.addEventListener('pointermove', function (e) {
+            if (!start) return;
+            var p = pt(e);
+            r = { x: Math.min(start.x, p.x), y: Math.min(start.y, p.y), w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y) };
+            paint();
+        });
+        cv.addEventListener('pointerup', function () { start = null; });
+        m.o.querySelector('#lgUse').addEventListener('click', function () {
+            if (!r || r.w < 10 || r.h < 10) { alert('Drag a box around the logo first.'); return; }
+            var out = document.createElement('canvas');
+            out.width = Math.round(r.w / sc); out.height = Math.round(r.h / sc);
+            out.getContext('2d').drawImage(img, r.x / sc, r.y / sc, r.w / sc, r.h / sc, 0, 0, out.width, out.height);
+            m.close(); done(out);
         });
     }
 
     function openGenerator(init) {
-        var st = { mode: init.mode, img: init.img || null, pos: {}, scale: 1, color: '#1f2937', extras: init.mode === 'system', boxes: [], drag: null };
+        var st = { mode: init.mode, img: init.img || null, pal: Object.assign({}, init.pal || DEF), logo: null, pos: {}, scale: 1, boxes: [], drag: null };
         var isTpl = st.mode === 'template';
         var today = new Date().toISOString().slice(0, 10);
+        function clr(id, label, val) { return '<label style="font-size:13px">' + label + ' <input id="' + id + '" type="color" value="' + val + '" style="vertical-align:middle"></label>'; }
 
         var m = modal(
             '<div style="width:min(980px,100%);max-height:94vh;overflow:auto;background:#fff;color:#111827;border-radius:14px;padding:20px;font-family:inherit">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
-            '<h3 style="margin:0;font-size:18px">Generate certificate \u00B7 ' + (isTpl ? 'New template' : 'System template') + '</h3>' +
+            '<h3 style="margin:0;font-size:18px">Generate certificate \u00B7 ' + (isTpl ? 'New template (copied to system layout)' : 'System template') + '</h3>' +
             '<button type="button" data-cg-close style="border:0;background:transparent;font-size:20px;cursor:pointer">\u2715</button></div>' +
             '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px">' +
             field('Title', '<input id="cgTitle" type="text" placeholder="Title of the document" style="' + inp() + '">') +
@@ -633,14 +699,17 @@ document.addEventListener('DOMContentLoaded', () => {
             field('Role', '<select id="cgRole" style="' + inp() + '"><option value="analyst">Data Analyst</option><option value="grammarian">Grammarian</option></select>') +
             field('Name', '<input id="cgName" type="text" placeholder="Name of the Data Analyst / Grammarian" style="' + inp() + '">') +
             '</div>' +
-            '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-bottom:10px;font-size:13px;color:#334155">' +
-            '<label>Text size <input id="cgScale" type="range" min="70" max="150" value="100" style="vertical-align:middle"></label>' +
-            (isTpl ? '<label>Text color <input id="cgColor" type="color" value="#1f2937" style="vertical-align:middle"></label>' +
-                '<label><input id="cgExtras" type="checkbox" style="vertical-align:middle"> Include heading, sentence and labels</label>' : '') +
-            '<span style="color:#64748b">Tip: drag any text on the preview to move it.</span></div>' +
+            '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-bottom:10px;color:#334155">' +
+            (isTpl ? '<img id="cgThumb" src="' + st.img.src + '" alt="Your template" title="Your template (reference)" style="height:56px;border:1px solid #cbd5e1;border-radius:6px">' : '') +
+            clr('cgBg', 'Background', st.pal.bg) + clr('cgPrimary', 'Main', st.pal.primary) +
+            clr('cgAccent', 'Accent', st.pal.accent) + clr('cgText', 'Text', st.pal.text) +
+            '<label style="font-size:13px">Text size <input id="cgScale" type="range" min="70" max="150" value="100" style="vertical-align:middle"></label>' +
+            '<span style="font-size:12px;color:#64748b">Drag any text or the logo on the preview to move it.</span></div>' +
             '<canvas id="cgCanvas" style="width:100%;height:auto;border:1px solid #d1d5db;border-radius:8px;touch-action:none"></canvas>' +
             '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap">' +
-            (isTpl ? '<button type="button" id="cgChange" style="' + btn('#e5e7eb', '#111827') + '">Change template</button>' : '') +
+            (isTpl ? '<button type="button" id="cgLogo" style="' + btn('#e5e7eb', '#111827') + '">Pick logo from template</button>' +
+                '<button type="button" id="cgNoLogo" style="' + btn('#e5e7eb', '#111827') + '">Remove logo</button>' +
+                '<button type="button" id="cgChange" style="' + btn('#e5e7eb', '#111827') + '">Change template</button>' : '') +
             '<button type="button" id="cgReset" style="' + btn('#e5e7eb', '#111827') + '">Reset positions</button>' +
             '<button type="button" data-cg-close style="' + btn('#e5e7eb', '#111827') + '">Close</button>' +
             '<button type="button" id="cgPrint" style="' + btn('#e5e7eb', '#111827') + '">Print / PDF</button>' +
@@ -649,24 +718,22 @@ document.addEventListener('DOMContentLoaded', () => {
             (isTpl ? '<input type="file" id="cgFile2" accept="image/png,image/jpeg,image/webp" hidden>' : '') +
             '</div>');
         var o = m.o, canvas = o.querySelector('#cgCanvas');
+        function q(s) { return o.querySelector(s); }
 
         function data() {
-            st.scale = (Number(o.querySelector('#cgScale').value) || 100) / 100;
-            if (isTpl) { st.color = o.querySelector('#cgColor').value; st.extras = o.querySelector('#cgExtras').checked; }
+            st.scale = (Number(q('#cgScale').value) || 100) / 100;
+            st.pal = { bg: q('#cgBg').value, primary: q('#cgPrimary').value, accent: q('#cgAccent').value, text: q('#cgText').value };
             return {
-                title: o.querySelector('#cgTitle').value.trim(),
-                proto: o.querySelector('#cgProto').value.trim(),
-                date:  o.querySelector('#cgDate').value,
-                role:  o.querySelector('#cgRole').value,
-                name:  o.querySelector('#cgName').value.trim()
+                title: q('#cgTitle').value.trim(), proto: q('#cgProto').value.trim(),
+                date: q('#cgDate').value, role: q('#cgRole').value, name: q('#cgName').value.trim()
             };
         }
         function redraw() { draw(canvas, data(), st); }
+        function setPal(p) { q('#cgBg').value = p.bg; q('#cgPrimary').value = p.primary; q('#cgAccent').value = p.accent; q('#cgText').value = p.text; }
         redraw();
         o.addEventListener('input', redraw);
         o.addEventListener('change', redraw);
 
-        // drag text on the preview
         function pt(e) { var r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height }; }
         function hit(p) {
             for (var i = st.boxes.length - 1; i >= 0; i--) {
@@ -695,14 +762,22 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.addEventListener('pointerup', endDrag);
         canvas.addEventListener('pointercancel', endDrag);
 
-        o.querySelector('#cgReset').addEventListener('click', function () { st.pos = {}; redraw(); });
+        q('#cgReset').addEventListener('click', function () { st.pos = {}; redraw(); });
         if (isTpl) {
-            var f2 = o.querySelector('#cgFile2');
-            o.querySelector('#cgChange').addEventListener('click', function () { f2.click(); });
-            f2.addEventListener('change', function () { loadImage(f2.files[0], function (im) { st.img = im; redraw(); }); });
+            var f2 = q('#cgFile2');
+            q('#cgLogo').addEventListener('click', function () { pickLogo(st.img, function (c) { st.logo = c; delete st.pos.logo; redraw(); }); });
+            q('#cgNoLogo').addEventListener('click', function () { st.logo = null; redraw(); });
+            q('#cgChange').addEventListener('click', function () { f2.click(); });
+            f2.addEventListener('change', function () {
+                loadImage(f2.files[0], function (im) {
+                    st.img = im; st.logo = null; st.pos = {};
+                    q('#cgThumb').src = im.src;
+                    setPal(analyze(im)); redraw();
+                });
+            });
         }
 
-        o.querySelector('#cgDl').addEventListener('click', function () {
+        q('#cgDl').addEventListener('click', function () {
             var d = data();
             canvas.toBlob(function (blob) {
                 var a = document.createElement('a');
@@ -712,7 +787,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
             }, 'image/png');
         });
-        o.querySelector('#cgPrint').addEventListener('click', function () {
+        q('#cgPrint').addEventListener('click', function () {
             var w = window.open('', '_blank');
             if (!w) { alert('Allow pop-ups to print, or use Download PNG.'); return; }
             w.document.write('<html><head><title>Certificate</title><style>@page{size:landscape;margin:0}body{margin:0}img{width:100%;display:block}</style></head><body><img src="' + canvas.toDataURL('image/png') + '"></body></html>');
