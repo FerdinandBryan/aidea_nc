@@ -211,3 +211,38 @@ require __DIR__ . '/profile.php';
     }
     return response()->json(['ok' => true]);
 })->middleware(['auth:sanctum', 'admin']);
+
+// Certificate templates (admin): reference images shown in Generate certificate
+\Illuminate\Support\Facades\Route::middleware(['auth:sanctum', 'admin'])->prefix('certificate-templates')->group(function () {
+    \Illuminate\Support\Facades\Route::get('/', function () {
+        return response()->json(\Illuminate\Support\Facades\DB::table('certificate_templates')->orderByDesc('id')->get(['id', 'name', 'created_at']));
+    });
+    \Illuminate\Support\Facades\Route::post('/', function (\Illuminate\Http\Request $request) {
+        $data = $request->validate([
+            'name'  => 'required|string|max:120',
+            'image' => 'required|file|mimes:png,jpg,jpeg,webp|max:10240',
+        ]);
+        $file = $request->file('image');
+        $mime = $file->getMimeType();
+        $ext  = strtolower($file->getClientOriginalExtension() ?: 'png');
+        $path = $file->storeAs('certificate-templates', uniqid('tpl_') . '.' . $ext, 'public');
+        $id = \Illuminate\Support\Facades\DB::table('certificate_templates')->insertGetId([
+            'name' => $data['name'], 'path' => $path, 'mime' => $mime, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        return response()->json(['ok' => true, 'id' => $id], 201);
+    });
+    \Illuminate\Support\Facades\Route::get('/{id}/image', function ($id) {
+        $row = \Illuminate\Support\Facades\DB::table('certificate_templates')->where('id', $id)->first();
+        abort_unless($row, 404);
+        $disk = \Illuminate\Support\Facades\Storage::disk('public');
+        abort_unless($disk->exists($row->path), 404);
+        return response()->json(['image' => 'data:' . ($row->mime ?: 'image/png') . ';base64,' . base64_encode($disk->get($row->path))]);
+    })->whereNumber('id');
+    \Illuminate\Support\Facades\Route::delete('/{id}', function ($id) {
+        $row = \Illuminate\Support\Facades\DB::table('certificate_templates')->where('id', $id)->first();
+        abort_unless($row, 404);
+        \Illuminate\Support\Facades\Storage::disk('public')->delete($row->path);
+        \Illuminate\Support\Facades\DB::table('certificate_templates')->where('id', $id)->delete();
+        return response()->json(['ok' => true]);
+    })->whereNumber('id');
+});

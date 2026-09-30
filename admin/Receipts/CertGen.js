@@ -298,11 +298,31 @@
             '<p style="margin:14px 0 0;font-size:12px;color:#64748b">A new template must be an image (PNG, JPG or WebP). For a PDF, export it as an image first.</p>' +
             '</div>');
         var file = m.o.querySelector('#cgFile');
+        var tplBase = (typeof API_BASE !== 'undefined' ? API_BASE : 'https://aideanc-production.up.railway.app/api');
+        var tplHd = { 'Accept': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') };
+        (function () {
+            var first = m.o.querySelector('[data-choice]'), grid = first && first.parentNode;
+            if (!grid) return;
+            fetch(tplBase + '/certificate-templates', { headers: tplHd }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function (list) {
+                (Array.isArray(list) ? list : []).forEach(function (t) {
+                    var nm = String(t.name || 'Template').replace(/[&<>"']/g, function (ch) { return '&#' + ch.charCodeAt(0) + ';'; });
+                    grid.insertAdjacentHTML('beforeend', choice('tpl:' + parseInt(t.id, 10), nm, 'Saved template'));
+                });
+            }).catch(function (e) { console.warn('Saved templates not loaded:', e); });
+        })();
         m.o.addEventListener('click', function (e) {
             var c = e.target.closest('[data-choice]');
             if (!c) return;
             if (c.getAttribute('data-choice') === 'sys') { m.close(); openGenerator(Object.assign({ mode: 'system' }, cgExtra)); }
-            else file.click();
+            else if (String(c.getAttribute('data-choice')).indexOf('tpl:') === 0) {
+                var tid = parseInt(String(c.getAttribute('data-choice')).slice(4), 10);
+                fetch(tplBase + '/certificate-templates/' + tid + '/image', { headers: tplHd }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function (j) {
+                    var im = new Image();
+                    im.onload = function () { m.close(); openGenerator(Object.assign({ mode: 'template', img: im, pal: analyze(im) }, cgExtra)); };
+                    im.onerror = function () { alert('Could not open that template.'); };
+                    im.src = j.image;
+                }).catch(function (e) { alert('Could not load that template.'); console.warn(e); });
+            } else file.click();
         });
         file.addEventListener('change', function () {
             loadImage(file.files[0], function (im) { m.close(); openGenerator(Object.assign({ mode: 'template', img: im, pal: analyze(im) }, cgExtra)); });

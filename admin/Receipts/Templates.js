@@ -1,0 +1,48 @@
+/* AIDEA Admin - Templates.js: upload, list and delete certificate templates (Receipts page). */
+(function () {
+    var BASE = (typeof API_BASE !== 'undefined' ? API_BASE : 'https://aideanc-production.up.railway.app/api');
+    function hd() { return { 'Accept': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') }; }
+    var list = document.getElementById('tplList'), nameIn = document.getElementById('tplName'), fileIn = document.getElementById('tplFile'), addBtn = document.getElementById('tplAdd');
+    if (!list || !addBtn) return;
+
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
+    function ok(r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw j; return j; }); }
+
+    function card(t) {
+        var d = document.createElement('div');
+        d.style.cssText = 'border:1px solid rgba(128,128,128,.3);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px';
+        d.innerHTML = '<img alt="" style="width:100%;height:110px;object-fit:contain;background:rgba(128,128,128,.12);border-radius:6px"><div style="font-weight:600;font-size:14px;word-break:break-word">' + esc(t.name) + '</div><button type="button" style="align-self:flex-start;padding:6px 12px;border:0;border-radius:8px;background:#fee2e2;color:#b91c1c;font:inherit;font-size:13px;font-weight:600;cursor:pointer">Delete</button>';
+        list.appendChild(d);
+        var img = d.querySelector('img');
+        fetch(BASE + '/certificate-templates/' + t.id + '/image', { headers: hd() }).then(ok).then(function (j) { if (j && j.image) img.src = j.image; }).catch(function () {});
+        d.querySelector('button').addEventListener('click', function () {
+            if (!confirm('Delete the template "' + t.name + '"?')) return;
+            fetch(BASE + '/certificate-templates/' + t.id, { method: 'DELETE', headers: hd() }).then(ok).then(function () { load(); }).catch(function (e) { alert('Not deleted: ' + ((e && e.message) || 'server error')); });
+        });
+    }
+
+    function load() {
+        fetch(BASE + '/certificate-templates', { headers: hd() }).then(ok).then(function (rows) {
+            rows = Array.isArray(rows) ? rows : [];
+            list.innerHTML = rows.length ? '' : '<p style="margin:0;font-size:13px;opacity:.7">No templates yet.</p>';
+            rows.forEach(card);
+        }).catch(function (e) { list.innerHTML = '<p style="margin:0;font-size:13px;color:#dc2626">Could not load templates.</p>'; console.warn('Templates not loaded:', e); });
+    }
+
+    addBtn.addEventListener('click', function () {
+        var f = fileIn.files && fileIn.files[0], nm = (nameIn.value || '').trim();
+        if (!nm) { alert('Enter a name for the template.'); return; }
+        if (!f) { alert('Choose an image first (PNG, JPG or WebP).'); return; }
+        if (f.size > 10 * 1024 * 1024) { alert('The image is over 10 MB. Use a smaller one.'); return; }
+        var fd = new FormData(); fd.append('name', nm); fd.append('image', f);
+        var label = addBtn.textContent;
+        addBtn.disabled = true; addBtn.textContent = 'Uploading...';
+        fetch(BASE + '/certificate-templates', { method: 'POST', headers: hd(), body: fd }).then(ok).then(function () {
+            nameIn.value = ''; fileIn.value = ''; load();
+        }).catch(function (e) {
+            alert('Not saved: ' + ((e && (e.message || (e.errors && JSON.stringify(e.errors)))) || 'could not reach the server.'));
+        }).then(function () { addBtn.disabled = false; addBtn.textContent = label; });
+    });
+
+    load();
+})();
