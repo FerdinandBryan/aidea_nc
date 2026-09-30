@@ -345,28 +345,51 @@ async function loadThesisOptions() {
     }
 }
 
+let reviewerItems = [];
+let reviewerFilter = 'all';
+
+function renderReviewerOptions() {
+    const select = document.getElementById('sendRecipient');
+    if (!select) return;
+    const byRole = { statistician: [], grammarian: [] };
+    reviewerItems.forEach(r => { (byRole[r.role] || (byRole[r.role] = [])).push(r); });
+
+    const optgroup = (role, label) => {
+        if (reviewerFilter !== 'all' && reviewerFilter !== role) return '';
+        const people = byRole[role] || [];
+        if (!people.length) return '';
+        return `<optgroup label="${label}">${people.map(r => `
+            <option value="${r.id}">${escHtml([r.fname, r.lname].filter(Boolean).join(' ') || r.name || label)}</option>
+        `).join('')}</optgroup>`;
+    };
+
+    const body = optgroup('statistician', 'Statistician') + optgroup('grammarian', 'Grammarian');
+    select.innerHTML = '<option value="" disabled selected>' + (body ? 'Select a reviewer\u2026' : 'No reviewers in this group') + '</option>' + body;
+}
+
+function setReviewerFilter(role) {
+    reviewerFilter = (role === 'statistician' || role === 'grammarian') ? role : 'all';
+    document.querySelectorAll('#reviewerFilter [data-role]').forEach(b => {
+        const on = b.dataset.role === reviewerFilter;
+        b.classList.toggle('action-btn-primary', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    renderReviewerOptions();
+}
+
+document.addEventListener('click', e => {
+    const b = e.target.closest('#reviewerFilter [data-role]');
+    if (b) { e.preventDefault(); setReviewerFilter(b.dataset.role); }
+});
+
 async function loadReviewerOptions() {
     const select = document.getElementById('sendRecipient');
     try {
         const res = await fetch(`${ADMIN_API}/admin/reviewers`, { headers: authHeaders() });
         if (res.status === 401) { clearSession(); window.location.href = LOGIN_URL; return; }
         if (!res.ok) throw new Error();
-        const items = asList(await res.json());
-
-        const byRole = { statistician: [], grammarian: [] };
-        items.forEach(r => { (byRole[r.role] || (byRole[r.role] = [])).push(r); });
-
-        const optgroup = (role, label) => {
-            const people = byRole[role] || [];
-            if (!people.length) return '';
-            return `<optgroup label="${label}">${people.map(r => `
-                <option value="${r.id}">${escHtml([r.fname, r.lname].filter(Boolean).join(' ') || r.name || label)}</option>
-            `).join('')}</optgroup>`;
-        };
-
-        select.innerHTML = '<option value="" disabled selected>Select a reviewer…</option>'
-            + optgroup('statistician', 'Statistician')
-            + optgroup('grammarian', 'Grammarian');
+        reviewerItems = asList(await res.json());
+        setReviewerFilter(new URLSearchParams(window.location.search).get('role') || 'all');
     } catch {
         select.innerHTML = '<option value="" disabled selected>Couldn\u2019t load reviewers</option>';
     }

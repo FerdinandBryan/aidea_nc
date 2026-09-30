@@ -185,6 +185,11 @@
 
                             <div class="field">
                                 <label for="sendRecipient">Send to</label>
+                                <div id="reviewerFilter" style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 8px;">
+                                    <button type="button" class="action-btn action-btn-primary" data-role="all" aria-pressed="true">All</button>
+                                    <button type="button" class="action-btn" data-role="statistician" aria-pressed="false">Statistician</button>
+                                    <button type="button" class="action-btn" data-role="grammarian" aria-pressed="false">Grammarian</button>
+                                </div>
                                 <select id="sendRecipient" name="sendRecipient" required>
                                     <option value="" disabled selected>Select a reviewer…</option>
                                 </select>

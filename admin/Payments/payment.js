@@ -360,7 +360,10 @@
                     '<span class="none">—</span>';
             }
 
-            return '<tr class="' + (isPending(p) ? 'row-pending' : '') + '">' +
+            actions += '<a class="btn-action" style="text-decoration:none;" href="../File%20transfer/file_transfer.html?tab=send&role=grammarian">Grammarian</a>' +
+                   '<a class="btn-action" style="text-decoration:none;" href="../File%20transfer/file_transfer.html?tab=send&role=statistician">Statistician</a>';
+        actions += '<a class="btn-action" style="text-decoration:none;" href="../formatting/formatting.html">Check format</a>';
+        return '<tr class="' + (isPending(p) ? 'row-pending' : '') + '">' +
                 '<td data-label="Student"><strong>' + escHtml(p.student) + '</strong>' +
                 (p.student_id || p.studentId ? '<small>' + escHtml(p.student_id || p.studentId) + '</small>' : '') + '</td>' +
                 '<td data-label="Service">' + escHtml(p.service) + '</td>' +
