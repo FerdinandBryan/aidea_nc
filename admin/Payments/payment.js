@@ -610,7 +610,7 @@ function openViewModal(i) {
 
     // ── Reload ───────────────────────────────────────────────────────────────
         // -- Send files / Certificate dialog ------------------------------------
-    var MAX_FILE_MB = 5;
+    var MAX_FILE_MB = 20;
 
     function isAllowedFile(f) {
         return f.type === 'application/pdf' || f.type.indexOf('image/') === 0;
