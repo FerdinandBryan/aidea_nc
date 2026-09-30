@@ -246,7 +246,7 @@ function renderPayments() {
     });
 
     if (!payments.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty">No payments yet. Avail a service to get started.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">No requests yet. Avail a service to get started.</td></tr>';
     } else if (!filtered.length) {
         tbody.innerHTML = '<tr><td colspan="7" class="empty">No payments match your filter.</td></tr>';
     } else {
