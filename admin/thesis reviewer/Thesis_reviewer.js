@@ -301,6 +301,11 @@ function splitReviewTitle(t) {
     if (m) return { title: m[1] + ' - ' + m[2], label: m[3] };
     return { title: title, label: '' };
 }
+function linkifyLabel(label) {
+    return escHtml(String(label)).replace(/(https?:\/\/[^\s<]+)/g, function (u) {
+        return '<a href="' + u + '" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;font-weight:600">' + u + '</a>';
+    });
+}
 function renderFileLabel(label) {
     if (!label) return '';
     if (!document.getElementById('fl-styles')) {
@@ -313,7 +318,7 @@ function renderFileLabel(label) {
         ].join('');
         document.head.appendChild(st);
     }
-    return '<span class="fl-caption"><span class="fl-title">Uploaded for</span><span class="fl-text">' + escHtml(String(label)) + '</span></span>';
+    return '<span class="fl-caption"><span class="fl-title">Uploaded for</span><span class="fl-text">' + linkifyLabel(label) + '</span></span>';
 }
 const ICON_DOWNLOAD = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>`;
 const ICON_CHECK = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
