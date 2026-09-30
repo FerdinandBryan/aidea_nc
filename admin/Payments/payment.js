@@ -339,7 +339,31 @@
     }
 
     // ── Render table ─────────────────────────────────────────────────────────
+    var activeCertTab = 'certificates';
+    var certTypeMap = {};
+    function sentType(p) {
+        var r = certTypeMap[String(p.id)];
+        return r && r.type === 'files' ? 'files' : 'certificates';
+    }
+    function matchTab(p) { return sentType(p) === activeCertTab; }
+    function updateTabs() {
+        var f = allPayments.filter(function (p) { return sentType(p) === 'files'; }).length;
+        var c = document.getElementById('countCert');
+        var d = document.getElementById('countFiles');
+        if (c) c.textContent = allPayments.length - f;
+        if (d) d.textContent = f;
+        document.querySelectorAll('[data-cert-tab]').forEach(function (b) {
+            b.classList.toggle('active', b.getAttribute('data-cert-tab') === activeCertTab);
+        });
+    }
+    document.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-cert-tab]');
+        if (!b) return;
+        activeCertTab = b.getAttribute('data-cert-tab');
+        render();
+    });
     function render() {
+        updateTabs();
         const q = searchTerm.toLowerCase();
         fillServiceOptions();
         filtered = allPayments.filter(function (p) {
@@ -349,7 +373,7 @@
             const normStatus = p.status === 'Paid' ? 'Completed' : p.status === 'Rejected' ? 'Cancelled' : p.status;
             const matchSt = !statusFilter || normStatus === statusFilter;
             const matchSv = !serviceFilter || String(p.service || '') === serviceFilter;
-            return matchQ && matchSt && matchSv;
+            return matchQ && matchSt && matchSv && matchTab(p);
         });
 
         const isPending = function (p) { return p.status === 'Pending'; };
@@ -933,6 +957,7 @@ function openViewModal(i) {
     async function reload() {
         try {
             allPayments = await apiFetch('/payments');
+        try { certTypeMap = await apiFetch('/certificates') || {}; } catch (e) { certTypeMap = {}; }
         } catch (err) {
             console.error('Failed to load payments:', err);
             showToast('Failed to load payments.', 'error');
