@@ -419,6 +419,7 @@ function renderServices() {
 // ══════════════════════════════════════════
 
 function renderHistory() {
+    if (!document.getElementById('historyBody')) return;
     document.getElementById('historyBody').innerHTML = priceHistory.length
         ? priceHistory.map(h => {
             const up = h.newPrice > h.oldPrice;
