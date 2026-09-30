@@ -33,6 +33,10 @@ class AssignmentController extends Controller
             'note' => ['nullable', 'string'],
             'file_label' => ['nullable', 'string', 'max:2000'],
             'file' => ['nullable', 'file', 'max:20480'],
+            'files' => ['nullable', 'array', 'max:10'],
+            'files.*' => ['file', 'max:20480'],
+            'file_labels' => ['nullable', 'array'],
+            'file_labels.*' => ['nullable', 'string', 'max:2000'],
         ]);
 
         if ($validator->fails()) {
@@ -40,6 +44,15 @@ class AssignmentController extends Controller
         }
 
         $path = $request->hasFile('file') ? $request->file('file')->store('assignments', 'public') : null;
+
+        $fileItems = [];
+        $labels = (array) $request->input('file_labels', []);
+        foreach ((array) $request->file('files', []) as $i => $f) {
+            $fileItems[] = ['path' => $f->store('assignments', 'public'), 'label' => $labels[$i] ?? null];
+        }
+        if ($fileItems) {
+            $path = $fileItems[0]['path'];
+        }
 
         $assignment = ThesisAssignment::create([
             'thesis_submission_id' => $request->input('thesis_id'),
@@ -49,6 +62,7 @@ class AssignmentController extends Controller
             'file_label' => $request->input('file_label'),
             'reviewer_id' => $request->input('reviewer_id'),
             'file_path' => $path,
+            'files' => $fileItems ?: null,
             'status' => 'pending',
         ]);
 

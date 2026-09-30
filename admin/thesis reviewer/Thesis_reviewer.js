@@ -306,6 +306,16 @@ function linkifyLabel(label) {
         return '<a href="' + u + '" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;font-weight:600">' + u + '</a>';
     });
 }
+function renderFileRows(t) {
+    let items = Array.isArray(t.file_items) ? t.file_items.filter(function (i) { return i && i.url; }) : [];
+    if (!items.length && t.file_url) items = [{ url: t.file_url, label: splitReviewTitle(t).label }];
+    if (!items.length) return '';
+    return '<div class="review-card-files" style="display:flex;flex-direction:column;gap:8px">' + items.map(function (i, n) {
+        const dl = items.length > 1 ? '<a class="action-btn" href="' + escHtml(i.url) + '" download>Download</a>' : '';
+        const name = items.length > 1 ? 'File ' + (n + 1) : 'Original thesis file';
+        return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px"><a class="file-chip" href="' + escHtml(i.url) + '" target="_blank" rel="noopener">' + ICON_DOC + ' ' + name + '</a>' + renderFileLabel(i.label) + dl + '</div>';
+    }).join('') + '</div>';
+}
 function renderFileLabel(label) {
     if (!label) return '';
     if (!document.getElementById('fl-styles')) {
@@ -360,18 +370,12 @@ async function loadPending() {
 
                     ${renderAdminNote(t.note)}
 
-                    ${t.file_url ? `
-                    <div class="review-card-files">
-                        <a class="file-chip" href="${escHtml(t.file_url)}" target="_blank" rel="noopener">
-                            ${ICON_DOC} Original thesis file
-                        </a>
-                        ${renderFileLabel(splitReviewTitle(t).label)}
-                    </div>` : ''}
+                    ${renderFileRows(t)}
 
                     
 
                     <div class="review-card-actions">
-                        ${t.file_url ? `
+                        ${(t.file_url && !(t.file_items && t.file_items.length > 1)) ? `
                         <a class="action-btn" href="${escHtml(t.file_url)}" target="_blank" rel="noopener">${ICON_EYE} View</a>
                         <a class="action-btn" href="${escHtml(t.file_url)}" download>${ICON_DOWNLOAD} Download</a>
                         ` : ''}

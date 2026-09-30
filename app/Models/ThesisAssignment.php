@@ -15,15 +15,17 @@ class ThesisAssignment extends Model
         'note',
         'file_label',
         'file_path',
+        'files',
         'reviewed_file_path',
         'reviewed_files',
         'status',
     ];
 
-    protected $appends = ['file_url', 'reviewed_file_url', 'reviewed_file_urls'];
+    protected $appends = ['file_url', 'file_items', 'reviewed_file_url', 'reviewed_file_urls'];
 
     protected $casts = [
         'reviewed_files' => 'array',
+        'files' => 'array',
     ];
 
     public function thesis()
@@ -43,6 +45,18 @@ class ThesisAssignment extends Model
         return array_values(array_map(function ($p) {
             return Storage::disk('public')->url($p);
         }, $paths));
+    }
+
+    public function getFileItemsAttribute()
+    {
+        $items = $this->files ?: [];
+        if (!$items && $this->file_path) {
+            $items = [['path' => $this->file_path, 'label' => $this->file_label]];
+        }
+
+        return array_values(array_map(function ($i) {
+            return ['url' => Storage::disk('public')->url($i['path']), 'label' => $i['label'] ?? null];
+        }, $items));
     }
 
     public function getFileUrlAttribute()
