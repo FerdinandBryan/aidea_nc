@@ -1035,3 +1035,9 @@ button {
 .modal-btn-primary:hover {
     filter: brightness(1.08);
 }
+/* == Certificates / Files tabs ============================================ */
+.cert-tabs { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 14px; background: rgba(128,128,128,.12); border: 1px solid rgba(128,128,128,.25); border-radius: 999px; }
+.cert-tab { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border: 0; border-radius: 999px; background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; opacity: .75; }
+.cert-tab.active { background: rgba(47,107,255,.25); opacity: 1; }
+.cert-count { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: rgba(128,128,128,.3); font-size: 12px; text-align: center; }
+.cert-tab.active .cert-count { background: #2f6bff; color: #fff; }

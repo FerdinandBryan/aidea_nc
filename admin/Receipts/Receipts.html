@@ -133,7 +133,11 @@
 
     <main class="content">
       <div class="toolbar">
-        <input type="text" class="search-input" id="searchInput"
+        <div class="cert-tabs" id="certTabs">
+                <button type="button" class="cert-tab active" data-cert-tab="certificates">Certificates <span class="cert-count" id="countCert">0</span></button>
+                <button type="button" class="cert-tab" data-cert-tab="files">Files <span class="cert-count" id="countFiles">0</span></button>
+            </div>
+            <input type="text" class="search-input" id="searchInput"
           placeholder="Search by student, receipt no. or GCash ref…" />
       </div>
 

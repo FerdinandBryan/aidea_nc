@@ -35,7 +35,25 @@ async function apiFetch(path, options = {}) {
 }
 
 /* -- State -- */
-let allReceipts = [];   // only Paid payments
+let allReceipts = [];
+let activeTab = 'certificates';
+function tabOf(p) { return p.certType === 'files' ? 'files' : 'certificates'; }
+function updateTabs() {
+    const f = allReceipts.filter(p => tabOf(p) === 'files').length;
+    const c = document.getElementById('countCert');
+    const d = document.getElementById('countFiles');
+    if (c) c.textContent = allReceipts.length - f;
+    if (d) d.textContent = f;
+    document.querySelectorAll('[data-cert-tab]').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-cert-tab') === activeTab);
+    });
+}
+document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-cert-tab]');
+    if (!b) return;
+    activeTab = b.getAttribute('data-cert-tab');
+    render();
+});   // only Paid payments
 let filtered = [];
 let searchTerm = '';
 
@@ -97,7 +115,10 @@ async function attachCertificates(list) {
   } catch (e) {
     console.warn('Certificates not available yet:', e);
   }
-  list.forEach(p => { p.certificate = (map && map[p.id]) || p.certificate || null; });
+  list.forEach(p => {
+        p.certificate = (map && map[p.id]) || p.certificate || null;
+        p.certType = (map && map[p.id] && map[p.id].type) || (p.certificate && p.certificate.type) || 'certificate';
+    });
 }
 
 function previewHtml(p) {
@@ -208,11 +229,11 @@ function openViewer(p, c) {
 }
 
 /* -- Render receipt cards -- */
-function render() {
+function render() { updateTabs();
   const grid = document.getElementById('receiptsGrid');
   const q = searchTerm.toLowerCase();
 
-  filtered = allReceipts.filter(p => {
+  filtered = allReceipts.filter(p => { if (tabOf(p) !== activeTab) return false;
     const rcpNo = toReceiptNo(p.id).toLowerCase();
     const gcashRef = (p.gcash_ref || p.gcashRef || '').toLowerCase();
     return !q
