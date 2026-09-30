@@ -315,7 +315,7 @@ const _TEMPLATE_STORAGE_KEY = 'aidea_format_templates';
 function _getActiveFormatTemplates() {
     try {
         const all = JSON.parse(localStorage.getItem(_TEMPLATE_STORAGE_KEY) || '[]');
-        return all.filter(t => t && t.active);
+        return all.filter(t => t && t.id != null).sort((a, b) => (b.active ? 1 : 0) - (a.active ? 1 : 0));
     } catch (e) {
         console.warn('[Validator] Could not read admin templates:', e);
         return [];
@@ -1187,7 +1187,7 @@ function _dvRenderPickerStep() {
     const templatePickerHtml = _dvActiveTemplates.length
         ? `<select id="dvTemplateSelect" class="dv-select">
                 ${_dvActiveTemplates.map(t =>
-            `<option value="${_escHtml(String(t.id))}" ${String(t.id) === String(_dvSelectedTemplateId) ? 'selected' : ''}>${_escHtml(t.name)} — ${_escHtml(t.type)}</option>`
+            `<option value="${_escHtml(String(t.id))}" ${String(t.id) === String(_dvSelectedTemplateId) ? 'selected' : ''}>${_escHtml(t.name)}${t.active ? "" : " (inactive)"} — ${_escHtml(t.type)}</option>`
         ).join('')}
            </select>
            <div class="dv-template-desc" id="dvTemplateDesc"></div>`
