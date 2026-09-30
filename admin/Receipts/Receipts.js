@@ -630,14 +630,24 @@ document.addEventListener('DOMContentLoaded', () => {
         Array.prototype.forEach.call(o.querySelectorAll('[data-cg-close]'), function (x) {
             if (x.textContent.trim() === '\u2715') x.style.display = 'none';
         });
-        var cb = document.createElement('button');
-        cb.type = 'button';
-        cb.textContent = '\u2715 Close';
-        cb.title = 'Close (Esc)';
-        cb.setAttribute('aria-label', 'Close');
-        cb.style.cssText = 'position:fixed;top:16px;right:24px;z-index:10000;padding:10px 16px;border:0;border-radius:999px;background:#ef4444;color:#fff;font:inherit;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.35)';
-        cb.addEventListener('click', close);
-        o.appendChild(cb);
+        
+        Array.prototype.forEach.call(o.querySelectorAll('[data-cg-close]'), function (x) {
+            if (x.textContent.trim() === '\u2715') x.style.display = 'none';
+        });
+        var dlg = o.firstElementChild;
+        if (dlg) {
+            var bar = document.createElement('div');
+            bar.style.cssText = 'position:sticky;top:0;height:0;z-index:5;text-align:right;overflow:visible';
+            var cb = document.createElement('button');
+            cb.type = 'button';
+            cb.textContent = '\u2715 Close';
+            cb.title = 'Close (Esc)';
+            cb.setAttribute('aria-label', 'Close');
+            cb.style.cssText = 'position:relative;top:-8px;right:-8px;padding:8px 14px;border:0;border-radius:999px;background:#ef4444;color:#fff;font:inherit;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+            cb.addEventListener('click', close);
+            bar.appendChild(cb);
+            dlg.insertBefore(bar, dlg.firstChild);
+        }
         return { o: o, close: close };
     }
 
@@ -814,11 +824,11 @@ document.addEventListener('DOMContentLoaded', () => {
             '<span style="font-size:12px;color:#64748b">Drag any text or the logo on the preview to move it.</span></div>' +
             '<canvas id="cgCanvas" style="width:100%;height:auto;border:1px solid #d1d5db;border-radius:8px;touch-action:none"></canvas>' +
             '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap">' +
-            (isTpl ? '<button type="button" id="cgLogo" style="' + btn('#e5e7eb', '#111827') + '">Pick logo from template</button>' +
-                '<button type="button" id="cgNoLogo" style="' + btn('#e5e7eb', '#111827') + '">Remove logo</button>' +
+            (isTpl ? 
+                
                 '<button type="button" id="cgChange" style="' + btn('#e5e7eb', '#111827') + '">Change template</button>' : '') +
-            '<button type="button" id="cgReset" style="' + btn('#e5e7eb', '#111827') + '">Reset positions</button>' +
-            '<button type="button" data-cg-close style="' + btn('#e5e7eb', '#111827') + '">Close</button>' +
+            
+            
             '<button type="button" id="cgPrint" style="' + btn('#e5e7eb', '#111827') + '">Print / PDF</button>' +
             '<button type="button" id="cgDl" style="' + btn('#1d4ed8', '#fff') + '">Download PNG</button>' +
             '</div>' +
@@ -870,11 +880,11 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.addEventListener('pointerup', endDrag);
         canvas.addEventListener('pointercancel', endDrag);
 
-        q('#cgReset').addEventListener('click', function () { st.pos = {}; redraw(); });
+        
         if (isTpl) {
             var f2 = q('#cgFile2');
-            q('#cgLogo').addEventListener('click', function () { pickLogo(st.img, function (c) { st.logo = c; delete st.pos.logo; redraw(); }); });
-            q('#cgNoLogo').addEventListener('click', function () { st.logo = null; redraw(); });
+            
+            
             q('#cgChange').addEventListener('click', function () { f2.click(); });
             f2.addEventListener('change', function () {
                 loadImage(f2.files[0], function (im) {
