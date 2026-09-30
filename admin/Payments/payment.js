@@ -360,8 +360,11 @@
                     '<span class="none">—</span>';
             }
 
-            actions += '<button type="button" class="btn-action" onclick="AideaPayments.sendReviewer(' + p.id + ',\'grammarian\')">Grammarian</button>' +
-                   '<button type="button" class="btn-action" onclick="AideaPayments.sendReviewer(' + p.id + ',\'statistician\')">Statistician</button>';
+            const svcName = String(p.service || '').toLowerCase();
+            const reviewerRole = /grammar/.test(svcName) ? 'grammarian' : (/data analysis|statistic/.test(svcName) ? 'statistician' : '');
+            if (reviewerRole) {
+                actions += '<button type="button" class="btn-action" onclick="AideaPayments.sendReviewer(' + p.id + ',\'' + reviewerRole + '\')">' + (reviewerRole === 'grammarian' ? 'Grammarian' : 'Statistician') + '</button>';
+            }
         return '<tr class="' + (isPending(p) ? 'row-pending' : '') + '">' +
                 '<td data-label="Student"><strong>' + escHtml(p.student) + '</strong>' +
                 (p.student_id || p.studentId ? '<small>' + escHtml(p.student_id || p.studentId) + '</small>' : '') + '</td>' +
