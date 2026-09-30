@@ -377,7 +377,7 @@ async function loadPending() {
                         ` : ''}
                         <button type="button" class="action-btn action-btn-primary" data-send-back="${t.id}"
                             data-title="${escHtml(t.title || 'this thesis')}">
-                            ${ICON_CHECK} Satisfied — send back
+                            ${ICON_CHECK} Send Evaluation
                         </button>
                     </div>
                 </div>
