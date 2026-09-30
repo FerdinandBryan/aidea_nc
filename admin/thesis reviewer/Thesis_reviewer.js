@@ -300,13 +300,13 @@ function renderFileLabel(label) {
         const st = document.createElement('style');
         st.id = 'fl-styles';
         st.textContent = [
-            '.fl-caption{margin:8px 0 4px;padding:8px 12px;border-left:3px solid rgba(127,127,127,.45);background:rgba(127,127,127,.06);border-radius:0 8px 8px 0}',
-            '.fl-title{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.6;margin-bottom:2px}',
+            '.fl-caption{display:inline-flex;align-items:baseline;gap:8px;flex:1 1 240px;min-width:0;padding:6px 12px;border-left:3px solid rgba(127,127,127,.45);background:rgba(127,127,127,.06);border-radius:0 8px 8px 0}',
+            '.fl-title{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.6;white-space:nowrap}',
             '.fl-text{font-size:13px;line-height:1.45;word-break:break-word}'
         ].join('');
         document.head.appendChild(st);
     }
-    return '<div class="fl-caption"><div class="fl-title">Uploaded for</div><div class="fl-text">' + escHtml(String(label)) + '</div></div>';
+    return '<span class="fl-caption"><span class="fl-title">Uploaded for</span><span class="fl-text">' + escHtml(String(label)) + '</span></span>';
 }
 const ICON_DOWNLOAD = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>`;
 const ICON_CHECK = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
@@ -353,9 +353,10 @@ async function loadPending() {
                         <a class="file-chip" href="${escHtml(t.file_url)}" target="_blank" rel="noopener">
                             ${ICON_DOC} Original thesis file
                         </a>
+                        ${renderFileLabel(t.file_label)}
                     </div>` : ''}
 
-                    ${renderFileLabel(t.file_label)}
+                    
 
                     <div class="review-card-actions">
                         ${t.file_url ? `
