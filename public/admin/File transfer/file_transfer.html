@@ -177,7 +177,7 @@
                     <form id="sendForm" class="account-form" novalidate>
                         <div class="form-grid">
                             <div class="field">
-                                <label for="sendThesis">Thesis</label>
+                                <label for="sendThesis">Payment files</label>
                                 <select id="sendThesis" name="sendThesis" required>
                                     <option value="" disabled selected>Select a thesis…</option>
                                 </select>
@@ -198,16 +198,17 @@
                         </div>
 
                         <div class="field">
-                            <label for="sendFile">Attach a file (optional — defaults to the thesis on record)</label>
+                            <label for="sendFile">Or upload files from your computer (optional)</label>
                             <label class="file-drop" id="fileDropLabel" for="sendFile">
                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                     <path d="M12 16V4M12 4 7 9M12 4l5 5" />
                                     <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
                                 </svg>
-                                <span id="fileDropText">Click to choose a file, or drag it here</span>
+                                <span id="fileDropText">Click to choose files, or drag them here</span>
                             </label>
-                            <input type="file" id="sendFile" name="sendFile" class="sr-only" accept=".pdf,.doc,.docx" />
+                            <input type="file" id="sendFile" name="sendFile" class="sr-only" accept=".pdf,.doc,.docx" multiple />
+                            <ul id="sendQueue" style="list-style:none;margin:8px 0 0;padding:0;"></ul>
                         </div>
 
                         <p class="form-msg" id="sendMsg" role="status" aria-live="polite"></p>

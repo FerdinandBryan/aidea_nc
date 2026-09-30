@@ -473,11 +473,63 @@ async function loadReceived() {
 // ── Send form ────────────────────────────────────────────────────────────
 
 let selectedFile = null;
+let sendQueue = [];
+
+function renderQueue() {
+    const list = document.getElementById('sendQueue');
+    if (!list) return;
+    list.innerHTML = '';
+    sendQueue.forEach(function (entry, idx) {
+        const li = document.createElement('li');
+        li.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;';
+        const span = document.createElement('span');
+        span.textContent = entry.label;
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.textContent = '\u2715';
+        x.setAttribute('aria-label', 'Remove');
+        x.style.cssText = 'border:0;background:none;cursor:pointer;font-size:14px;color:inherit;';
+        x.addEventListener('click', function () { sendQueue.splice(idx, 1); renderQueue(); });
+        li.appendChild(span);
+        li.appendChild(x);
+        list.appendChild(li);
+    });
+    const dropLabel = document.getElementById('fileDropLabel');
+    if (sendQueue.length) {
+        dropLabel.classList.add('has-file');
+        setText('fileDropText', sendQueue.length + (sendQueue.length === 1 ? ' file' : ' files') + ' ready \u2014 click to add more');
+    } else {
+        resetFileDrop();
+    }
+}
+
+function addUploadedFiles(files) {
+    files.forEach(function (f) {
+        const dup = sendQueue.some(function (q) { return q.source === 'upload' && q.file.name === f.name && q.file.size === f.size; });
+        if (!dup) sendQueue.push({ source: 'upload', key: null, file: f, title: f.name, student_name: '', label: f.name });
+    });
+    renderQueue();
+}
+
+function addPaymentFile(key, opt) {
+    if (sendQueue.some(function (q) { return q.key === key; })) return;
+    const name = opt.item.file_name || 'file';
+    let file;
+    try { file = dataUrlToFile(opt.item.file_base64, name); }
+    catch (e) { showMsg('sendMsg', 'Could not read that file.', 'error'); return; }
+    sendQueue.push({
+        source: 'payment', key: key, file: file,
+        title: (opt.item.label || 'File') + ' - ' + name,
+        student_name: opt.payment.student || '',
+        label: (opt.payment.student || 'Student') + ' \u2014 ' + (opt.item.label || 'File') + ' (' + name + ')'
+    });
+    renderQueue();
+}
 
 function resetFileDrop() {
     const label = document.getElementById('fileDropLabel');
     label.classList.remove('has-file', 'is-dragover');
-    setText('fileDropText', 'Click to choose a file, or drag it here');
+    setText('fileDropText', 'Click to choose files, or drag them here');
 }
 
 function initSendForm() {
@@ -485,13 +537,15 @@ function initSendForm() {
     const dropLabel = document.getElementById('fileDropLabel');
 
     fileInput.addEventListener('change', () => {
-        selectedFile = fileInput.files[0] || null;
-        if (selectedFile) {
-            dropLabel.classList.add('has-file');
-            setText('fileDropText', selectedFile.name);
-        } else {
-            resetFileDrop();
-        }
+        addUploadedFiles(Array.prototype.slice.call(fileInput.files));
+        fileInput.value = '';
+    });
+
+    const paySelect = document.getElementById('sendThesis');
+    paySelect.addEventListener('change', () => {
+        const opt = paymentFileOptions[paySelect.value];
+        if (opt) addPaymentFile(paySelect.value, opt);
+        paySelect.selectedIndex = 0;
     });
 
     ['dragover', 'dragenter'].forEach(evt =>
@@ -499,22 +553,15 @@ function initSendForm() {
     ['dragleave', 'drop'].forEach(evt =>
         dropLabel.addEventListener(evt, e => { e.preventDefault(); dropLabel.classList.remove('is-dragover'); }));
     dropLabel.addEventListener('drop', e => {
-        const file = e.dataTransfer.files[0];
-        if (file) {
-            fileInput.files = e.dataTransfer.files;
-            selectedFile = file;
-            dropLabel.classList.add('has-file');
-            setText('fileDropText', file.name);
-        }
+        addUploadedFiles(Array.prototype.slice.call(e.dataTransfer.files));
     });
 
     document.getElementById('sendForm').addEventListener('submit', async e => {
         e.preventDefault();
 
-        const thesisId = document.getElementById('sendThesis').value;
         const reviewerId = document.getElementById('sendRecipient').value;
-        if (!thesisId || !reviewerId) {
-            showMsg('sendMsg', 'Choose a thesis and a reviewer first.', 'error');
+        if (!sendQueue.length || !reviewerId) {
+            showMsg('sendMsg', 'Add at least one file and choose a reviewer first.', 'error');
             return;
         }
 
@@ -522,37 +569,44 @@ function initSendForm() {
         setBtnLoading(submitBtn, true);
         showMsg('sendMsg', '', null);
 
-        const body = new FormData();
-        const opt = paymentFileOptions[thesisId];
-        if (opt) {
-            body.append('title', (opt.item.label || 'File') + ' - ' + (opt.item.file_name || 'file'));
-            body.append('student_name', opt.payment.student || '');
-        }
-        body.append('reviewer_id', reviewerId);
-        body.append('note', document.getElementById('sendNote').value.trim());
-        if (selectedFile) body.append('file', selectedFile);
-        else if (opt) body.append('file', dataUrlToFile(opt.item.file_base64, opt.item.file_name || 'file'));
+        const note = document.getElementById('sendNote').value.trim();
+        const total = sendQueue.length;
+        let sent = 0;
 
         try {
-            const res = await fetch(`${ADMIN_API}/admin/assignments`, {
-                method: 'POST',
-                headers: authHeaders(false), // let the browser set the multipart boundary
-                body,
-            });
+            while (sendQueue.length) {
+                const entry = sendQueue[0];
+                const body = new FormData();
+                body.append('reviewer_id', reviewerId);
+                body.append('note', note);
+                body.append('title', entry.title);
+                if (entry.student_name) body.append('student_name', entry.student_name);
+                body.append('file', entry.file);
 
-            if (res.status === 401) { clearSession(); window.location.href = LOGIN_URL; return; }
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.message || 'Could not send this file. Try again.');
+                const res = await fetch(`${ADMIN_API}/admin/assignments`, {
+                    method: 'POST',
+                    headers: authHeaders(false),
+                    body,
+                });
+
+                if (res.status === 401) { clearSession(); window.location.href = LOGIN_URL; return; }
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.message || ('Could not send "' + entry.file.name + '".'));
+                }
+                sendQueue.shift();
+                sent++;
+                renderQueue();
             }
 
             document.getElementById('sendForm').reset();
             selectedFile = null;
-            resetFileDrop();
-            showMsg('sendMsg', 'Sent!', 'success');
+            renderQueue();
+            showMsg('sendMsg', total === 1 ? 'Sent!' : ('Sent ' + total + ' files!'), 'success');
             await loadSent();
         } catch (err) {
-            showMsg('sendMsg', err.message || 'Something went wrong. Try again.', 'error');
+            showMsg('sendMsg', (sent ? ('Sent ' + sent + ' of ' + total + '. ') : '') + (err.message || 'Something went wrong. Try again.'), 'error');
+            if (sent) { try { await loadSent(); } catch (e2) { /* ignore */ } }
         } finally {
             setBtnLoading(submitBtn, false);
         }
