@@ -44,6 +44,7 @@ class AssignmentController extends Controller
             'thesis_submission_id' => $request->input('thesis_id'),
             'title' => $request->input('title'),
             'student_name' => $request->input('student_name'),
+            'note' => $request->input('note'),
             'reviewer_id' => $request->input('reviewer_id'),
             'file_path' => $path,
             'status' => 'pending',

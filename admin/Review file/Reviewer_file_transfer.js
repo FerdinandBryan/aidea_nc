@@ -409,7 +409,7 @@ async function loadSent() {
                         <span class="badge badge-success">Sent</span>
                     </div>
 
-                    ${t.reviewer_note ? `<div class="review-card-note"><span>Your note:</span> ${escHtml(t.reviewer_note)}</div>` : ''}
+                    ${t.reviewer_note ? `<div class="review-card-note" style="white-space:pre-line"><span>Your note:</span> ${escHtml(t.reviewer_note)}</div>` : ''}
 
                     <div class="review-card-files">
                         ${t.file_url ? `<a class="file-chip" href="${escHtml(t.file_url)}" target="_blank" rel="noopener">${ICON_DOC} Original file</a>` : ''}
@@ -466,7 +466,7 @@ async function loadReceived() {
                         <span class="badge badge-warning">Awaiting your review</span>
                     </div>
 
-                    ${t.note ? `<div class="review-card-note"><span>Admin's note:</span> ${escHtml(t.note)}</div>` : ''}
+                    ${t.note ? `<div class="review-card-note" style="white-space:pre-line"><span>Admin's note:</span> ${escHtml(t.note)}</div>` : ''}
 
                     ${t.file_url ? `
                     <div class="review-card-files">

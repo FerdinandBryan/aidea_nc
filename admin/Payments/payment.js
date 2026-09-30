@@ -597,6 +597,28 @@ function openViewModal(i) {
         return f.type === 'application/pdf' || f.type.indexOf('image/') === 0;
     }
     function isDoneStatus(p) { return p.status === 'Completed' || p.status === 'Paid'; }
+    function buildReviewerNote(p, userNote) {
+        const lines = [];
+        if (userNote) { lines.push(userNote); lines.push(''); }
+        lines.push('REQUEST DETAILS');
+        lines.push('Student: ' + (p.student || '-'));
+        const sid = p.student_id || p.studentId;
+        if (sid) lines.push('Student ID: ' + sid);
+        lines.push('Service: ' + (p.service || '-'));
+        const d = p.date || p.date_iso || p.dateISO;
+        if (d) lines.push('Date: ' + d);
+        if (p.status) lines.push('Status: ' + p.status);
+        try {
+            const raw = p.research_items;
+            const items = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (Array.isArray(items)) {
+                items.forEach(function (item) {
+                    if (item && item.type === 'text') lines.push((item.label || 'Info') + ': ' + (item.value || '-'));
+                });
+            }
+        } catch (e) { /* ignore bad research data */ }
+        return lines.join('\n');
+    }
     function openReviewerDialog(id, role) {
         const p = allPayments.find(function (x) { return String(x.id) === String(id); });
         if (!p) return;
@@ -731,7 +753,7 @@ function openViewModal(i) {
                     const f = files[0];
                     const fd = new FormData();
                     fd.append('reviewer_id', select.value);
-                    fd.append('note', note.value.trim());
+                    fd.append('note', buildReviewerNote(p, note.value.trim()));
                     fd.append('title', f.name);
                     fd.append('student_name', p.student || '');
                     fd.append('file', f);
