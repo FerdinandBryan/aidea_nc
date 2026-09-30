@@ -25,6 +25,14 @@
         rel="stylesheet" />
     <link rel="stylesheet" href="../dashboard/dashboard.css" />
     <link rel="stylesheet" href="payments-reciepts.css" />
+<style>
+.cert-tabs{display:inline-flex;gap:4px;padding:4px;margin:0 0 16px;border-radius:999px;background:rgba(127,127,127,.12);border:1px solid rgba(127,127,127,.2)}
+.cert-tab{display:inline-flex;align-items:center;gap:8px;padding:7px 16px;border:0;border-radius:999px;background:transparent;color:inherit;font:inherit;font-size:13px;font-weight:600;cursor:pointer;opacity:.75}
+.cert-tab:hover{opacity:1}
+.cert-tab.active{background:rgba(88,130,255,.2);opacity:1}
+.cert-count{min-width:22px;padding:1px 7px;border-radius:999px;background:rgba(127,127,127,.25);font-size:12px;text-align:center}
+.cert-tab.active .cert-count{background:#5b8cff;color:#fff}
+</style>
 </head>
 
 <body>
@@ -171,7 +179,11 @@
                         <p class="panel-sub">Sent by the admin once a service you availed is completed</p>
                     </div>
                 </div>
-                <div id="certGrid" class="cert-grid" aria-busy="true">
+<div class="cert-tabs" id="certTabs" role="tablist">
+                    <button type="button" class="cert-tab active" data-tab="certificate" role="tab">Certificates <span class="cert-count" id="certCountCert">0</span></button>
+                    <button type="button" class="cert-tab" data-tab="files" role="tab">Files <span class="cert-count" id="certCountFiles">0</span></button>
+                </div>
+                                <div id="certGrid" class="cert-grid" aria-busy="true">
                     <p class="cert-loading">Loading…</p>
                 </div>
             </section>

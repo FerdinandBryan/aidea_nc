@@ -360,18 +360,56 @@ function certPreview(p) {
         <img src="${escHtml(secureUrl(c.url))}" alt="${escHtml(certKind(c))}" loading="lazy" /></button>`;
 }
 
+let certTab = 'certificate';
+let certTabTouched = false;
+let certTabsWired = false;
+
+function certTypeOf(p) { return p.certificate && p.certificate.type === 'files' ? 'files' : 'certificate'; }
+
+function wireCertTabs() {
+    if (certTabsWired) return;
+    const wrap = document.getElementById('certTabs');
+    if (!wrap) return;
+    certTabsWired = true;
+    wrap.addEventListener('click', e => {
+        const b = e.target.closest('.cert-tab');
+        if (!b) return;
+        certTab = b.dataset.tab;
+        certTabTouched = true;
+        renderCertificates();
+    });
+}
+
 function renderCertificates() {
     const grid = document.getElementById('certGrid');
     if (!grid) return;
+    wireCertTabs();
     grid.setAttribute('aria-busy', 'false');
 
-    if (!certItems.length) {
-        grid.innerHTML = `<div class="cert-empty"><strong>Nothing here yet</strong>
-            <div>Certificates or completed files will appear here once the admin sends them.</div></div>`;
+    const certs = certItems.filter(p => certTypeOf(p) === 'certificate');
+    const files = certItems.filter(p => certTypeOf(p) === 'files');
+
+    if (!certTabTouched && certTab === 'certificate' && !certs.length && files.length) certTab = 'files';
+
+    const cc = document.getElementById('certCountCert');
+    const cf = document.getElementById('certCountFiles');
+    if (cc) cc.textContent = certs.length;
+    if (cf) cf.textContent = files.length;
+    document.querySelectorAll('#certTabs .cert-tab').forEach(b => {
+        b.classList.toggle('active', b.dataset.tab === certTab);
+        b.setAttribute('aria-selected', b.dataset.tab === certTab ? 'true' : 'false');
+    });
+
+    const list = certTab === 'files' ? files : certs;
+
+    if (!list.length) {
+        const isFiles = certTab === 'files';
+        grid.innerHTML = `<div class="cert-empty"><strong>${isFiles ? 'No files yet' : 'No certificates yet'}</strong>
+            <div>${isFiles ? 'Completed files' : 'Certificates'} will appear here once the admin sends them.</div></div>`;
         return;
     }
 
-    grid.innerHTML = certItems.map((p, i) => `
+    grid.innerHTML = list.map((p, i) => `
         <div class="receipt-card" style="animation-delay:${i * 0.04}s">
             <div class="rc-header">
                 <span class="rc-no">${certNo(p.id)}</span>
@@ -391,7 +429,6 @@ function renderCertificates() {
         </div>
     `).join('');
 }
-
 function secureUrl(u) {
     return String(u || '').replace(/^http:\/\/(?=[^\/]*\.up\.railway\.app)/i, 'https://');
 }
