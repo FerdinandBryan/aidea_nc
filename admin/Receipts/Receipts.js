@@ -851,7 +851,7 @@ document.addEventListener('DOMContentLoaded', () => {
         redraw();
         o.addEventListener('input', redraw); if (isTpl) runOcr(st, q, redraw);
         o.addEventListener('change', redraw);
-        fetch('/api/services').then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function (j) {
+        fetch((typeof API_BASE !== 'undefined' ? API_BASE : 'https://aideanc-production.up.railway.app/api') + '/services', { headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') } }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function (j) {
             var a = Array.isArray(j) ? j : (j.services || j.data || j.items || j.results || []);
             var seen = {}, names = [];
             a.forEach(function (s) {
