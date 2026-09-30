@@ -981,11 +981,88 @@ function openViewModal(i) {
             searchTerm = e.target.value;
             render();
         });
-        const svSel = document.getElementById('filterService');
+        (function buildNestedFilter() {
+        const sv = document.getElementById('filterService');
+        const st = document.getElementById('filterStatus');
+        if (!sv || !st || document.getElementById('nfWrap')) return;
+        sv.style.display = 'none';
+        st.style.display = 'none';
+        const STATUSES = [['', 'All status'], ['Pending', 'Pending'], ['Completed', 'Completed'], ['Cancelled', 'Cancelled']];
+        let curService = '', curStatus = '', openService = '';
+
+        const wrap = document.createElement('div');
+        wrap.id = 'nfWrap';
+        wrap.style.cssText = 'position:relative;display:inline-block';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'form-control filter-select';
+        btn.style.cssText = 'text-align:left;cursor:pointer;min-width:180px';
+        const panel = document.createElement('div');
+        panel.style.cssText = 'display:none;position:absolute;left:0;top:100%;margin-top:4px;z-index:60;min-width:240px;max-height:340px;overflow:auto;padding:6px;border:1px solid rgba(127,127,127,.35);border-radius:10px;background:var(--card-bg,var(--surface,Canvas));color:inherit;box-shadow:0 8px 24px rgba(0,0,0,.18)';
+        wrap.appendChild(btn);
+        wrap.appendChild(panel);
+        sv.parentNode.insertBefore(wrap, sv);
+
+        function row(text, bold, indent) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.textContent = text;
+            b.style.cssText = 'display:block;width:100%;text-align:left;border:0;background:transparent;color:inherit;cursor:pointer;padding:8px 10px;border-radius:6px;font:inherit;' + (bold ? 'font-weight:600;' : '') + (indent ? 'padding-left:26px;' : '');
+            b.onmouseenter = function () { b.style.background = 'rgba(127,127,127,.15)'; };
+            b.onmouseleave = function () { b.style.background = 'transparent'; };
+            return b;
+        }
+        function label() {
+            if (!curService) return 'All services';
+            const s = STATUSES.filter(function (x) { return x[0] === curStatus; })[0];
+            return curService + ' \u00b7 ' + (s ? s[1] : 'All status');
+        }
+        function apply(service, status) {
+            curService = service; curStatus = status;
+            fillServiceOptions();
+            st.value = status;
+            sv.value = service;
+            sv.dispatchEvent(new Event('change'));
+            panel.style.display = 'none';
+            btn.textContent = label() + ' \u25be';
+        }
+        function build() {
+            fillServiceOptions();
+            panel.innerHTML = '';
+            const names = [];
+            allPayments.forEach(function (p) {
+                const s = String(p.service || '').trim();
+                if (s && names.indexOf(s) < 0) names.push(s);
+            });
+            names.sort();
+            const all = row('All services', true, false);
+            all.onclick = function () { openService = ''; apply('', ''); };
+            panel.appendChild(all);
+            names.forEach(function (n) {
+                const r = row((openService === n ? '\u25be ' : '\u25b8 ') + n, true, false);
+                r.onclick = function () { openService = (openService === n) ? '' : n; build(); };
+                panel.appendChild(r);
+                if (openService === n) {
+                    STATUSES.forEach(function (s) {
+                        const sr = row(s[1], curService === n && curStatus === s[0], true);
+                        sr.onclick = function () { apply(n, s[0]); };
+                        panel.appendChild(sr);
+                    });
+                }
+            });
+        }
+        btn.onclick = function (e) {
+            e.stopPropagation();
+            if (panel.style.display === 'none') { build(); panel.style.display = 'block'; } else { panel.style.display = 'none'; }
+        };
+        document.addEventListener('click', function (e) { if (!wrap.contains(e.target)) panel.style.display = 'none'; });
+        btn.textContent = label() + ' \u25be';
+    })();
+    const svSel = document.getElementById('filterService');
     if (svSel) svSel.addEventListener('change', function (e) {
         serviceFilter = e.target.value;
         const st = document.getElementById('filterStatus');
-        st.style.display = serviceFilter ? '' : 'none';
+        st.style.display = 'none';
         if (!serviceFilter) st.value = '';
         st.dispatchEvent(new Event('change'));
     });
