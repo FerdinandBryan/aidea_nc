@@ -1,4 +1,4 @@
-<h2>New Payment Submitted</h2>
+<h2>New Request Submitted</h2>
 
 <p>A student has submitted a payment for a service. Details below:</p>
 

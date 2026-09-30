@@ -20,7 +20,7 @@ class PaymentSubmitted extends Mailable
 
     public function build()
     {
-        $email = $this->subject('New Service Payment Submitted - ' . $this->payment->service)
+        $email = $this->subject('New Service Request Submitted - ' . $this->payment->service)
             ->view('emails.payment-submitted');
 
         if (!empty($this->payment->research_items)) {
