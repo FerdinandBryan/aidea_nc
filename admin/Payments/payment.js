@@ -749,9 +749,10 @@ function openViewModal(i) {
                         const one = new FormData();
                         one.append('reviewer_id', select.value);
                         one.append('note', buildReviewerNote(p, note.value.trim()));
-                        one.append('title', (p.service || 'Request') + ' - ' + (p.student || '') + (rFiles.length > 1 ? ' - ' + rFiles[i].label : ''));
+                        one.append('title', (p.service || 'Request') + ' - ' + (p.student || '') + (rFiles.length > 1 ? ' (' + (i + 1) + '/' + rFiles.length + ')' : ''));
                         one.append('student_name', p.student || '');
                         one.append('file', rFiles[i].file);
+                        one.append('file_label', rFiles[i].label);
                         await uploadFetch('/admin/assignments', one);
                     }
                 }

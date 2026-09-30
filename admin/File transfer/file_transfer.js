@@ -247,6 +247,20 @@ const ICON_CHECK = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" 
 
 // ── File view / download (shared by admin + reviewer) ──────────────────────
 const ICON_EYE = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
+function renderFileLabel(label) {
+    if (!label) return '';
+    if (!document.getElementById('fl-styles')) {
+        const st = document.createElement('style');
+        st.id = 'fl-styles';
+        st.textContent = [
+            '.fl-caption{margin:8px 0 4px;padding:8px 12px;border-left:3px solid rgba(127,127,127,.45);background:rgba(127,127,127,.06);border-radius:0 8px 8px 0}',
+            '.fl-title{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.6;margin-bottom:2px}',
+            '.fl-text{font-size:13px;line-height:1.45;word-break:break-word}'
+        ].join('');
+        document.head.appendChild(st);
+    }
+    return '<div class="fl-caption"><div class="fl-title">Uploaded for</div><div class="fl-text">' + escHtml(String(label)) + '</div></div>';
+}
 const ICON_DOWNLOAD = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>`;
 
 /** One row: label + View + Download. Returns '' if there's no file. */
@@ -433,6 +447,7 @@ async function loadSent() {
                     ${t.note ? `<div class="review-card-note"><span>Your note:</span> ${escHtml(t.note)}</div>` : ''}
 
                     ${fileRow(t.file_url, 'File sent', 'thesis-sent')}
+                    ${renderFileLabel(t.file_label)}
                 </div>
             </article>
         `).join('');
@@ -479,6 +494,7 @@ async function loadReceived() {
                     ${t.reviewer_note ? `<div class="review-card-note"><span>Reviewer's note:</span> ${escHtml(t.reviewer_note)}</div>` : ''}
 
                     ${fileRow(t.file_url, 'Original file', 'thesis-original')}
+                    ${renderFileLabel(t.file_label)}
                     ${reviewedRows(t, 'Reviewed file', 'thesis-reviewed')}
                 </div>
             </article>

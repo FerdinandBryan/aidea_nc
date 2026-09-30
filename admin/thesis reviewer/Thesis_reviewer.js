@@ -252,6 +252,62 @@ function initTabs() {
 
 const ICON_DOC = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>`;
 const ICON_EYE = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
+function renderAdminNote(raw) {
+    if (!raw) return '';
+    if (!document.getElementById('rn-styles')) {
+        const st = document.createElement('style');
+        st.id = 'rn-styles';
+        st.textContent = [
+            '.rn-wrap{margin-top:14px;display:flex;flex-direction:column;gap:12px}',
+            '.rn-note{border-left:3px solid #f5b301;background:rgba(245,179,1,.10);padding:10px 14px;border-radius:0 8px 8px 0}',
+            '.rn-title{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.65;margin-bottom:4px}',
+            '.rn-text{font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word}',
+            '.rn-details{border:1px solid rgba(127,127,127,.25);border-radius:10px;padding:14px 16px;background:rgba(127,127,127,.05)}',
+            '.rn-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px 28px;margin-top:10px}',
+            '.rn-item{min-width:0}',
+            '.rn-label{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;opacity:.6;margin-bottom:2px}',
+            '.rn-value{font-size:14px;font-weight:600;line-height:1.4;word-break:break-word}'
+        ].join('');
+        document.head.appendChild(st);
+    }
+    const text = String(raw);
+    const marker = 'REQUEST DETAILS';
+    const at = text.indexOf(marker);
+    const noteText = (at >= 0 ? text.slice(0, at) : text).trim();
+    let html = '';
+    if (noteText) {
+        html += '<div class="rn-note"><div class="rn-title">Admin\'s note</div><div class="rn-text">' + escHtml(noteText) + '</div></div>';
+    }
+    if (at >= 0) {
+        const items = text.slice(at + marker.length).split('\n')
+            .map(function (l) { return l.trim(); })
+            .filter(Boolean)
+            .map(function (line) {
+                const i = line.indexOf(': ');
+                const label = i > 0 ? line.slice(0, i) : '';
+                const value = i > 0 ? line.slice(i + 2) : line;
+                return '<div class="rn-item"><div class="rn-label">' + escHtml(label || 'Info') + '</div><div class="rn-value">' + escHtml(value || '-') + '</div></div>';
+            });
+        if (items.length) {
+            html += '<div class="rn-details"><div class="rn-title">Request details</div><div class="rn-grid">' + items.join('') + '</div></div>';
+        }
+    }
+    return '<div class="rn-wrap">' + html + '</div>';
+}
+function renderFileLabel(label) {
+    if (!label) return '';
+    if (!document.getElementById('fl-styles')) {
+        const st = document.createElement('style');
+        st.id = 'fl-styles';
+        st.textContent = [
+            '.fl-caption{margin:8px 0 4px;padding:8px 12px;border-left:3px solid rgba(127,127,127,.45);background:rgba(127,127,127,.06);border-radius:0 8px 8px 0}',
+            '.fl-title{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.6;margin-bottom:2px}',
+            '.fl-text{font-size:13px;line-height:1.45;word-break:break-word}'
+        ].join('');
+        document.head.appendChild(st);
+    }
+    return '<div class="fl-caption"><div class="fl-title">Uploaded for</div><div class="fl-text">' + escHtml(String(label)) + '</div></div>';
+}
 const ICON_DOWNLOAD = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>`;
 const ICON_CHECK = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
 
@@ -290,7 +346,7 @@ async function loadPending() {
                         <span class="badge badge-warning">Pending review</span>
                     </div>
 
-                    ${t.note ? `<div class="review-card-note" style="white-space:pre-line"><span>Admin's note:</span> ${escHtml(t.note)}</div>` : ''}
+                    ${renderAdminNote(t.note)}
 
                     ${t.file_url ? `
                     <div class="review-card-files">
@@ -298,6 +354,8 @@ async function loadPending() {
                             ${ICON_DOC} Original thesis file
                         </a>
                     </div>` : ''}
+
+                    ${renderFileLabel(t.file_label)}
 
                     <div class="review-card-actions">
                         ${t.file_url ? `

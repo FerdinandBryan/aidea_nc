@@ -31,6 +31,7 @@ class AssignmentController extends Controller
             'student_name' => ['nullable', 'string', 'max:255'],
             'reviewer_id' => ['required', 'exists:users,id'],
             'note' => ['nullable', 'string'],
+            'file_label' => ['nullable', 'string', 'max:2000'],
             'file' => ['nullable', 'file', 'max:20480'],
         ]);
 
@@ -45,6 +46,7 @@ class AssignmentController extends Controller
             'title' => $request->input('title'),
             'student_name' => $request->input('student_name'),
             'note' => $request->input('note'),
+            'file_label' => $request->input('file_label'),
             'reviewer_id' => $request->input('reviewer_id'),
             'file_path' => $path,
             'status' => 'pending',

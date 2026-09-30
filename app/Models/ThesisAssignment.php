@@ -13,6 +13,7 @@ class ThesisAssignment extends Model
         'student_name',
         'reviewer_id',
         'note',
+        'file_label',
         'file_path',
         'reviewed_file_path',
         'reviewed_files',
