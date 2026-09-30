@@ -341,6 +341,90 @@
     // ── Render table ─────────────────────────────────────────────────────────
     var activeCertTab = 'certificates';
     var certTypeMap = {};
+    function acPad(n) { return 'RCP-' + String(n).padStart(4, '0'); }
+    function acIsPdf(r) { return /\.pdf($|\?)/i.test((r && (r.name || r.url)) || ''); }
+    function acIsImg(r) { return /\.(png|jpe?g|gif|webp|svg|bmp)($|\?)/i.test((r && (r.name || r.url)) || ''); }
+    function acPreview(r) {
+        if (acIsImg(r)) return '<div class="ac-preview"><img src="' + escHtml(r.url) + '" alt="" loading="lazy"></div>';
+        return '<div class="ac-preview ac-file"><strong>' + (acIsPdf(r) ? 'PDF' : 'FILE') + '</strong><span>' + escHtml(r.name || '') + '</span></div>';
+    }
+    function renderSentCards() {
+        var grid = document.getElementById('acGrid');
+        if (!grid) return;
+        var items = allPayments.filter(function (p) {
+            return certTypeMap[String(p.id)] && sentType(p) === activeCertTab;
+        });
+        if (!items.length) {
+            grid.innerHTML = '<div class="ac-empty"><strong>Nothing here yet</strong><div>' +
+                (activeCertTab === 'files' ? 'Files you send will appear here.' : 'Certificates you send will appear here.') + '</div></div>';
+            return;
+        }
+        grid.innerHTML = items.map(function (p) {
+            var r = certTypeMap[String(p.id)];
+            var isFiles = activeCertTab === 'files';
+            return '<div class="ac-card">' +
+                '<div class="ac-row"><span class="ac-no">' + acPad(p.id) + '</span>' +
+                '<span class="ac-badge">' + (isFiles ? 'Files' : 'Certificate') + '</span></div>' +
+                '<div class="ac-service">' + escHtml(p.service) + '</div>' +
+                '<div class="ac-student">' + escHtml(p.student) + '</div>' +
+                acPreview(r) +
+                '<div class="ac-meta"><span>GCash: ' + escHtml(p.gcash_ref || p.gcashRef || '\u2014') + '</span>' +
+                '<span>' + escHtml(p.date || p.date_iso || p.dateISO || '\u2014') + '</span></div>' +
+                '<div class="ac-meta"><span>Ref: ' + escHtml(p.ref || '\u2014') + ' \u00B7 ' + escHtml(p.method || 'GCash') + '</span></div>' +
+                '<div class="ac-actions">' +
+                '<button type="button" class="ac-btn" data-ac-view="' + p.id + '">View</button>' +
+                '<button type="button" class="ac-btn" data-ac-dl="' + p.id + '">Download</button>' +
+                '</div></div>';
+        }).join('');
+    }
+    async function acDownload(id) {
+        var r = certTypeMap[String(id)];
+        if (!r) return;
+        try {
+            var res = await fetch(r.url);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            var blob = await res.blob();
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = r.name || 'file';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+        } catch (e) {
+            window.open(r.url, '_blank', 'noopener');
+        }
+    }
+    function acView(id) {
+        var r = certTypeMap[String(id)];
+        if (!r) return;
+        if (!acIsImg(r) && !acIsPdf(r)) { window.open(r.url, '_blank', 'noopener'); return; }
+        var p = allPayments.find(function (x) { return String(x.id) === String(id); }) || {};
+        var o = document.createElement('div');
+        o.className = 'ac-overlay';
+        o.innerHTML = '<div class="ac-viewer" role="dialog" aria-modal="true">' +
+            '<div class="ac-viewer-head"><div><h3>' + escHtml(r.name || 'File') + '</h3><p>' + escHtml(p.service || '') + ' \u00B7 ' + escHtml(p.student || '') + '</p></div>' +
+            '<button type="button" class="ac-x" data-ac-close="1" aria-label="Close">\u2715</button></div>' +
+            '<div class="ac-viewer-media">' + (acIsPdf(r)
+                ? '<iframe src="' + escHtml(r.url) + '" title="File"></iframe>'
+                : '<img src="' + escHtml(r.url) + '" alt="">') + '</div>' +
+            '<div class="ac-viewer-foot"><button type="button" class="ac-btn" data-ac-close="1">Close</button>' +
+            '<button type="button" class="ac-btn ac-primary" data-ac-download="1">Download</button></div></div>';
+        var onKey = function (e) { if (e.key === 'Escape') close(); };
+        var close = function () { document.removeEventListener('keydown', onKey); o.remove(); };
+        o.addEventListener('click', function (e) {
+            if (e.target === o || e.target.closest('[data-ac-close]')) close();
+            else if (e.target.closest('[data-ac-download]')) acDownload(id);
+        });
+        document.addEventListener('keydown', onKey);
+        document.body.appendChild(o);
+    }
+    document.addEventListener('click', function (e) {
+        var v = e.target.closest && e.target.closest('[data-ac-view]');
+        if (v) { acView(v.getAttribute('data-ac-view')); return; }
+        var d = e.target.closest && e.target.closest('[data-ac-dl]');
+        if (d) acDownload(d.getAttribute('data-ac-dl'));
+    });
     function sentType(p) {
         var r = certTypeMap[String(p.id)];
         return r && r.type === 'files' ? 'files' : 'certificates';
@@ -350,7 +434,7 @@
         var f = allPayments.filter(function (p) { return sentType(p) === 'files'; }).length;
         var c = document.getElementById('countCert');
         var d = document.getElementById('countFiles');
-        if (c) c.textContent = allPayments.length - f;
+        if (c) c.textContent = allPayments.filter(function (p) { return certTypeMap[String(p.id)] && sentType(p) === 'certificates'; }).length;
         if (d) d.textContent = f;
         document.querySelectorAll('[data-cert-tab]').forEach(function (b) {
             b.classList.toggle('active', b.getAttribute('data-cert-tab') === activeCertTab);
@@ -363,7 +447,7 @@
         render();
     });
     function render() {
-        updateTabs();
+        updateTabs(); renderSentCards();
         const q = searchTerm.toLowerCase();
         fillServiceOptions();
         filtered = allPayments.filter(function (p) {
@@ -373,7 +457,7 @@
             const normStatus = p.status === 'Paid' ? 'Completed' : p.status === 'Rejected' ? 'Cancelled' : p.status;
             const matchSt = !statusFilter || normStatus === statusFilter;
             const matchSv = !serviceFilter || String(p.service || '') === serviceFilter;
-            return matchQ && matchSt && matchSv && matchTab(p);
+            return matchQ && matchSt && matchSv;
         });
 
         const isPending = function (p) { return p.status === 'Pending'; };

@@ -161,12 +161,6 @@
                 </select>
             </div>
 
-            <!-- TABS -->
-            <div class="cert-tabs" id="certTabs">
-                <button type="button" class="cert-tab active" data-cert-tab="certificates">Certificates <span class="cert-count" id="countCert">0</span></button>
-                <button type="button" class="cert-tab" data-cert-tab="files">Files <span class="cert-count" id="countFiles">0</span></button>
-            </div>
-
             <!-- TABLE -->
             <section class="panel">
                 <div class="table-wrap">
@@ -192,6 +186,17 @@
                 </div>
             </section>
 
+        <section class="panel ac-panel">
+                <div class="ac-head">
+                    <h3>Sent certificates &amp; files</h3>
+                    <p>Everything you have sent to students.</p>
+                </div>
+                <div class="cert-tabs" id="certTabs">
+                    <button type="button" class="cert-tab active" data-cert-tab="certificates">Certificates <span class="cert-count" id="countCert">0</span></button>
+                    <button type="button" class="cert-tab" data-cert-tab="files">Files <span class="cert-count" id="countFiles">0</span></button>
+                </div>
+                <div class="ac-grid" id="acGrid"></div>
+            </section>
         </main>
     </div>
 
