@@ -52,7 +52,7 @@ async function loadAndRenderServices() {
                 <div class="svc-card-name">${s.name}</div>
                 <p class="svc-card-desc">${s.description || ''}</p>
                 <div class="svc-card-price">₱ ${Number(s.price).toLocaleString()} <span>/ session</span></div>
-                <button class="btn-avail" onclick="openGcashModal(${s.id})">💚 Pay via GCash</button>
+                <button class="btn-avail" onclick="openGcashModal(${s.id})">Avail</button>
             </div>
         `).join('');
 

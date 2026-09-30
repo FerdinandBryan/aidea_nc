@@ -295,7 +295,7 @@ async function loadAndRenderServices() {
                 <p class="svc-card-desc">${escapeHtml(s.description || '')}</p>
                 ${s.requires_research_info ? `<span class="svc-research-badge">Requires research info</span>` : ''}
                 <div class="svc-card-price">₱ ${Number(s.price).toLocaleString()} <span>/ session</span></div>
-                <button class="btn-avail" type="button" onclick="openGcashModal(${Number(s.id)})">Pay via GCash</button>
+                <button class="btn-avail" type="button" onclick="openGcashModal(${Number(s.id)})">Avail</button>
             </div>
         `).join('');
 
