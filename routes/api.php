@@ -183,7 +183,7 @@ require __DIR__ . '/profile.php';
     return response()->download($disk->path($path), $name);
 })->where('file', '[A-Za-z0-9._\-]+');
 
-// Forces a real download for payment files and certificates (student Payments & Receipts)
+// Forces a real download for payment files and certificates (student Request & Certificate)
 \Illuminate\Support\Facades\Route::get('/download/payment-files/{path}', function (\Illuminate\Http\Request $request, string $path) {
     abort_if(str_contains($path, '..'), 404);
     $rel = 'payment-files/' . ltrim($path, '/');
