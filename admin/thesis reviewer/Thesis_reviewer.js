@@ -292,7 +292,7 @@ function renderAdminNote(raw) {
             html += '<div class="rn-details"><div class="rn-title">Request details</div><div class="rn-grid">' + items.join('') + '</div></div>';
         }
     }
-    return '<div class="rn-wrap">' + html + '</div>';
+    return '<div class="rn-wrap">' + stripStatusItem(html) + '</div>';
 }
 function splitReviewTitle(t) {
     const title = String((t && t.title) || '');
@@ -315,6 +315,17 @@ function renderFileRows(t) {
         const name = items.length > 1 ? 'File ' + (n + 1) : 'Original thesis file';
         return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px"><a class="file-chip" href="' + escHtml(i.url) + '" target="_blank" rel="noopener">' + ICON_DOC + ' ' + name + '</a>' + renderFileLabel(i.label) + dl + '</div>';
     }).join('') + '</div>';
+}
+function stripStatusItem(html) {
+    try {
+        const box = document.createElement('div');
+        box.innerHTML = html;
+        box.querySelectorAll('.rn-grid *').forEach(function (n) {
+            const par = n.parentElement;
+            if (n.children.length === 0 && /^status:?$/i.test((n.textContent || '').trim()) && par && par.parentElement && par.parentElement.classList.contains('rn-grid')) par.remove();
+        });
+        return box.innerHTML;
+    } catch (e) { return html; }
 }
 function renderFileLabel(label) {
     if (!label) return '';
