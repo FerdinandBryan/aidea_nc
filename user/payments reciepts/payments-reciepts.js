@@ -357,7 +357,7 @@ function certPreview(p) {
             <strong>PDF</strong><span>${escHtml(c.name)}</span></button>`;
     }
     return `<button type="button" class="cert-preview" data-view="${p.id}">
-        <img src="${escHtml(c.url)}" alt="${escHtml(certKind(c))}" loading="lazy" /></button>`;
+        <img src="${escHtml(secureUrl(c.url))}" alt="${escHtml(certKind(c))}" loading="lazy" /></button>`;
 }
 
 function renderCertificates() {
@@ -392,11 +392,15 @@ function renderCertificates() {
     `).join('');
 }
 
+function secureUrl(u) {
+    return String(u || '').replace(/^http:\/\/(?=[^\/]*\.up\.railway\.app)/i, 'https://');
+}
+
 async function downloadCert(id) {
     const p = certItems.find(x => x.id === id);
     if (!p) return;
     try {
-        const res = await fetch(p.certificate.url);
+        const res = await fetch(secureUrl(p.certificate.url));
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const blob = await res.blob();
         const a = document.createElement('a');
@@ -407,7 +411,7 @@ async function downloadCert(id) {
         a.remove();
         setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     } catch {
-        window.open(p.certificate.url, '_blank', 'noopener');
+        window.open(secureUrl(p.certificate.url), '_blank', 'noopener');
     }
 }
 
@@ -433,8 +437,8 @@ function viewCert(id) {
             </div>
             <div class="cert-viewer-media">
                 ${isPdf(c)
-            ? `<iframe src="${escHtml(c.url)}" title="${escHtml(certKind(c))}"></iframe>`
-            : `<img src="${escHtml(c.url)}" alt="${escHtml(certKind(c))}" />`}
+            ? `<iframe src="${escHtml(secureUrl(c.url))}" title="${escHtml(certKind(c))}"></iframe>`
+            : `<img src="${escHtml(secureUrl(c.url))}" alt="${escHtml(certKind(c))}" />`}
             </div>
             <div class="cert-viewer-actions">
                 <button class="modal-btn modal-btn-cancel" data-close="1" type="button">Close</button>
