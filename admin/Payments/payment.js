@@ -306,7 +306,7 @@
         const pending = allPayments.filter(function (p) { return p.status === 'Pending'; });
         const cancelled = allPayments.filter(function (p) { return p.status === 'Cancelled' || p.status === 'Rejected'; });
 
-        const totalRev = allPayments.reduce(function (s, p) { return s + Number(p.amount); }, 0);
+        const totalRev = allPayments.reduce(function (s, p) { return (p.status === 'Cancelled' || p.status === 'Rejected') ? s : s + Number(p.amount); }, 0);
         const compRev = completed.reduce(function (s, p) { return s + Number(p.amount); }, 0);
         const pendRev = pending.reduce(function (s, p) { return s + Number(p.amount); }, 0);
         const cancRev = cancelled.reduce(function (s, p) { return s + Number(p.amount); }, 0);
