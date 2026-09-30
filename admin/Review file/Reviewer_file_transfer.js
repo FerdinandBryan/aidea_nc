@@ -315,8 +315,9 @@ async function loadThesisOptions() {
             return;
         }
 
-        select.innerHTML = '<option value="" disabled selected>Select an assigned thesis\u2026</option>' + items.map(t => `
-            <option value="${t.id}">${escHtml(t.title || 'Untitled thesis')} \u2014 ${escHtml(t.student_name || t.student?.name || '\u2014')}</option>
+        items.sort((a, b) => (a.id || 0) - (b.id || 0));
+        select.innerHTML = items.map((t, i) => `
+            <option value="${t.id}"${i === 0 ? ' selected' : ''}>${escHtml(t.title || 'Untitled thesis')} \u2014 ${escHtml(t.student_name || t.student?.name || '\u2014')}${i === 0 ? ' (next in line)' : ''}</option>
         `).join('');
     } catch {
         select.innerHTML = '<option value="" disabled selected>Couldn\u2019t load your assignments</option>';
