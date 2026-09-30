@@ -460,3 +460,145 @@ document.addEventListener('DOMContentLoaded', () => {
     render();
   });
 });
+/* == Certificate template generator ======================================= */
+(function () {
+    var ROLES = {
+        analyst:    { label: 'Data Analyst', head: 'CERTIFICATE OF DATA ANALYSIS' },
+        grammarian: { label: 'Grammarian',   head: 'CERTIFICATE OF GRAMMAR REVIEW' }
+    };
+
+    function fmtDate(v) {
+        if (!v) return '';
+        var d = new Date(v + 'T00:00:00');
+        return isNaN(d) ? v : d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+    function wrap(ctx, text, maxW) {
+        var words = String(text).split(/\s+/), lines = [], cur = '';
+        words.forEach(function (w) {
+            var t = cur ? cur + ' ' + w : w;
+            if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else { cur = t; }
+        });
+        if (cur) lines.push(cur);
+        return lines;
+    }
+    function draw(canvas, d) {
+        var W = 1600, H = 1131, role = ROLES[d.role] || ROLES.analyst;
+        canvas.width = W; canvas.height = H;
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+        ctx.strokeStyle = '#0f3d6e'; ctx.lineWidth = 14; ctx.strokeRect(40, 40, W - 80, H - 80);
+        ctx.strokeStyle = '#e0a82e'; ctx.lineWidth = 4; ctx.strokeRect(68, 68, W - 136, H - 136);
+        ctx.textAlign = 'center';
+
+        ctx.fillStyle = '#0f3d6e'; ctx.font = 'bold 34px Arial';
+        ctx.fillText('NORZAGARAY COLLEGE', W / 2, 170);
+        ctx.fillStyle = '#666'; ctx.font = '22px Arial';
+        ctx.fillText('AIDEA', W / 2, 208);
+
+        ctx.fillStyle = '#0f3d6e'; ctx.font = 'bold 60px Georgia, serif';
+        ctx.fillText(role.head, W / 2, 330);
+        ctx.fillStyle = '#e0a82e'; ctx.fillRect(W / 2 - 180, 360, 360, 5);
+
+        ctx.fillStyle = '#333'; ctx.font = 'italic 28px Georgia, serif';
+        ctx.fillText('This is to certify that the manuscript entitled', W / 2, 450);
+
+        ctx.fillStyle = '#0f3d6e'; ctx.font = 'bold 46px Georgia, serif';
+        var lines = wrap(ctx, d.title || 'Title of the document', 1200).slice(0, 3);
+        var y = 535;
+        lines.forEach(function (ln) { ctx.fillText(ln, W / 2, y); y += 62; });
+
+        ctx.fillStyle = '#333'; ctx.font = 'italic 28px Georgia, serif';
+        ctx.fillText('has been reviewed and finalized by the undersigned.', W / 2, y + 30);
+
+        ctx.font = '26px Arial'; ctx.fillStyle = '#222';
+        ctx.textAlign = 'left';
+        ctx.fillText('Protocol No.: ' + (d.proto || '\u2014'), 200, 870);
+        ctx.textAlign = 'right';
+        ctx.fillText('Date: ' + (fmtDate(d.date) || '\u2014'), W - 200, 870);
+
+        ctx.textAlign = 'center';
+        ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(W / 2 - 230, 985); ctx.lineTo(W / 2 + 230, 985); ctx.stroke();
+        ctx.fillStyle = '#0f3d6e'; ctx.font = 'bold 34px Georgia, serif';
+        ctx.fillText(d.name || 'Name', W / 2, 965);
+        ctx.fillStyle = '#555'; ctx.font = '24px Arial';
+        ctx.fillText(role.label, W / 2, 1025);
+    }
+
+    function openGenerator() {
+        var today = new Date().toISOString().slice(0, 10);
+        var o = document.createElement('div');
+        o.style.cssText = 'position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:16px;background:rgba(15,23,42,.6);overflow:auto';
+        o.innerHTML =
+            '<div style="width:min(980px,100%);max-height:94vh;overflow:auto;background:#fff;color:#111827;border-radius:14px;padding:20px;font-family:inherit">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
+            '<h3 style="margin:0;font-size:18px">Generate certificate</h3>' +
+            '<button type="button" data-cg-close style="border:0;background:transparent;font-size:20px;cursor:pointer">\u2715</button></div>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:14px">' +
+            cgField('Title', '<input id="cgTitle" type="text" placeholder="Title of the document" style="' + inp() + '">') +
+            cgField('Protocol No.', '<input id="cgProto" type="text" placeholder="e.g. NC-2026-001" style="' + inp() + '">') +
+            cgField('Date', '<input id="cgDate" type="date" value="' + today + '" style="' + inp() + '">') +
+            cgField('Role', '<select id="cgRole" style="' + inp() + '"><option value="analyst">Data Analyst</option><option value="grammarian">Grammarian</option></select>') +
+            cgField('Name', '<input id="cgName" type="text" placeholder="Name of the Data Analyst / Grammarian" style="' + inp() + '">') +
+            '</div>' +
+            '<canvas id="cgCanvas" style="width:100%;height:auto;border:1px solid #d1d5db;border-radius:8px"></canvas>' +
+            '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap">' +
+            '<button type="button" data-cg-close style="' + btn('#e5e7eb', '#111827') + '">Close</button>' +
+            '<button type="button" id="cgPrint" style="' + btn('#e5e7eb', '#111827') + '">Print / PDF</button>' +
+            '<button type="button" id="cgDl" style="' + btn('#1d4ed8', '#fff') + '">Download PNG</button>' +
+            '</div></div>';
+        document.body.appendChild(o);
+
+        var canvas = o.querySelector('#cgCanvas');
+        function data() {
+            return {
+                title: o.querySelector('#cgTitle').value.trim(),
+                proto: o.querySelector('#cgProto').value.trim(),
+                date:  o.querySelector('#cgDate').value,
+                role:  o.querySelector('#cgRole').value,
+                name:  o.querySelector('#cgName').value.trim()
+            };
+        }
+        function redraw() { draw(canvas, data()); }
+        redraw();
+        o.addEventListener('input', redraw);
+        o.addEventListener('change', redraw);
+
+        var onKey = function (e) { if (e.key === 'Escape') close(); };
+        function close() { document.removeEventListener('keydown', onKey); o.remove(); }
+        document.addEventListener('keydown', onKey);
+        o.addEventListener('mousedown', function (e) { if (e.target === o) close(); });
+        o.addEventListener('click', function (e) { if (e.target.closest('[data-cg-close]')) close(); });
+
+        o.querySelector('#cgDl').addEventListener('click', function () {
+            var d = data();
+            canvas.toBlob(function (blob) {
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'certificate-' + (d.proto || 'template').replace(/[^\w.-]+/g, '_') + '.png';
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+            }, 'image/png');
+        });
+        o.querySelector('#cgPrint').addEventListener('click', function () {
+            var w = window.open('', '_blank');
+            if (!w) { alert('Allow pop-ups to print, or use Download PNG.'); return; }
+            w.document.write('<html><head><title>Certificate</title><style>@page{size:landscape;margin:0}body{margin:0}img{width:100%;display:block}</style></head><body><img src="' + canvas.toDataURL('image/png') + '"></body></html>');
+            w.document.close();
+            w.onload = function () { w.focus(); w.print(); };
+        });
+    }
+    function inp() { return 'width:100%;padding:9px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#111827;font:inherit;box-sizing:border-box'; }
+    function btn(bg, fg) { return 'padding:10px 16px;border:0;border-radius:10px;background:' + bg + ';color:' + fg + ';font:inherit;font-weight:600;cursor:pointer'; }
+    function cgField(label, control) { return '<label style="display:block;font-size:12px;font-weight:600;color:#475569">' + label + '<div style="margin-top:4px">' + control + '</div></label>'; }
+
+    var tabs = document.getElementById('certTabs');
+    if (tabs) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = '+ Generate certificate';
+        b.style.cssText = 'margin-left:12px;margin-bottom:14px;padding:10px 16px;border:0;border-radius:999px;background:#2f6bff;color:#fff;font:inherit;font-weight:600;cursor:pointer;vertical-align:top';
+        b.addEventListener('click', openGenerator);
+        tabs.insertAdjacentElement('afterend', b);
+    }
+})();
