@@ -1055,6 +1055,7 @@ function openViewModal(i) {
             e.stopPropagation();
             if (panel.style.display === 'none') { build(); panel.style.display = 'block'; } else { panel.style.display = 'none'; }
         };
+        panel.addEventListener('click', function (e) { e.stopPropagation(); });
         document.addEventListener('click', function (e) { if (!wrap.contains(e.target)) panel.style.display = 'none'; });
         btn.textContent = label() + ' \u25be';
     })();
