@@ -557,7 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /* ---- draw the certificate in the SYSTEM layout ---- */
     function draw(canvas, d, st) {
         var pal = st.pal, role = ROLES[d.role] || ROLES.analyst;
-        var BG = !!(st.bg && st.img); var H = BG ? Math.round(W * st.img.naturalHeight / st.img.naturalWidth) : 1131; canvas.width = W; canvas.height = H;
+        var BGP = { head: { x: 0.5, y: 0.235 }, intro1: { x: 0.5, y: 0.315 }, title: { x: 0.5, y: 0.405 }, intro2: { x: 0.5, y: 0.585 }, proto: { x: 0.17, y: 0.70 }, date: { x: 0.83, y: 0.70 }, name: { x: 0.5, y: 0.79 }, role: { x: 0.5, y: 0.85 } }; var BG = !!(st.bg && st.img); var H = BG ? Math.round(W * st.img.naturalHeight / st.img.naturalWidth) : 1131; canvas.width = W; canvas.height = H;
         var ctx = canvas.getContext('2d');
         if (BG) { ctx.drawImage(st.img, 0, 0, W, H); eraseBoxes(ctx, st); } else { ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, W, H); }
         var boxes = [];
@@ -571,7 +571,7 @@ document.addEventListener('DOMContentLoaded', () => {
         var S2 = st.on && st.tpl.sub; if (S2) ctx.font = Math.round(S2.size) + 'px Arial'; if (BG ? S2 : (!S1 || S2)) ctx.fillText(S2 ? S2.text : 'AIDEA', S2 ? S2.x * W : W / 2, S2 ? S2.y * H : 208);
 
         function put(key, text, size, style, fam, col, align, dx, dy) {
-            var T = st.on && st.tpl[key]; var p = st.pos[key] || (T ? { x: T.x, y: T.y } : { x: dx, y: dy }); if (T) { if (T.keep && T.text) text = T.text; if (T.size) size = T.size; } if (BG && !T && !st.pos[key] && (key === 'head' || key === 'intro1' || key === 'intro2')) return { x: p.x * W, y: p.y * H };
+            var T = st.on && st.tpl[key]; var p = st.pos[key] || (T ? { x: T.x, y: T.y } : (BG && BGP[key] ? BGP[key] : { x: dx, y: dy })); if (T) { if (T.keep && T.text) text = T.text; if (T.size) size = T.size; } if (BG && !T && !st.pos[key] && Object.keys(st.tpl).length > 0 && (key === 'head' || key === 'intro1' || key === 'intro2')) return { x: p.x * W, y: p.y * H };
             var x = p.x * W, y = p.y * H, px = Math.round(size * st.scale);
             ctx.font = style + ' ' + px + 'px ' + fam;
             ctx.fillStyle = col; ctx.textAlign = align;
@@ -591,10 +591,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         var h = put('head', role.head, 60, 'bold', SERIF, pal.primary, 'center', 0.5, 0.292);
-        if (!BG) { ctx.fillStyle = pal.accent; ctx.fillRect(h.x - 180, h.y + 30, 360, 5); }
+        ctx.fillStyle = pal.accent; ctx.fillRect(h.x - 180, h.y + 30, 360, 5);
         put('intro1', 'This is to certify that the manuscript entitled', 28, 'italic', SERIF, pal.text, 'center', 0.5, 0.398);
 
-        var tp = st.pos.title || (st.on && st.tpl.title) || { x: 0.5, y: 0.473 };
+        var tp = st.pos.title || (st.on && st.tpl.title) || (BG ? BGP.title : { x: 0.5, y: 0.473 });
         var tx = tp.x * W, ty = tp.y * H, tpx = Math.round(46 * st.scale);
         ctx.font = 'bold ' + tpx + 'px ' + SERIF;
         ctx.fillStyle = pal.primary; ctx.textAlign = 'center';
@@ -607,7 +607,7 @@ document.addEventListener('DOMContentLoaded', () => {
         put('date', 'Date: ' + (fmtDate(d.date) || '\u2014'), 26, 'normal', SANS, pal.text, 'right', 0.875, 0.77);
         var n = put('name', d.name || 'Name', 34, 'bold', SERIF, pal.primary, 'center', 0.5, 0.853);
         ctx.strokeStyle = pal.text; ctx.lineWidth = 2;
-        if (!BG) { ctx.beginPath(); ctx.moveTo(n.x - 230, n.y + 20); ctx.lineTo(n.x + 230, n.y + 20); ctx.stroke(); }
+        ctx.beginPath(); ctx.moveTo(n.x - 230, n.y + 20); ctx.lineTo(n.x + 230, n.y + 20); ctx.stroke();
         put('role', role.label, 24, 'normal', SANS, pal.text, 'center', 0.5, 0.906);
         st.boxes = boxes;
     }
