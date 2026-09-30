@@ -4,7 +4,7 @@
 //   - Requests history table, read from GET /api/payments?student=<name>
 //     (Status: Pending | Paid | Rejected)
 //   - "My certificates & files" — whatever the admin has sent for a
-//     completed payment, read from GET /api/certificates -> { <payment_id>:
+//     Completed requests, read from GET /api/certificates -> { <payment_id>:
 //     { url, name, type } }. type is 'certificate' or 'files'; older
 //     records without a type are treated as a certificate.
 //   - Receipt modal with print.
