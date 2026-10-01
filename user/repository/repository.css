@@ -1228,3 +1228,80 @@ body {
 /* REPO-NAV-SPACING: remove old group margin so spacing matches the dashboard */
 .nav-group { margin-bottom: 0; }
 .sidebar-scroll { padding: 8px 12px 16px; }
+
+
+/* REPO-DARK-MOBILE-FIX */
+/* Make text colors follow the theme (dashboard uses --text / --muted) */
+:root {
+    --text-primary: var(--text);
+    --text-secondary: var(--muted);
+}
+body { color: var(--text); }
+.repo-card h4,
+.repo-title { color: var(--text); }
+
+/* Top bar: same behavior as the dashboard */
+.topbar {
+    align-items: center;
+    margin-bottom: 0;
+}
+.topbar h1 {
+    font-size: 17px;
+    line-height: 1.25;
+    margin: 0;
+}
+.subtitle {
+    font-size: 12.5px;
+    margin-top: 2px;
+}
+
+/* Phone / tablet drawer */
+@media (max-width: 1024px) {
+    .sidebar {
+        transform: translateX(-102%);
+        width: min(300px, 84vw);
+        z-index: 300;
+    }
+    .sidebar.open {
+        transform: none;
+        box-shadow: 0 0 60px rgba(0, 0, 0, .45);
+    }
+    .scrim {
+        z-index: 250;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+    .main { margin-left: 0; }
+    .topbar {
+        padding-left: max(16px, env(safe-area-inset-left, 0px));
+        padding-right: max(16px, env(safe-area-inset-right, 0px));
+    }
+}
+
+
+/* REPO-TITLE-MATCH: same title style as the dashboard */
+.topbar .page-title h1 {
+    font-family: inherit;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -.015em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    line-height: 1.25;
+    margin: 0;
+}
+.topbar .page-title p,
+.topbar .page-title .subtitle {
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-top: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+@media (max-width: 720px) {
+    .topbar .page-title h1 { font-size: 16.5px; }
+    .topbar .page-title p,
+    .topbar .page-title .subtitle { display: none; }
+}
