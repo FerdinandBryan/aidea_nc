@@ -70,22 +70,162 @@
     right.setAttribute('data-ph', 'Type here (page ' + num + ')');
     right.style.aspectRatio = String(ratio);
     var skey = notesKey + ':' + num;
-    try { var saved = localStorage.getItem(skey); if (saved) right.textContent = saved; } catch (e) { }
+    try { var saved = localStorage.getItem(skey); var savedH = localStorage.getItem(skey + ':h'); if (savedH) { right.innerHTML = savedH; } else if (saved) { right.textContent = saved; } } catch (e) { }
     right.addEventListener('input', function () {
       try {
         var v = right.innerText.replace(/\n$/, '');
-        if (v) localStorage.setItem(skey, v); else localStorage.removeItem(skey);
+        if (v) { localStorage.setItem(skey, v); localStorage.setItem(skey + ':h', right.innerHTML); } else { localStorage.removeItem(skey); localStorage.removeItem(skey + ':h'); }
       } catch (e) { }
     });
     right.addEventListener('paste', function (e) {
       e.preventDefault();
       var t = (e.clipboardData || window.clipboardData).getData('text');
-      document.execCommand('insertText', false, t);
+      var h = (e.clipboardData || window.clipboardData).getData('text/html'); var clean = h ? svCleanHtml(h) : ''; if (clean) { document.execCommand('insertHTML', false, clean); } else { document.execCommand('insertText', false, t); }
     });
     row.appendChild(left);
     row.appendChild(right);
     scroll.appendChild(row);
     return { left: left, right: right };
+  }
+
+    function svEsc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  function svFontInfo(f) {
+    var raw = String((f && f.name) || '').replace(/^[A-Z]{6}\+/, '');
+    var base = raw.split(/[-,]/)[0].replace(/(PSMT|PS|MT)$/, '');
+    var fam = base.replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+    var generic = /courier|mono|consolas/i.test(raw) ? 'monospace' : ((/times|georgia|garamond|cambria|palatino|book|minion|serif/i.test(raw) && !/sans/i.test(raw)) ? 'serif' : 'sans-serif');
+    if (!fam) fam = generic === 'serif' ? 'Times New Roman' : (generic === 'monospace' ? 'Courier New' : 'Arial');
+    return {
+      family: "'" + fam + "', " + generic,
+      bold: !!(f && f.bold) || /bold|black|heavy/i.test(raw),
+      italic: !!(f && f.italic) || /italic|oblique/i.test(raw)
+    };
+  }
+
+  function svFontsFor(page, tl) {
+    var wait = (tl._tlp && tl._tlp.promise) ? tl._tlp.promise : Promise.resolve();
+    return wait.catch(function () { }).then(function () {
+      return page.getTextContent();
+    }).then(function (tc) {
+      var items = tc.items.filter(function (it) { return typeof it.str === 'string' && it.str !== ''; });
+      var spans = Array.prototype.filter.call(tl.querySelectorAll('span'), function (s) { return !s.querySelector('span') && s.textContent !== ''; });
+      if (items.length !== spans.length) return;
+      items.forEach(function (it, i) {
+        var f = null;
+        try { if (page.commonObjs.has(it.fontName)) f = page.commonObjs.get(it.fontName); } catch (e) { }
+        if (f) spans[i]._svf = svFontInfo(f);
+      });
+    }).catch(function () { });
+  }
+
+  function svTextLayerHtml(tl, rg) {
+    var spans = Array.prototype.filter.call(tl.querySelectorAll('span'), function (s) { return !s.querySelector('span') && s.textContent !== ''; });
+    var out = '', lastTop = null, lastH = 0, lastRight = 0, lastText = '';
+    spans.forEach(function (s) {
+      var txt = s.textContent;
+      if (rg) {
+        if (!rg.intersectsNode(s)) return;
+        var tn = s.firstChild, a = 0, b = txt.length;
+        if (tn && tn.nodeType === 3) {
+          if (rg.startContainer === tn) a = rg.startOffset;
+          if (rg.endContainer === tn) b = rg.endOffset;
+        }
+        txt = txt.slice(a, b);
+      }
+      if (!txt) return;
+      var cs = getComputedStyle(s), r = s.getBoundingClientRect();
+      var fs = parseFloat(cs.fontSize) || 14;
+      if (lastTop !== null) {
+        var d = r.top - lastTop;
+        if (Math.abs(d) > lastH * 0.5) { out += '<br>'; if (d > lastH * 2.5) out += '<br>'; }
+        else if (r.left - lastRight > fs * 0.15 && !/\s$/.test(lastText) && !/^\s/.test(txt)) out += ' ';
+      }
+      var fam, bold = false, italic = false, fi = s._svf;
+      if (fi) { fam = fi.family; bold = fi.bold; italic = fi.italic; }
+      else {
+        var ff = cs.fontFamily;
+        fam = /monospace/.test(ff) ? "'Courier New', monospace" : (/sans-serif/.test(ff) ? 'Arial, sans-serif' : (/serif/.test(ff) ? "'Times New Roman', serif" : 'Arial, sans-serif'));
+      }
+      var st = 'font-family:' + fam + ';font-size:' + fs.toFixed(2) + 'px' + (bold ? ';font-weight:bold' : '') + (italic ? ';font-style:italic' : '');
+      out += '<span style="' + st + '">' + svEsc(txt) + '</span>';
+      lastTop = r.top; lastH = r.height || fs; lastRight = r.right; lastText = txt;
+    });
+    return out;
+  }
+
+  function svStyle(cs, k) {
+    var fs = (parseFloat(cs.fontSize) || 14) * (k || 1);
+    var s = 'font-family:' + String(cs.fontFamily).replace(/"/g, "'") + ';font-size:' + fs.toFixed(2) + 'px';
+    var w = cs.fontWeight;
+    if (w === 'bold' || parseInt(w, 10) >= 600) s += ';font-weight:bold';
+    if (cs.fontStyle === 'italic' || cs.fontStyle === 'oblique') s += ';font-style:italic';
+    if (/underline/.test(cs.textDecorationLine || cs.textDecoration || '')) s += ';text-decoration:underline';
+    return s;
+  }
+
+  function svDomHtml(root, k) {
+    function walk(n) {
+      if (n.nodeType === 3) {
+        var p = n.parentElement, t = n.nodeValue;
+        if (!p || !t) return '';
+        return '<span style="' + svStyle(getComputedStyle(p), k) + '">' + svEsc(t) + '</span>';
+      }
+      if (n.nodeType !== 1) return '';
+      var tag = n.tagName.toLowerCase();
+      if (/^(style|script|svg|img|canvas)$/.test(tag)) return '';
+      if (tag === 'br') return '<br>';
+      var inner = '';
+      Array.prototype.forEach.call(n.childNodes, function (c) { inner += walk(c); });
+      if (/^(td|th)$/.test(tag)) return inner + ' ';
+      if (/^(p|div|li|h[1-6]|tr|section|article|header|footer)$/.test(tag)) {
+        if (!inner) return /^(p|li|h[1-6])$/.test(tag) ? '<div><br></div>' : '';
+        var ta = getComputedStyle(n).textAlign;
+        var st = /^(center|right|justify)$/.test(ta) ? ' style="text-align:' + ta + '"' : '';
+        return '<div' + st + '>' + inner + '</div>';
+      }
+      return inner;
+    }
+    return walk(root);
+  }
+
+  function svAllHtml(scroll) {
+    var parts = [];
+    Array.prototype.forEach.call(scroll.querySelectorAll('.sv-pg'), function (p) {
+      var t = p.querySelector('.sv-text'), h = '';
+      if (t) h = svTextLayerHtml(t, null);
+      else { var sec = p.querySelector('section') || p; h = svDomHtml(sec, sec._svk || 1); }
+      if (h) parts.push(h);
+    });
+    return parts.join('<br><br>');
+  }
+
+  function svCleanHtml(html) {
+    var doc = new DOMParser().parseFromString(html, 'text/html');
+    if (!doc.body || !doc.body.textContent.trim()) return '';
+    function walk(n) {
+      if (n.nodeType === 3) return svEsc(n.nodeValue);
+      if (n.nodeType !== 1) return '';
+      var tag = n.tagName.toLowerCase();
+      if (/^(script|style|head|meta|link|title|svg|img|iframe|object|canvas)$/.test(tag)) return '';
+      if (tag === 'br') return '<br>';
+      var inner = '';
+      Array.prototype.forEach.call(n.childNodes, function (c) { inner += walk(c); });
+      if (/^(td|th)$/.test(tag)) return inner + ' ';
+      var s = n.style || {}, st = '';
+      if (s.fontFamily) st += 'font-family:' + String(s.fontFamily).replace(/"/g, "'") + ';';
+      if (s.fontSize) st += 'font-size:' + s.fontSize + ';';
+      var fw = s.fontWeight || '';
+      if ((/^(b|strong)$/.test(tag) && !/^(normal|400)$/.test(fw)) || /^(bold|[6-9]00)$/.test(fw)) st += 'font-weight:bold;';
+      if ((/^(i|em)$/.test(tag) || /^(italic|oblique)$/.test(s.fontStyle || '')) && s.fontStyle !== 'normal') st += 'font-style:italic;';
+      if (tag === 'u' || /underline/.test(s.textDecoration || s.textDecorationLine || '')) st += 'text-decoration:underline;';
+      if (/^(p|div|li|h[1-6]|tr|ul|ol|table|tbody|section|article)$/.test(tag)) {
+        if (/^(center|right|justify)$/.test(s.textAlign || '')) st += 'text-align:' + s.textAlign + ';';
+        return '<div' + (st ? ' style="' + st + '"' : '') + '>' + (inner || '<br>') + '</div>';
+      }
+      return st ? '<span style="' + st + '">' + inner + '</span>' : inner;
+    }
+    return walk(doc.body).trim();
   }
 
   function renderPdf(buf, scroll, stat) {
@@ -116,10 +256,10 @@
           row.left.appendChild(tl);
           try {
             if (window.pdfjsLib.renderTextLayer) {
-              window.pdfjsLib.renderTextLayer({ textContentSource: page.streamTextContent(), container: tl, viewport: cssVp, textDivs: [] });
+              tl._tlp = window.pdfjsLib.renderTextLayer({ textContentSource: page.streamTextContent(), container: tl, viewport: cssVp, textDivs: [] });
             }
           } catch (e) { }
-          return page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+          return page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise.then(function () { svFontsFor(page, tl); });
         }).then(next);
       }
       return next();
@@ -145,7 +285,7 @@
           row.right.style.aspectRatio = '';
           row.right.style.height = (h * k) + 'px';
           sec.style.transformOrigin = 'top left';
-          sec.style.transform = 'scale(' + k + ')';
+          sec.style.transform = 'scale(' + k + ')'; sec._svk = k;
           sec.style.margin = '0';
           row.left.appendChild(sec);
         });
@@ -196,9 +336,21 @@
       var all = parts.join('\n\n');
       function done(msg) { copyBtn.textContent = msg; setTimeout(function () { copyBtn.textContent = 'Copy all text'; }, 1800); }
       if (!all) { done('No text found'); return; }
-      if (navigator.clipboard && navigator.clipboard.writeText) {
+      var rich = svAllHtml(scroll); if (rich && window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) { navigator.clipboard.write([new ClipboardItem({ 'text/plain': new Blob([all], { type: 'text/plain' }), 'text/html': new Blob([rich], { type: 'text/html' }) })]).then(function () { done('Copied'); }, function () { navigator.clipboard.writeText(all).then(function () { done('Copied'); }, function () { done('Copy failed'); }); }); } else if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(all).then(function () { done('Copied'); }, function () { done('Copy failed'); });
       } else { done('Copy failed'); }
+    });
+    ov.addEventListener('copy', function (e) {
+      var sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.rangeCount) return;
+      var rg = sel.getRangeAt(0);
+      var tls = Array.prototype.filter.call(ov.querySelectorAll('.sv-text'), function (t) { return rg.intersectsNode(t); });
+      if (!tls.length) return;
+      var html = tls.map(function (t) { return svTextLayerHtml(t, rg); }).join('<br><br>');
+      if (!html) return;
+      e.clipboardData.setData('text/html', html);
+      e.clipboardData.setData('text/plain', sel.toString());
+      e.preventDefault();
     });
     ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
 
