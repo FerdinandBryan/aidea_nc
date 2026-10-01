@@ -40,6 +40,10 @@
       '.sv-pg,.sv-blank{box-sizing:border-box;background:#fff;min-width:0}' +
       '.sv-pg{border:1px solid #cbd5e1;position:relative}' +
       '.sv-pg canvas{display:block;width:100%;height:auto}' +
+      '.sv-pg{user-select:text;-webkit-user-select:text}' +
+      '.sv-text{position:absolute;left:0;top:0;overflow:hidden;line-height:1;user-select:text;-webkit-user-select:text}' +
+      '.sv-text span,.sv-text br{color:transparent;position:absolute;white-space:pre;cursor:text;transform-origin:0% 0%}' +
+      '.sv-text ::selection{background:rgba(59,130,246,.35)}' +
       '.sv-blank{border:1px solid #cbd5e1;display:block;padding:7%;overflow:auto;text-align:left;white-space:pre-wrap;word-wrap:break-word;color:#111827;font:14px/1.7 Georgia,serif;cursor:text}' +
       '.sv-blank:empty::before{content:attr(data-ph);color:#9ca3af}' +
       '.sv-blank:focus{outline:2px solid #3b82f6;outline-offset:-1px}' +
@@ -103,6 +107,18 @@
           canvas.height = Math.floor(vp.height);
           var row = makeRow(scroll, num, base.width / base.height);
           row.left.appendChild(canvas);
+          var tl = document.createElement('div');
+          tl.className = 'sv-text';
+          var cssVp = page.getViewport({ scale: cellWidth(scroll) / base.width });
+          tl.style.width = Math.floor(cssVp.width) + 'px';
+          tl.style.height = Math.floor(cssVp.height) + 'px';
+          tl.style.setProperty('--scale-factor', String(cssVp.scale));
+          row.left.appendChild(tl);
+          try {
+            if (window.pdfjsLib.renderTextLayer) {
+              window.pdfjsLib.renderTextLayer({ textContentSource: page.streamTextContent(), container: tl, viewport: cssVp, textDivs: [] });
+            }
+          } catch (e) { }
           return page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
         }).then(next);
       }
@@ -146,6 +162,7 @@
     ov.innerHTML =
       '<div class="sv-win" role="dialog" aria-modal="true" aria-label="Paper viewer">' +
       '<div class="sv-head"><div class="sv-title"></div><span class="sv-stat">Loading</span>' +
+      '<button type="button" class="sv-btn sv-copy">Copy all text</button>' +
       '<a class="sv-btn sv-open" target="_blank" rel="noopener">Open in new tab</a>' +
       '<button type="button" class="sv-btn sv-close">Close</button></div>' +
       '<div class="sv-cols"><div>Original paper</div><div>Your page (type here)</div></div>' +
@@ -167,6 +184,22 @@
     function onKey(e) { if (e.key === 'Escape' && !(document.activeElement && document.activeElement.isContentEditable)) close(); }
     document.addEventListener('keydown', onKey, true);
     ov.querySelector('.sv-close').addEventListener('click', close);
+    var copyBtn = ov.querySelector('.sv-copy');
+    copyBtn.addEventListener('click', function () {
+      var parts = [];
+      Array.prototype.forEach.call(scroll.querySelectorAll('.sv-pg'), function (p) {
+        var t = p.querySelector('.sv-text');
+        var s = (t ? t.innerText || t.textContent : p.innerText) || '';
+        s = s.replace(/[ \t]+\n/g, '\n').trim();
+        if (s) parts.push(s);
+      });
+      var all = parts.join('\n\n');
+      function done(msg) { copyBtn.textContent = msg; setTimeout(function () { copyBtn.textContent = 'Copy all text'; }, 1800); }
+      if (!all) { done('No text found'); return; }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(all).then(function () { done('Copied'); }, function () { done('Copy failed'); });
+      } else { done('Copy failed'); }
+    });
     ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
 
     function fail(err) {
