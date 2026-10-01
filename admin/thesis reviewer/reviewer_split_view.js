@@ -9,6 +9,7 @@
     docx: 'https://cdnjs.cloudflare.com/ajax/libs/docx-preview/0.3.2/docx-preview.min.js'
   };
   var loading = {};
+  var notesKey = 'svNotes';
 
   function loadScript(src) {
     if (loading[src]) return loading[src];
@@ -39,7 +40,9 @@
       '.sv-pg,.sv-blank{box-sizing:border-box;background:#fff;min-width:0}' +
       '.sv-pg{border:1px solid #cbd5e1;position:relative}' +
       '.sv-pg canvas{display:block;width:100%;height:auto}' +
-      '.sv-blank{border:1px dashed #9ca3af;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:12px}' +
+      '.sv-blank{border:1px solid #cbd5e1;display:block;padding:7%;overflow:auto;text-align:left;white-space:pre-wrap;word-wrap:break-word;color:#111827;font:14px/1.7 Georgia,serif;cursor:text}' +
+      '.sv-blank:empty::before{content:attr(data-ph);color:#9ca3af}' +
+      '.sv-blank:focus{outline:2px solid #3b82f6;outline-offset:-1px}' +
       '.sv-msg{padding:24px;text-align:center;color:#4b5563;font-size:14px}';
     document.head.appendChild(st);
   }
@@ -55,8 +58,26 @@
     left.className = 'sv-pg';
     var right = document.createElement('div');
     right.className = 'sv-blank';
-    right.textContent = 'Page ' + num;
+    right.setAttribute('contenteditable', 'true');
+    right.setAttribute('spellcheck', 'true');
+    right.setAttribute('role', 'textbox');
+    right.setAttribute('aria-multiline', 'true');
+    right.setAttribute('aria-label', 'Your page ' + num);
+    right.setAttribute('data-ph', 'Type here (page ' + num + ')');
     right.style.aspectRatio = String(ratio);
+    var skey = notesKey + ':' + num;
+    try { var saved = localStorage.getItem(skey); if (saved) right.textContent = saved; } catch (e) { }
+    right.addEventListener('input', function () {
+      try {
+        var v = right.innerText.replace(/\n$/, '');
+        if (v) localStorage.setItem(skey, v); else localStorage.removeItem(skey);
+      } catch (e) { }
+    });
+    right.addEventListener('paste', function (e) {
+      e.preventDefault();
+      var t = (e.clipboardData || window.clipboardData).getData('text');
+      document.execCommand('insertText', false, t);
+    });
     row.appendChild(left);
     row.appendChild(right);
     scroll.appendChild(row);
@@ -119,6 +140,7 @@
 
   function openViewer(url, title, src) {
     injectCss();
+    notesKey = src ? ('svNotes:' + src.id + ':' + src.n) : ('svNotes:' + url);
     var ov = document.createElement('div');
     ov.id = 'svOv';
     ov.innerHTML =
@@ -126,7 +148,7 @@
       '<div class="sv-head"><div class="sv-title"></div><span class="sv-stat">Loading</span>' +
       '<a class="sv-btn sv-open" target="_blank" rel="noopener">Open in new tab</a>' +
       '<button type="button" class="sv-btn sv-close">Close</button></div>' +
-      '<div class="sv-cols"><div>Original paper</div><div>Blank page</div></div>' +
+      '<div class="sv-cols"><div>Original paper</div><div>Your page (type here)</div></div>' +
       '<div class="sv-scroll"></div></div>';
     document.body.appendChild(ov);
     var prevOverflow = document.body.style.overflow;
@@ -142,7 +164,7 @@
       document.body.style.overflow = prevOverflow;
       if (ov.parentNode) ov.parentNode.removeChild(ov);
     }
-    function onKey(e) { if (e.key === 'Escape') close(); }
+    function onKey(e) { if (e.key === 'Escape' && !(document.activeElement && document.activeElement.isContentEditable)) close(); }
     document.addEventListener('keydown', onKey, true);
     ov.querySelector('.sv-close').addEventListener('click', close);
     ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
