@@ -181,7 +181,7 @@
       if (/^(p|div|li|h[1-6]|tr|section|article|header|footer)$/.test(tag)) {
         if (!inner) return /^(p|li|h[1-6])$/.test(tag) ? '<div><br></div>' : '';
         var ta = getComputedStyle(n).textAlign;
-        var st = /^(center|right|justify)$/.test(ta) ? ' style="text-align:' + ta + '"' : '';
+        if (ta === 'end') ta = 'right'; var stl = ''; if (/^(center|right|justify)$/.test(ta)) stl += 'text-align:' + ta + ';'; if (tag !== 'section') { var cs2 = getComputedStyle(n), ind = (parseFloat(cs2.paddingLeft) || 0) + (parseFloat(cs2.marginLeft) || 0), ti = parseFloat(cs2.textIndent) || 0; if (ind > 0.5) stl += 'padding-left:' + (ind * (k || 1)).toFixed(1) + 'px;'; if (Math.abs(ti) > 0.5) stl += 'text-indent:' + (ti * (k || 1)).toFixed(1) + 'px;'; } var st = stl ? ' style="' + stl + '"' : '';
         return '<div' + st + '>' + inner + '</div>';
       }
       return inner;
@@ -193,7 +193,7 @@
     var parts = [];
     Array.prototype.forEach.call(scroll.querySelectorAll('.sv-pg'), function (p) {
       var t = p.querySelector('.sv-text'), h = '';
-      if (t) h = svTextLayerHtml(t, null);
+      if (t) h = svLinesHtml(t, null);
       else { var sec = p.querySelector('section') || p; h = svDomHtml(sec, sec._svk || 1); }
       if (h) parts.push(h);
     });
@@ -220,12 +220,94 @@
       if ((/^(i|em)$/.test(tag) || /^(italic|oblique)$/.test(s.fontStyle || '')) && s.fontStyle !== 'normal') st += 'font-style:italic;';
       if (tag === 'u' || /underline/.test(s.textDecoration || s.textDecorationLine || '')) st += 'text-decoration:underline;';
       if (/^(p|div|li|h[1-6]|tr|ul|ol|table|tbody|section|article)$/.test(tag)) {
-        if (/^(center|right|justify)$/.test(s.textAlign || '')) st += 'text-align:' + s.textAlign + ';';
+        if (/^(center|right|justify)$/.test(s.textAlign || '')) st += 'text-align:' + s.textAlign + ';'; if (s.textAlignLast === 'justify') st += 'text-align-last:justify;'; if (/^[\d.]+px$/.test(s.paddingLeft || '')) st += 'padding-left:' + s.paddingLeft + ';'; if (/^-?[\d.]+px$/.test(s.textIndent || '')) st += 'text-indent:' + s.textIndent + ';';
         return '<div' + (st ? ' style="' + st + '"' : '') + '>' + (inner || '<br>') + '</div>';
       }
       return st ? '<span style="' + st + '">' + inner + '</span>' : inner;
     }
     return walk(doc.body).trim();
+  }
+
+  function svSpanStyleOf(s) {
+    var cs = getComputedStyle(s), fs = parseFloat(cs.fontSize) || 14, fam, bold = false, italic = false, fi = s._svf;
+    if (fi) { fam = fi.family; bold = fi.bold; italic = fi.italic; }
+    else {
+      var ff = cs.fontFamily;
+      fam = /monospace/.test(ff) ? "'Courier New', monospace" : (/sans-serif/.test(ff) ? 'Arial, sans-serif' : (/serif/.test(ff) ? "'Times New Roman', serif" : 'Arial, sans-serif'));
+    }
+    return { fs: fs, st: 'font-family:' + fam + ';font-size:' + fs.toFixed(2) + 'px' + (bold ? ';font-weight:bold' : '') + (italic ? ';font-style:italic' : '') };
+  }
+
+  function svMode(vals, minCount, preferMax) {
+    var m = {}, best = null, bc = 0;
+    vals.forEach(function (v) { var key = Math.round(v / 3); m[key] = (m[key] || 0) + 1; });
+    Object.keys(m).forEach(function (key) {
+      var kk = +key;
+      if (m[key] > bc || (m[key] === bc && (preferMax ? kk > best : kk < best))) { bc = m[key]; best = kk; }
+    });
+    return bc >= minCount ? best * 3 : null;
+  }
+
+  function svLinesHtml(tl, rg) {
+    var spans = Array.prototype.filter.call(tl.querySelectorAll('span'), function (s) { return !s.querySelector('span') && s.textContent !== ''; });
+    if (!spans.length) return '';
+    var box = tl.getBoundingClientRect(), bw = box.width || 1, lines = [];
+    spans.forEach(function (s) {
+      var r = s.getBoundingClientRect();
+      var o = { s: s, top: r.top, left: r.left - box.left, right: r.right - box.left, h: r.height || 10 };
+      var ln = lines.length ? lines[lines.length - 1] : null;
+      if (ln && Math.abs(o.top - ln.top) <= Math.max(ln.h, o.h) * 0.5) {
+        ln.items.push(o); ln.left = Math.min(ln.left, o.left); ln.right = Math.max(ln.right, o.right); ln.h = Math.max(ln.h, o.h);
+      } else { lines.push({ items: [o], top: o.top, h: o.h, left: o.left, right: o.right }); }
+    });
+    var leftM = svMode(lines.map(function (l) { return l.left; }), 3, false);
+    if (leftM === null) leftM = Math.min.apply(null, lines.map(function (l) { return l.left; }));
+    var tol = Math.max(3, bw * 0.008);
+    var near = lines.filter(function (l) { return Math.abs(l.left - leftM) < tol * 2; });
+    var rightM = svMode(near.map(function (l) { return l.right; }), Math.max(3, Math.ceil(near.length * 0.3)), true);
+    var justOK = rightM !== null;
+    if (rightM === null) rightM = Math.max.apply(null, lines.map(function (l) { return l.right; }));
+    var bodyW = Math.max(rightM - leftM, 1);
+    var mid = (leftM + rightM) / 2, cx = Math.abs(mid - bw / 2) < bw * 0.03 ? bw / 2 : mid;
+    var out = '', prev = null;
+    lines.forEach(function (l) {
+      var html = '', lastRight = null, lastText = '', partial = false, fsz = 14;
+      l.items.forEach(function (o) {
+        var txt = o.s.textContent;
+        if (rg) {
+          if (!rg.intersectsNode(o.s)) { partial = true; return; }
+          var tn = o.s.firstChild, a = 0, b = txt.length;
+          if (tn && tn.nodeType === 3) {
+            if (rg.startContainer === tn) a = rg.startOffset;
+            if (rg.endContainer === tn) b = rg.endOffset;
+          }
+          if (a > 0 || b < txt.length) partial = true;
+          txt = txt.slice(a, b);
+        }
+        if (!txt) return;
+        var f = svSpanStyleOf(o.s); fsz = f.fs;
+        if (lastRight !== null && o.left - lastRight > f.fs * 0.15 && !/\s$/.test(lastText) && !/^\s/.test(txt)) html += ' ';
+        html += '<span style="' + f.st + '">' + svEsc(txt) + '</span>';
+        lastRight = o.right; lastText = txt;
+      });
+      if (!html) return;
+      var al = 'left', ind = 0, L = l.left, R = l.right;
+      if (!partial) {
+        if (Math.abs(L - leftM) < tol) { if (justOK && Math.abs(R - rightM) < tol && R - L > bodyW * 0.85) al = 'justify'; }
+        else if (Math.abs((L + R) / 2 - cx) < tol * 1.5 && L - leftM > tol * 2) al = 'center';
+        else if (Math.abs(R - rightM) < tol && L - leftM > bodyW * 0.15) al = 'right';
+        else if (L - leftM > fsz * 0.5) ind = L - leftM;
+      }
+      var stl = '';
+      if (al === 'center') stl = 'text-align:center;';
+      else if (al === 'right') stl = 'text-align:right;';
+      else if (al === 'justify') stl = 'text-align:justify;text-align-last:justify;';
+      else if (ind > 0) stl = 'padding-left:' + ind.toFixed(1) + 'px;';
+      if (prev && l.top - prev.top > prev.h * 2.5) out += '<div><br></div>';
+      out += '<div' + (stl ? ' style="' + stl + '"' : '') + '>' + html + '</div>';
+      prev = l;
+    });
+    return out;
   }
 
   function renderPdf(buf, scroll, stat) {
@@ -346,7 +428,7 @@
       var rg = sel.getRangeAt(0);
       var tls = Array.prototype.filter.call(ov.querySelectorAll('.sv-text'), function (t) { return rg.intersectsNode(t); });
       if (!tls.length) return;
-      var html = tls.map(function (t) { return svTextLayerHtml(t, rg); }).join('<br><br>');
+      var html = tls.map(function (t) { return svLinesHtml(t, rg); }).join('<br><br>');
       if (!html) return;
       e.clipboardData.setData('text/html', html);
       e.clipboardData.setData('text/plain', sel.toString());
