@@ -83,6 +83,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/thesis/{id}/review', [ThesisSubmissionController::class, 'review']);
     Route::get('/thesis/file/{id}', [ThesisSubmissionController::class, 'serveFile']);
     Route::patch('/thesis/{id}/toggle-repo', [ThesisSubmissionController::class, 'toggleRepoVisibility']);
+    Route::post('/thesis/librarian-upload', [\App\Http\Controllers\LibrarianUploadController::class, 'store']);
 });
 
 // -- Email Verification --

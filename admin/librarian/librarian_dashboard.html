@@ -42,11 +42,6 @@
         </a>
 
         <div class="sidebar-scroll">
-            <p class="nav-heading">Overview</p>
-            <nav class="nav-group">
-                <a href="librarian_dashboard.html">Dashboard</a>
-            </nav>
-
             <p class="nav-heading">Library</p>
             <nav class="nav-group">
                 <a href="librarian_dashboard.html" class="active" aria-current="page">Thesis Submissions</a>
@@ -156,7 +151,8 @@
                     <option value="Pending">Pending</option>
                     <option value="Rejected">Rejected</option>
                 </select>
-                <button class="btn-view-repo" id="viewRepoBtn" type="button">
+                <button class="btn-view-repo" id="addDocBtn" type="button" style="margin-right:8px">+ Add Document</button>
+<button class="btn-view-repo" id="viewRepoBtn" type="button">
                     Repository <span class="repo-count" id="repoBadgeCount" hidden>0</span>
                 </button>
             </div>
@@ -265,6 +261,42 @@
         </div>
     </div>
 
+    <!-- ADD DOCUMENT MODAL -->
+    <style>
+      .up-field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+      .up-field label{font-size:.85rem;font-weight:600}
+      .up-field input,.up-field textarea{padding:9px 10px;border:1px solid rgba(128,128,128,.45);border-radius:8px;background:transparent;color:inherit;font:inherit}
+      .up-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+      .up-err{color:#dc2626;font-size:.85rem;min-height:1.2em;margin:0 0 8px}
+      #upToast{position:fixed;right:16px;bottom:16px;z-index:9999;padding:10px 14px;border-radius:8px;color:#fff;background:#16a34a;font-size:.9rem}
+      #upToast.err{background:#dc2626}
+      @media (max-width:520px){.up-row{grid-template-columns:1fr}}
+    </style>
+    <div class="modal-backdrop" id="uploadModal" hidden>
+      <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="uploadModalTitle">
+        <div class="modal-head">
+          <h3 class="modal-title" id="uploadModalTitle">Add document to repository</h3>
+          <button class="modal-x" type="button" data-upload-close aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="up-field"><label for="upTitle">Title *</label><input id="upTitle" type="text" maxlength="500"></div>
+          <div class="up-field"><label for="upAuthors">Author(s) *</label><input id="upAuthors" type="text" maxlength="500" placeholder="e.g. Juan Dela Cruz, Maria Santos"></div>
+          <div class="up-row">
+            <div class="up-field"><label for="upYear">Academic year *</label><input id="upYear" type="text" maxlength="20" placeholder="2025-2026"></div>
+            <div class="up-field"><label for="upCourse">Course</label><input id="upCourse" type="text" maxlength="255"></div>
+          </div>
+          <div class="up-field"><label for="upAdviser">Adviser</label><input id="upAdviser" type="text" maxlength="255"></div>
+          <div class="up-field"><label for="upAbstract">Abstract</label><textarea id="upAbstract" rows="4"></textarea></div>
+          <div class="up-field"><label for="upFile">PDF file * (max 20 MB)</label><input id="upFile" type="file" accept="application/pdf,.pdf"></div>
+          <p class="up-err" id="upErr" role="alert"></p>
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn modal-btn-cancel" type="button" data-upload-close>Cancel</button>
+          <button class="modal-btn modal-btn-primary" type="button" id="upSubmit">Add to repository</button>
+        </div>
+      </div>
+    </div>
+
     <!-- REPOSITORY MODAL -->
     <div class="modal-backdrop" id="repoModal" hidden>
         <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="repoModalTitle">
@@ -294,6 +326,7 @@
     </div>
 
     <script src="Librarian_thesis_submissions.js?v=1"></script>
+<script src="librarian_upload.js?v=1"></script>
 <script src="../shared/sidebar_toggle.js"></script>
 </body>
 
