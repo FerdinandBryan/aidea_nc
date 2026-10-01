@@ -358,11 +358,18 @@ function updateStepTabs() {
     const researchTab = document.getElementById('gmStepResearchTab');
     researchTab.style.display = requiresResearch ? 'block' : 'none';
     document.getElementById('gmStep1Tab').style.display = isFreeService() ? 'none' : '';
+    document.getElementById('gmStep2Tab').style.display = isFreeService() ? 'none' : '';
+    (function () {
+        var rb = document.querySelector('#gmBodyResearch .gm-btn-next');
+        if (!rb) return;
+        if (!rb.dataset.orig) rb.dataset.orig = rb.textContent;
+        rb.textContent = isFreeService() ? 'Submit Request' : rb.dataset.orig;
+    })();
 
     const visibleTabs = [
         ...(isFreeService() ? [] : [document.getElementById('gmStep1Tab')]),
         ...(requiresResearch ? [researchTab] : []),
-        document.getElementById('gmStep2Tab'),
+        ...(isFreeService() ? [] : [document.getElementById('gmStep2Tab')]),
         document.getElementById('gmStep3Tab'),
     ];
     visibleTabs.forEach((tab, i) => {
@@ -404,6 +411,8 @@ function goToStepResearch() {
 }
 
 function goToStep2() {
+    if (isFreeService() && currentService?.requires_research_info) { submitPayment(); return; }
+    setProofMode();
     hideAllStepBodies();
     document.getElementById('gmBodyStep2').style.display = 'block';
     setTabState('gmStep1Tab', 'done');
@@ -413,6 +422,7 @@ function goToStep2() {
 }
 
 function goToStep3() {
+    { var sp = document.querySelector('#gmBodyStep3 .gm-success p'); if (sp) sp.textContent = isFreeService() ? 'Your request has been submitted and is awaiting admin review.' : 'Your payment proof has been submitted and is awaiting admin verification.'; }
     hideAllStepBodies();
     document.getElementById('gmBodyStep3').style.display = 'block';
     setTabState('gmStep1Tab', 'done');
@@ -718,23 +728,24 @@ function proceedFromResearch() {
    SUBMIT PAYMENT
 ══════════════════════════════════════════════════ */
 async function submitPayment() {
+    if (window.__submitting) return;
     const proofFile = document.getElementById('gmProofInput').files[0];
     const ref = document.getElementById('gmRefInput').value.trim();
 
-    if (!proofFile) return showToast('Please upload your GCash payment screenshot.', 'error');
-    if (!ref) return showToast('Please enter the GCash reference number.', 'error');
-    if (ref.length < 6) return showToast('Reference number looks too short.', 'error');
+    if (!isFreeService() && !proofFile) return showToast('Please upload your GCash payment screenshot.', 'error');
+    if (!isFreeService() && !ref) return showToast('Please enter the GCash reference number.', 'error');
+    if (!isFreeService() && ref.length < 6) return showToast('Reference number looks too short.', 'error');
 
     if (currentService?.requires_research_info && !researchInfoData) {
         return showToast('Please complete the Research Info step first.', 'error');
     }
 
     const submitBtn = document.querySelector('#gmBodyStep2 .gm-btn-next');
-    submitBtn.disabled = true;
+    window.__submitting = true; submitBtn.disabled = true;
     submitBtn.textContent = 'Submitting…';
 
     try {
-        const proofB64 = await new Promise((resolve, reject) => {
+        const proofB64 = isFreeService() ? null : await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = e => resolve(e.target.result);
             reader.onerror = () => reject(new Error('File read failed'));
@@ -747,7 +758,7 @@ async function submitPayment() {
         const studentId = user.student_number || user.student_id || '';
 
         const payload = {
-            gcash_ref: ref,
+            gcash_ref: isFreeService() ? null : ref,
             service: currentService.name,
             service_id: currentService.id,
             student: studentName,
@@ -755,7 +766,7 @@ async function submitPayment() {
             date: now.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }),
             date_iso: now.toISOString().split('T')[0],
             amount: currentService.price,
-            method: 'GCash',
+            method: isFreeService() ? 'Free' : 'GCash',
             status: 'Pending',
             proof_image: proofB64,
             ...(currentService.requires_research_info && researchInfoData ? {
@@ -769,15 +780,15 @@ async function submitPayment() {
         });
 
         console.log('Payment saved to DB:', created);
-        showToast('Payment proof submitted!', 'success');
+        showToast(isFreeService() ? 'Request submitted!' : 'Payment proof submitted!', 'success');
         goToStep3();
 
     } catch (err) {
         console.error('Payment submission failed:', err);
         showToast('Submission failed: ' + (err.message || JSON.stringify(err)), 'error');
     } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit Payment';
+        window.__submitting = false; submitBtn.disabled = false;
+        submitBtn.textContent = isFreeService() ? 'Submit Request' : 'Submit Payment';
     }
 }
 
@@ -857,4 +868,19 @@ document.addEventListener('DOMContentLoaded', () => {
 /* A service with price 0 or empty is free: no Scan & Pay step */
 function isFreeService() {
     return !!currentService && !(Number(currentService.price) > 0);
+}
+/* Upload Proof body: payment fields for paid services, a plain confirm for free ones */
+function setProofMode() {
+    var free = isFreeService();
+    var zone = document.getElementById('gmUploadZone');
+    var refRow = document.querySelector('#gmBodyStep2 .gm-ref-row');
+    var hint = document.querySelector('#gmBodyStep2 .gm-step-hint');
+    var btn = document.querySelector('#gmBodyStep2 .gm-btn-next');
+    if (zone) zone.style.display = free ? 'none' : '';
+    if (refRow) refRow.style.display = free ? 'none' : '';
+    if (hint) {
+        if (!hint.dataset.orig) hint.dataset.orig = hint.textContent;
+        hint.textContent = free ? 'This service is free. Confirm to send your request.' : hint.dataset.orig;
+    }
+    if (btn) btn.textContent = free ? 'Submit Request' : 'Submit Payment';
 }
