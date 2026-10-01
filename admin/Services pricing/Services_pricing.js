@@ -381,7 +381,7 @@ function renderServices() {
             <span class="svc-icon">${s.icon && s.icon !== 'undefined' ? s.icon : '🛠️'}</span>
             <div class="svc-name">${escHtml(s.name)}</div>
             <div class="svc-desc">${escHtml(s.description || '')}</div>
-            <div class="svc-price">₱ ${parseFloat(s.price).toLocaleString()}</div>
+            ${parseFloat(s.price) > 0 ? `<div class="svc-price">₱ ${parseFloat(s.price).toLocaleString()}</div>` : ''}
 
             ${s.requires_research_info ? `
                 <div class="research-badge">Requires research info form</div>
@@ -453,7 +453,7 @@ function openEdit(id) {
 
     document.getElementById('modalTitle').textContent = 'Edit Service';
     document.getElementById('editName').value = s.name;
-    document.getElementById('editPrice').value = s.price;
+    document.getElementById('editPrice').value = s.price; setTimeout(toggleGcashSection, 0);
     document.getElementById('editDesc').value = s.description || '';
     document.getElementById('editGcashNumber').value = s.gcash_number || '';
     document.getElementById('editRequiresResearch').checked = !!s.requires_research_info;
@@ -504,7 +504,7 @@ function openAdd() {
 
     document.getElementById('modalTitle').textContent = 'Add New Service';
     document.getElementById('editName').value = '';
-    document.getElementById('editPrice').value = '';
+    document.getElementById('editPrice').value = ''; setTimeout(toggleGcashSection, 0);
     document.getElementById('editDesc').value = '';
     document.getElementById('editGcashNumber').value = '';
     document.getElementById('editRequiresResearch').checked = false;
@@ -671,7 +671,7 @@ let pendingCodeFormat = null; // tracks detected format for current upload
 
 async function saveEdit() {
     const name = document.getElementById('editName').value.trim();
-    const newPrice = parseFloat(document.getElementById('editPrice').value);
+    const newPrice = parseFloat(document.getElementById('editPrice').value) || 0;
     const desc = document.getElementById('editDesc').value.trim();
     const gcashNum = document.getElementById('editGcashNumber').value.trim();
     const requiresResearch = document.getElementById('editRequiresResearch').checked;
@@ -1277,3 +1277,24 @@ syncResearchTextarea = function () {
     });
     ta.value = JSON.stringify(arr);
 };
+
+/* Show GCash payment details only when Price > 0 */
+function toggleGcashSection() {
+    var lbl = document.querySelector('.section-label-green');
+    var priceEl = document.getElementById('editPrice');
+    if (!lbl || !priceEl) return;
+    var show = (parseFloat(priceEl.value) || 0) > 0;
+    var nodes = [];
+    var prev = lbl.previousElementSibling;
+    if (prev && prev.tagName === 'HR') nodes.push(prev);
+    var n = lbl;
+    while (n) {
+        if (n !== lbl && !(n.classList.contains('form-group') || n.classList.contains('section-label'))) break;
+        nodes.push(n);
+        n = n.nextElementSibling;
+    }
+    nodes.forEach(function (x) { x.style.display = show ? '' : 'none'; });
+}
+document.addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'editPrice') toggleGcashSection();
+});

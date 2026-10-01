@@ -294,7 +294,7 @@ async function loadAndRenderServices() {
                 <div class="svc-card-name">${escapeHtml(s.name)}</div>
                 <p class="svc-card-desc">${escapeHtml(s.description || '')}</p>
                 ${s.requires_research_info ? `<span class="svc-research-badge">Requires research info</span>` : ''}
-                <div class="svc-card-price">₱ ${Number(s.price).toLocaleString()} <span>/ session</span></div>
+                ${Number(s.price) > 0 ? `<div class="svc-card-price">₱ ${Number(s.price).toLocaleString()} <span>/ session</span></div>` : ''}
                 <button class="btn-avail" type="button" onclick="openGcashModal(${Number(s.id)})">Avail</button>
             </div>
         `).join('');
