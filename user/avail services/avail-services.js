@@ -336,7 +336,7 @@ function openGcashModal(id) {
         : [];
     resetResearchForm();
     updateStepTabs();
-    goToStep1();
+    if (isFreeService()) { hideAllStepBodies(); proceedFromStep1(); } else { goToStep1(); }
     document.getElementById('gcashModalOverlay').hidden = false;
     document.body.classList.add('no-scroll');
 }
@@ -357,9 +357,10 @@ function updateStepTabs() {
     const requiresResearch = !!(currentService && currentService.requires_research_info);
     const researchTab = document.getElementById('gmStepResearchTab');
     researchTab.style.display = requiresResearch ? 'block' : 'none';
+    document.getElementById('gmStep1Tab').style.display = isFreeService() ? 'none' : '';
 
     const visibleTabs = [
-        document.getElementById('gmStep1Tab'),
+        ...(isFreeService() ? [] : [document.getElementById('gmStep1Tab')]),
         ...(requiresResearch ? [researchTab] : []),
         document.getElementById('gmStep2Tab'),
         document.getElementById('gmStep3Tab'),
@@ -384,6 +385,7 @@ function setTabState(id, state) {
 }
 
 function goToStep1() {
+    if (isFreeService()) { closeGcashModal(); return; }
     hideAllStepBodies();
     document.getElementById('gmBodyStep1').style.display = 'block';
     setTabState('gmStep1Tab', 'active');
@@ -852,3 +854,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Escape' && overlay && !overlay.hidden) closeGcashModal();
     });
 });
+/* A service with price 0 or empty is free: no Scan & Pay step */
+function isFreeService() {
+    return !!currentService && !(Number(currentService.price) > 0);
+}
