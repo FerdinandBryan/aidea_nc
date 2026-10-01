@@ -924,8 +924,7 @@ function renderResearchItems() {
         `<option value="${val}" ${item.type === val ? 'selected' : ''}>${m.label}</option>`
     ).join('')}
                 </select>
-                <input type="text" class="form-control research-item-input" data-idx="${i}"
-                    value="${escHtml(item.text)}" placeholder="Item label…" />
+                <textarea class="form-control research-item-input" data-idx="${i}" rows="1" placeholder="Item label (Enter = new line)" style="resize:vertical;min-height:38px;">${escHtml(item.text)}</textarea>
                 <button type="button" class="research-item-remove" data-idx="${i}">✕</button>
             </div>
             ${item.type === 'checkbox' ? `

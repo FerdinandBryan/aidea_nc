@@ -465,7 +465,7 @@ function renderResearchFields(items) {
             const upIcon = isImage ? '🖼️' : '📄';
             return `
                 <div class="form-group">
-                    <label>${fieldLabelHtml(item)}</label>
+                    <label style="white-space:pre-line;">${fieldLabelHtml(item)}</label>
                     <button type="button" class="gm-upload-zone ri-dyn-upload" data-idx="${i}">
                         <div class="up-icon">${upIcon}</div>
                         <div class="ri-dyn-prompt">
@@ -495,7 +495,7 @@ function renderResearchFields(items) {
             }
             return `
                 <div class="form-group">
-                    <label>${fieldLabelHtml(item)}</label>
+                    <label style="white-space:pre-line;">${fieldLabelHtml(item)}</label>
                     <input type="url" class="ri-dyn-input" data-idx="${i}" placeholder="Paste your ${isExcel ? 'Excel / Google Sheets ' : ''}link (https://...)" />
                 </div>`;
         }
@@ -519,7 +519,7 @@ function renderResearchFields(items) {
                 </div>`).join('');
             return `
                 <div class="form-group">
-                    <label>${fieldLabelHtml(item)}</label>
+                    <label style="white-space:pre-line;">${fieldLabelHtml(item)}</label>
                     <div style="display:flex;flex-direction:column;gap:.5rem;">
                         ${boxes || '<span style="font-size:.8rem;color:var(--muted);">No choices set.</span>'}
                     </div>
@@ -528,8 +528,8 @@ function renderResearchFields(items) {
 
         return `
             <div class="form-group">
-                <label>${fieldLabelHtml(item)}</label>
-                <input type="text" class="ri-dyn-input" data-idx="${i}" placeholder="Enter ${escapeHtml(item.text)}" />
+                <label style="white-space:pre-line;">${fieldLabelHtml(item)}</label>
+                <textarea class="ri-dyn-input" data-idx="${i}" rows="3" placeholder="Type your answer" style="width:100%;box-sizing:border-box;resize:vertical;min-height:72px;font:inherit;padding:.6rem .8rem;border:1px solid rgba(128,128,128,.4);border-radius:8px;background:transparent;color:inherit;"></textarea>
             </div>`;
     }).join('');
 
