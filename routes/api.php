@@ -246,3 +246,9 @@ require __DIR__ . '/profile.php';
         return response()->json(['ok' => true]);
     })->whereNumber('id');
 });
+
+
+// -- Pricing sheet (Excel upload shown to students) --
+Route::get('/pricing-sheet', [\App\Http\Controllers\PricingSheetController::class, 'show'])->middleware('auth:sanctum');
+Route::post('/pricing-sheet', [\App\Http\Controllers\PricingSheetController::class, 'store'])->middleware(['auth:sanctum', 'admin']);
+Route::delete('/pricing-sheet', [\App\Http\Controllers\PricingSheetController::class, 'destroy'])->middleware(['auth:sanctum', 'admin']);
