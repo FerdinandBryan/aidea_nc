@@ -529,7 +529,7 @@ function renderResearchFields(items) {
         return `
             <div class="form-group">
                 <label style="white-space:pre-line;">${fieldLabelHtml(item)}</label>
-                <textarea class="ri-dyn-input" data-idx="${i}" rows="3" placeholder="Type your answer" style="width:100%;box-sizing:border-box;resize:vertical;min-height:72px;font:inherit;padding:.6rem .8rem;border:1px solid rgba(128,128,128,.4);border-radius:8px;background:transparent;color:inherit;"></textarea>
+                <textarea class="ri-dyn-input" data-idx="${i}" rows="1" placeholder="Type your answer" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" style="width:100%;box-sizing:border-box;resize:none;overflow:hidden;min-height:42px;font:inherit;padding:.6rem .8rem;border:1px solid rgba(128,128,128,.4);border-radius:8px;background:transparent;color:inherit;"></textarea>
             </div>`;
     }).join('');
 

@@ -924,7 +924,7 @@ function renderResearchItems() {
         `<option value="${val}" ${item.type === val ? 'selected' : ''}>${m.label}</option>`
     ).join('')}
                 </select>
-                <textarea class="form-control research-item-input" data-idx="${i}" rows="1" placeholder="Item label (Enter = new line)" style="resize:vertical;min-height:38px;">${escHtml(item.text)}</textarea>
+                <textarea class="form-control research-item-input" data-idx="${i}" rows="1" placeholder="Item label (Enter = new line)" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" onfocus="this.style.height='auto';this.style.height=this.scrollHeight+'px'" style="resize:none;overflow:hidden;min-height:38px;">${escHtml(item.text)}</textarea>
                 <button type="button" class="research-item-remove" data-idx="${i}">✕</button>
             </div>
             ${item.type === 'checkbox' ? `
