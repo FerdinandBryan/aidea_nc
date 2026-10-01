@@ -117,7 +117,7 @@
     });
   }
 
-  function openViewer(url, title) {
+  function openViewer(url, title, src) {
     injectCss();
     var ov = document.createElement('div');
     ov.id = 'svOv';
@@ -157,7 +157,11 @@
       if (window.console) console.error('Split viewer:', err);
     }
 
-    fetch(url, { credentials: 'same-origin' }).then(function (res) {
+    var base = (typeof ADMIN_API !== 'undefined') ? ADMIN_API : 'https://aideanc-production.up.railway.app/api';
+    var token = '';
+    try { token = localStorage.getItem('auth_token') || ''; } catch (e) { }
+    var target = src ? base + '/reviewer/assignments/' + src.id + '/file/' + src.n : url;
+    fetch(target, src ? { headers: { 'Authorization': 'Bearer ' + token } } : {}).then(function (res) {
       if (!res.ok) throw new Error('HTTP ' + res.status);
       return res.arrayBuffer();
     }).then(function (buf) {
@@ -178,6 +182,14 @@
     e.preventDefault();
     e.stopPropagation();
     var t = card.querySelector('.review-card-title');
-    openViewer(a.href, t ? t.textContent.trim() : '');
+    var id = card.getAttribute('data-id');
+    var hrefs = [];
+    Array.prototype.forEach.call(card.querySelectorAll('a[href]'), function (x) {
+      if (x.hasAttribute('download')) return;
+      if (!/^(view|original)/i.test((x.textContent || '').trim())) return;
+      if (hrefs.indexOf(x.href) < 0) hrefs.push(x.href);
+    });
+    var n = Math.max(0, hrefs.indexOf(a.href));
+    openViewer(a.href, t ? t.textContent.trim() : '', id ? { id: id, n: n } : null);
   }, true);
 })();

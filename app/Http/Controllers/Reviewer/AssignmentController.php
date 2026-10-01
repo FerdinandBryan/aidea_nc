@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Reviewer;
 use App\Http\Controllers\Controller;
 use App\Models\ThesisAssignment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class AssignmentController extends Controller
@@ -61,6 +62,30 @@ class AssignmentController extends Controller
         ]);
 
         return response()->json(['data' => $assignment]);
+    }
+
+    // GET /api/reviewer/assignments/{id}/file/{n} - streams the n-th original file (used by the split viewer)
+    public function file(Request $request, $id, $n = 0)
+    {
+        $assignment = ThesisAssignment::where('reviewer_id', $request->user()->id)->find($id);
+
+        if (!$assignment) {
+            return response()->json(['message' => 'Assignment not found.'], 404);
+        }
+
+        $items = $assignment->files ?: [];
+        if (!$items && $assignment->file_path) {
+            $items = [['path' => $assignment->file_path]];
+        }
+
+        $item = $items[(int) $n] ?? null;
+        $path = is_array($item) ? ($item['path'] ?? null) : null;
+
+        if (!$path || !Storage::disk('public')->exists($path)) {
+            return response()->json(['message' => 'File not found.'], 404);
+        }
+
+        return Storage::disk('public')->response($path);
     }
 
     // POST /api/reviewer/assignments/{id}/resend

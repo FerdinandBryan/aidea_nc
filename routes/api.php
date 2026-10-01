@@ -167,6 +167,7 @@ Route::middleware(['auth:sanctum', 'reviewer'])->prefix('reviewer')->group(funct
     Route::get('assignments', [App\Http\Controllers\Reviewer\AssignmentController::class, 'index']);
     Route::post('assignments/{id}/complete', [App\Http\Controllers\Reviewer\AssignmentController::class, 'complete']);
     Route::post('assignments/{id}/resend', [App\Http\Controllers\Reviewer\AssignmentController::class, 'resend']);
+    Route::get('assignments/{id}/file/{n?}', [App\Http\Controllers\Reviewer\AssignmentController::class, 'file'])->where(['id' => '[0-9]+', 'n' => '[0-9]+']);
 });
 
 // My Profile routes
