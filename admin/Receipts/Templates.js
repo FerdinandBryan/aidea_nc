@@ -45,4 +45,38 @@
     });
 
     load();
+    /* PDF support: convert page 1 of a chosen PDF to a PNG in the browser, then upload it as an image */
+    function loadPdfJs(cb, bad) {
+        if (window.pdfjsLib) { cb(); return; }
+        var s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        s.onload = function () { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; cb(); };
+        s.onerror = bad;
+        document.head.appendChild(s);
+    }
+    fileIn.addEventListener('change', function () {
+        var f = fileIn.files && fileIn.files[0];
+        if (!f || !(f.type === 'application/pdf' || /\.pdf$/i.test(f.name))) return;
+        var label = addBtn.textContent;
+        addBtn.disabled = true; addBtn.textContent = 'Converting PDF...';
+        function done() { addBtn.disabled = false; addBtn.textContent = label; }
+        function fail(msg) { fileIn.value = ''; done(); alert(msg || 'Could not read that PDF. Export it as a PNG instead.'); }
+        loadPdfJs(function () {
+            f.arrayBuffer().then(function (buf) { return window.pdfjsLib.getDocument({ data: buf }).promise; })
+            .then(function (pdf) { return pdf.getPage(1); })
+            .then(function (page) {
+                var v0 = page.getViewport({ scale: 1 }), v = page.getViewport({ scale: 1600 / v0.width });
+                var c = document.createElement('canvas'); c.width = Math.round(v.width); c.height = Math.round(v.height);
+                var cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height);
+                return page.render({ canvasContext: cx, viewport: v }).promise.then(function () { return c; });
+            }).then(function (c) {
+                c.toBlob(function (b) {
+                    if (!b) { fail(); return; }
+                    var png = new File([b], f.name.replace(/\.pdf$/i, '') + '.png', { type: 'image/png' });
+                    var dt = new DataTransfer(); dt.items.add(png); fileIn.files = dt.files;
+                    done();
+                }, 'image/png');
+            }).catch(function (e) { console.warn(e); fail(); });
+        }, function () { fail('Could not load the PDF reader. Check your internet connection, or export the PDF as PNG.'); });
+    });
 })();
