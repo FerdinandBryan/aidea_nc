@@ -444,7 +444,7 @@ async function loadHistory() {
 
                     <div class="review-card-files">
                         ${t.file_url ? `<a class="file-chip" href="${escHtml(t.file_url)}" target="_blank" rel="noopener">${ICON_DOC} Original file</a>` : ''}
-                        ${t.reviewed_file_url ? `<a class="file-chip" href="${escHtml(t.reviewed_file_url)}" target="_blank" rel="noopener">${ICON_DOC} Your reviewed file</a>` : ''}
+                        ${t.reviewed_file_url ? `<a class="file-chip" href="${escHtml(t.reviewed_file_url)}" target="_blank" rel="noopener">${ICON_DOC} Your reviewed file</a>` : ''} ${t.comments_file_url ? `<a class="file-chip" href="${escHtml(t.comments_file_url)}" target="_blank" rel="noopener">${ICON_DOC} Your comments file</a>` : ''}
                     </div>
                 </div>
             </article>

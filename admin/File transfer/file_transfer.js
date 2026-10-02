@@ -501,6 +501,7 @@ async function loadReceived() {
                     ${fileRow(t.file_url, 'Original file', 'thesis-original')}
                     ${renderFileLabel(t.file_label)}
                     ${reviewedRows(t, 'Reviewed file', 'thesis-reviewed')}
+                    ${t.comments_file_url ? fileRow(t.comments_file_url, 'Comments file', 'thesis-comments') : ''}
                 </div>
             </article>
         `).join('');
