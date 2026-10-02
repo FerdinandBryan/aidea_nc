@@ -93,6 +93,72 @@
         });
     }
 
+        /* ---- layout that matches the Norzagaray certificate (template with header/footer only) ---- */
+    function drawLayout(ctx, d, role) {
+        var k = ctx.canvas.width / 1170, F = 'Arial, Helvetica, sans-serif';
+        var L = 138 * k, R = 1018 * k, MW = R - L, px = Math.round(25 * k), lh = 29 * k, C = 585 * k;
+        var analyst = d.role !== 'grammarian';
+        function f(b, s, i) { return (i ? 'italic ' : '') + (b ? 'bold ' : '') + Math.round(s) + 'px ' + F; }
+        ctx.fillStyle = '#000'; ctx.strokeStyle = '#000'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+
+        function para(parts, x, y, justify) {
+            var toks = [];
+            parts.forEach(function (p) {
+                String(p.t).split(/\s+/).filter(Boolean).forEach(function (w) {
+                    ctx.font = f(p.b, px); toks.push({ t: w, b: p.b, w: ctx.measureText(w).width });
+                });
+            });
+            ctx.font = f(false, px);
+            var sp = ctx.measureText(' ').width, lines = [], cur = [], cw = 0;
+            toks.forEach(function (tk) {
+                var nw = cur.length ? cw + sp + tk.w : tk.w;
+                if (nw > MW && cur.length) { lines.push(cur); cur = [tk]; cw = tk.w; } else { cur.push(tk); cw = nw; }
+            });
+            if (cur.length) lines.push(cur);
+            lines.forEach(function (ln, i) {
+                var sum = 0; ln.forEach(function (tk) { sum += tk.w; });
+                var gap = (justify && i < lines.length - 1 && ln.length > 1) ? (MW - sum) / (ln.length - 1) : sp, cx = x;
+                ln.forEach(function (tk) { ctx.font = f(tk.b, px); ctx.fillText(tk.t, cx, y + i * lh); cx += tk.w + gap; });
+            });
+            return y + (lines.length - 1) * lh;
+        }
+        function center(text, y, size, bold, italic) {
+            ctx.font = f(bold, size, italic); ctx.textAlign = 'center'; ctx.fillText(text, C, y); ctx.textAlign = 'left';
+        }
+
+        /* Protocol No. (top right) */
+        var a = 'Protocol No.: ', pv = d.proto || '\u2014';
+        ctx.font = f(false, px); var wa = ctx.measureText(a).width;
+        ctx.font = f(true, px); var wp = ctx.measureText(pv).width;
+        ctx.font = f(false, px); ctx.fillText(a, R - wa - wp, 215 * k);
+        ctx.font = f(true, px); ctx.fillText(pv, R - wp, 215 * k);
+
+        /* heading */
+        center(String(role.head || '').toUpperCase(), 364 * k, 34 * k, true, false);
+
+        /* paragraph with the title in bold */
+        var title = '\u201C' + String(d.title || 'TITLE OF THE DOCUMENT').toUpperCase() + '\u201D';
+        var dt = fmtDate(d.date) || '\u2014';
+        var parts = analyst
+            ? [{ t: 'This is to certify that the data for the research study', b: false }, { t: title, b: true },
+               { t: 'have been evaluated and treated with the appropriate statistical treatment by the undersigned. The statistical treatment was aligned with the objectives and statement of the problem of the study for analysis, interpretation, and discussion.', b: false }]
+            : [{ t: 'This is to certify that the manuscript entitled', b: false }, { t: title, b: true },
+               { t: 'has been reviewed and finalized by the undersigned.', b: false }];
+        var y = para(parts, L, 501 * k, true);
+        para([{ t: 'This certification was issued on', b: false }, { t: dt + ',', b: true },
+              { t: "upon the researcher's request for whatever legal purpose this may serve.", b: false }], L, y + 2 * lh, true);
+
+        /* name + signature line + caption */
+        ctx.lineWidth = Math.max(1, 1.3 * k);
+        center(d.name || 'Name', 962 * k, 25 * k, true, false);
+        ctx.beginPath(); ctx.moveTo(C - 262 * k, 971 * k); ctx.lineTo(C + 262 * k, 971 * k); ctx.stroke();
+        center('Name of ' + (analyst ? 'Data Analyst' : 'Grammarian') + ' and Signature', 999 * k, 23 * k, false, true);
+
+        /* date signed */
+        center(String(dt).toUpperCase(), 1171 * k, 25 * k, true, false);
+        ctx.beginPath(); ctx.moveTo(C - 262 * k, 1180 * k); ctx.lineTo(C + 262 * k, 1180 * k); ctx.stroke();
+        center('Date Signed', 1207 * k, 23 * k, false, true);
+    }
     /* ---- draw the certificate in the SYSTEM layout ---- */
     function draw(canvas, d, st) {
         var pal = st.pal, role = ROLES[d.role] || { label: d.role || '', head: 'CERTIFICATE OF ' + String(d.role || '').toUpperCase() };
@@ -129,7 +195,7 @@
             boxes.push({ key: 'logo', ax: lx, ay: ly, x0: lx - lw / 2, x1: lx + lw / 2, y0: ly - lh / 2, y1: ly + lh / 2 });
         }
 
-        var h = put('head', role.head, 60, 'bold', SERIF, pal.primary, 'center', 0.5, 0.292);
+        var LAY = BG && !st.on && !Object.keys(st.tpl).length; if (LAY) { drawLayout(ctx, d, role); } else { var h = put('head', role.head, 60, 'bold', SERIF, pal.primary, 'center', 0.5, 0.292);
         ctx.fillStyle = pal.accent; ctx.fillRect(h.x - 180, h.y + 30, 360, 5);
         put('intro1', 'This is to certify that the manuscript entitled', 28, 'italic', SERIF, pal.text, 'center', 0.5, 0.398);
 
@@ -147,7 +213,7 @@
         var n = put('name', d.name || 'Name', 34, 'bold', SERIF, pal.primary, 'center', 0.5, 0.853);
         ctx.strokeStyle = pal.text; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(n.x - 230, n.y + 20); ctx.lineTo(n.x + 230, n.y + 20); ctx.stroke();
-        put('role', role.label, 24, 'normal', SANS, pal.text, 'center', 0.5, 0.906);
+        put('role', role.label, 24, 'normal', SANS, pal.text, 'center', 0.5, 0.906); }
         st.boxes = boxes;
     }
 
