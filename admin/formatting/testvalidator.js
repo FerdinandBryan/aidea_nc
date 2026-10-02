@@ -312,7 +312,7 @@ const _DEFAULT_FORMAT_RULES = [
 const _TEMPLATE_STORAGE_KEY = 'aidea_format_templates';
 
 // All templates the admin has marked Active — used to populate the picker dropdown.
-function _getActiveFormatTemplates() {
+function _getActiveFormatTemplatesOriginal() {
     try {
         const all = JSON.parse(localStorage.getItem(_TEMPLATE_STORAGE_KEY) || '[]');
         return all.filter(t => t && t.id != null).sort((a, b) => (b.active ? 1 : 0) - (a.active ? 1 : 0));
@@ -1804,6 +1804,7 @@ function _withMeasurableRules(rules) {
 }
 
 function _getFormatRules(templateId) {
+    if (String(templateId) === '__checklist__') return { rules: _DEFAULT_FORMAT_RULES, source: 'Thesis Format and Assessment Checklist', template: _CHECKLIST_PSEUDO };
     try {
         const templates = JSON.parse(localStorage.getItem(_TEMPLATE_STORAGE_KEY) || '[]');
         if (templateId != null && templateId !== '') {
@@ -1964,3 +1965,21 @@ function _evaluateFormattingRule(rule, profile) {
         });
     });
 })();
+
+/* CHECKLIST_PICKER_OPTION: built-in checklist listed first in the template picker */
+const _CHECKLIST_PSEUDO = {
+    id: '__checklist__',
+    name: 'Thesis Format and Assessment Checklist',
+    type: 'Built-in',
+    description: 'Standard thesis criteria: double spacing, margins, chapters 1 to 5, references and appendices.',
+    active: true,
+    builtin: true,
+    rules: _DEFAULT_FORMAT_RULES
+};
+
+function _getActiveFormatTemplates() {
+    var list = _getActiveFormatTemplatesOriginal().filter(function (x) {
+        return x && x.name !== 'Thesis Format and Assessment Checklist';
+    });
+    return [_CHECKLIST_PSEUDO].concat(list);
+}
