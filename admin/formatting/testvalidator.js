@@ -1418,7 +1418,6 @@ function _renderValidationResult(result, onProceed, actionLabel, formattingProfi
             <div class="dv-rule-rows">${ruleRowsHtml}</div>
             <div class="dv-download-row">
                 <button class="btn-modal-close" id="dvRedlineBtn" onclick="window._dvDownloadRedline()">📥 Download Redlined Copy (shows errors)</button>
-                <button class="btn-modal-close" id="dvFixedBtn" onclick="window._dvDownloadFixed()">📥 Download Auto-Fixed Copy (aligned to template)</button>
             </div>`;
     } else {
         formattingSectionHtml = `
