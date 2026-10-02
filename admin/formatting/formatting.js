@@ -213,6 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
    SEED DEMO DATA
 ══════════════════════════════════════════════ */
 function seedDemoTemplates() {
+    return; // demo seeding disabled
     const demos = [
         {
             id: 1,
@@ -854,4 +855,14 @@ function loadThesisChecklist() {
         addBtn.parentNode.insertBefore(b, addBtn);
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', add); else add();
+})();
+
+/* REMOVE_DEMO_TEMPLATES: delete the three built-in demo templates from localStorage */
+(function () {
+    try {
+        var demoNames = ['Standard Thesis Format 2025', 'Proposal Submission Format', 'Revised Final Format'];
+        var list = JSON.parse(localStorage.getItem('aidea_format_templates') || '[]');
+        var kept = list.filter(function (x) { return demoNames.indexOf(x.name) === -1; });
+        if (kept.length !== list.length) localStorage.setItem('aidea_format_templates', JSON.stringify(kept));
+    } catch (e) { console.warn('demo cleanup skipped', e); }
 })();
