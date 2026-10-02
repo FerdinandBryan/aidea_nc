@@ -195,7 +195,7 @@
             boxes.push({ key: 'logo', ax: lx, ay: ly, x0: lx - lw / 2, x1: lx + lw / 2, y0: ly - lh / 2, y1: ly + lh / 2 });
         }
 
-        var LAY = BG && !st.on && !Object.keys(st.tpl).length; if (LAY) { drawLayout(ctx, d, role); } else { var h = put('head', role.head, 60, 'bold', SERIF, pal.primary, 'center', 0.5, 0.292);
+        var LAY = !!BG; if (LAY) { drawLayout(ctx, d, role); } else { var h = put('head', role.head, 60, 'bold', SERIF, pal.primary, 'center', 0.5, 0.292);
         ctx.fillStyle = pal.accent; ctx.fillRect(h.x - 180, h.y + 30, 360, 5);
         put('intro1', 'This is to certify that the manuscript entitled', 28, 'italic', SERIF, pal.text, 'center', 0.5, 0.398);
 
