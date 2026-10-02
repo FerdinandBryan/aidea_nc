@@ -99,11 +99,22 @@ window._dvCloseModal = _dvCloseModal;
 ══════════════════════════════════════════ */
 const _validatorDeps = {
     loadScript(src, onload) {
-        if (document.querySelector(`script[src="${src}"]`)) { onload(); return; }
+        this._pending = this._pending || {};
+        this._loaded = this._loaded || {};
+        if (this._loaded[src]) { onload(); return; }
+        if (this._pending[src]) { this._pending[src].push(onload); return; }
+        if (document.querySelector('script[src="' + src + '"]')) { onload(); return; }
+        this._pending[src] = [onload];
+        const done = ok => {
+            const q = this._pending[src] || [];
+            delete this._pending[src];
+            if (ok) this._loaded[src] = true;
+            q.forEach(fn => { try { fn(); } catch (e) { console.warn('[Validator] callback error:', e); } });
+        };
         const s = document.createElement('script');
         s.src = src;
-        s.onload = onload;
-        s.onerror = () => console.warn('[Validator] Failed to load:', src);
+        s.onload = () => done(true);
+        s.onerror = () => { console.warn('[Validator] Failed to load:', src); s.remove(); done(false); };
         document.head.appendChild(s);
     },
 
