@@ -326,7 +326,7 @@ function _getActiveFormatTemplates() {
 // If `templateId` is given (student/admin picked a specific template in the
 // picker step), that template's rules are used. Otherwise falls back to the
 // first active template with rules, then to the built-in defaults.
-function _getFormatRules(templateId) {
+function _getFormatRulesOriginal(templateId) {
     try {
         const templates = JSON.parse(localStorage.getItem(_TEMPLATE_STORAGE_KEY) || '[]');
 
@@ -542,7 +542,7 @@ async function _extractFormattingProfile(file) {
     return null; // .doc or unsupported — no structural check possible
 }
 
-function _evaluateFormattingRule(rule, profile) {
+function _evaluateFormattingRuleRaw(rule, profile) {
     if (!profile) return null;
 
     const type = (rule.type || '').toLowerCase();
@@ -1785,3 +1785,46 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     document.head.appendChild(style);
 })();
+
+/* CHECKLIST_VALIDATOR_PATCH: checklist-based defaults, PDF results advisory */
+const _CHECKLIST_MEASURABLE = [
+    { id: 'checklist-spacing', name: 'Line Spacing', type: 'spacing', value: 2, detail: 'The manuscript is in double line spacing.' },
+    { id: 'checklist-margin', name: 'Page Margins', type: 'margin', value: { top: 1, bottom: 1, left: 1.5, right: 1 }, detail: 'Left 1.5 inches; right, top and bottom 1 inch.' }
+];
+
+_DEFAULT_FORMAT_RULES.length = 0;
+_CHECKLIST_MEASURABLE.forEach(function (r) { _DEFAULT_FORMAT_RULES.push(r); });
+
+function _withMeasurableRules(rules) {
+    var has = rules.some(function (r) {
+        var ty = String((r && r.type) || '').toLowerCase();
+        return ty === 'spacing' || ty === 'margin';
+    });
+    return has ? rules : _CHECKLIST_MEASURABLE.concat(rules);
+}
+
+function _getFormatRules(templateId) {
+    try {
+        const templates = JSON.parse(localStorage.getItem(_TEMPLATE_STORAGE_KEY) || '[]');
+        if (templateId != null && templateId !== '') {
+            const chosen = templates.find(t => t && String(t.id) === String(templateId));
+            if (chosen) {
+                const rules = (Array.isArray(chosen.rules) && chosen.rules.length) ? chosen.rules : _DEFAULT_FORMAT_RULES;
+                return { rules: _withMeasurableRules(rules), source: chosen.name || 'Selected Template', template: chosen };
+            }
+        }
+        const active = templates.find(t => t && t.active && Array.isArray(t.rules) && t.rules.length);
+        if (active) return { rules: _withMeasurableRules(active.rules), source: active.name || 'Admin Template', template: active };
+    } catch (e) {
+        console.warn('[Validator] Could not read admin templates, using defaults:', e);
+    }
+    return { rules: _DEFAULT_FORMAT_RULES, source: 'Thesis Format and Assessment Checklist', template: null };
+}
+
+function _evaluateFormattingRule(rule, profile) {
+    var ev = _evaluateFormattingRuleRaw(rule, profile);
+    if (ev && profile && profile.estimated && ev.status === 'fail') {
+        return { status: 'manual', violations: [], checkedCount: ev.checkedCount };
+    }
+    return ev;
+}
