@@ -476,7 +476,7 @@
         function q(s) { return o.querySelector(s); }
 
         function data() {
-            st.scale = (Number(q('#cgScale').value) || 100) / 100; if (!st.locked) q('#cgProto').value = protoPeek((q('#cgDate').value || today).slice(0, 4), q('#cgRole').value); if (isTpl) { var oc = q('#cgOcr'); st.on = !!(oc && oc.checked); var bm = q('#cgBgMode'); st.bg = !!(bm && bm.checked); }
+            st.scale = (Number(q('#cgScale').value) || 100) / 100; if (!st.locked) q('#cgProto').value = protoPeek((q('#cgDate').value || today).slice(0, 4), q('#cgRole').value); if (isTpl) { var oc = q('#cgOcr'); st.on = false; var bm = q('#cgBgMode'); st.bg = !!(bm && bm.checked); }
             st.pal = { bg: q('#cgBg').value, primary: q('#cgPrimary').value, accent: q('#cgAccent').value, text: q('#cgText').value };
             return {
                 title: q('#cgTitle').value.trim(), proto: q('#cgProto').value.trim(),
