@@ -386,7 +386,7 @@
         im.setAttribute('contenteditable', 'false');
         im.src = t.toDataURL('image/jpeg', 0.92);
         im.style.cssText = 'position:absolute;left:0;width:100%;height:auto;' + (idx === 0 ? 'top:0;' : 'bottom:0;') + 'pointer-events:none;user-select:none;-webkit-user-select:none;';
-        right.appendChild(im);
+        right.appendChild(im); var ihpx = Math.round(right.clientWidth * z / W) + 6; if (idx === 0) right.style.paddingTop = ihpx + 'px'; else right.style.paddingBottom = ihpx + 'px';
       });
     } catch (e) { }
   }
