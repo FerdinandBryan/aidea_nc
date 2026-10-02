@@ -480,8 +480,7 @@
                     '<button class="btn-action btn-approve" onclick="AideaPayments.approve(' + p.id + ')">Approve</button>' +
                     '<button class="btn-action btn-reject" onclick="AideaPayments.reject(' + p.id + ')">Reject</button>';
             } else if (p.status === 'Completed' || p.status === 'Paid' || p.status === 'Ongoing') {
-                actions = '<button class="btn-action" onclick="AideaPayments.openView(' + i + ')">View</button>' +
-                    '<button class="btn-action btn-receipt" onclick="AideaPayments.sendCertificate(' + p.id + ')">Certificate</button>';
+                actions = '<button class="btn-action" onclick="AideaPayments.openView(' + i + ')">View</button>';
             } else {
                 actions = '<button class="btn-action" onclick="AideaPayments.openView(' + i + ')">View</button>' +
                     '<span class="none">—</span>';
