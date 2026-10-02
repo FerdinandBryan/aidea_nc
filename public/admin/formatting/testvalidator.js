@@ -226,7 +226,7 @@ const _INVALID_SIGNALS = {
 
 const _DOC_TYPE_LABELS = {
     thesis: { label: 'Thesis / Research Paper', icon: '📄', color: '#22c55e' },
-    capstone: { label: 'Capstone / IT Project', icon: '💻', color: '#3b82f6' },
+    capstone: { label: 'Thesis / Research Paper', icon: '📄', color: '#22c55e' },
     receipt: { label: 'Payment Receipt', icon: '🧾', color: '#ef4444' },
     certificate: { label: 'Certificate / Clearance', icon: '📜', color: '#ef4444' },
     letter: { label: 'Letter / Correspondence', icon: '✉️', color: '#f59e0b' },
@@ -1142,7 +1142,7 @@ function _createValidationModal() {
     modal.innerHTML = `
         <div class="modal-box" style="max-width:640px;">
             <div class="modal-header">
-                <h2>🔎 Document Type & Format Check</h2>
+                <h2>Document Type & Format Check</h2>
                 <button class="modal-close" onclick="window._dvCloseModal('docValidationModal')">✕</button>
             </div>
             <div class="modal-body" id="docValidationBody">
