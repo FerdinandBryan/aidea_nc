@@ -384,7 +384,7 @@
     ov.innerHTML =
       '<div class="sv-win" role="dialog" aria-modal="true" aria-label="Paper viewer">' +
       '<div class="sv-head"><div class="sv-title"></div><span class="sv-stat">Loading</span>' +
-      '<button type="button" class="sv-btn sv-copy">Copy all text</button>' +
+      
       '<a class="sv-btn sv-open" target="_blank" rel="noopener">Open in new tab</a>' +
       '<button type="button" class="sv-btn sv-close">Close</button></div>' +
       '<div class="sv-cols"><div>Original paper</div><div>Your page (type here)</div></div>' +
@@ -407,7 +407,7 @@
     document.addEventListener('keydown', onKey, true);
     ov.querySelector('.sv-close').addEventListener('click', close);
     var copyBtn = ov.querySelector('.sv-copy');
-    copyBtn.addEventListener('click', function () {
+    if (copyBtn) copyBtn.addEventListener('click', function () {
       var parts = [];
       Array.prototype.forEach.call(scroll.querySelectorAll('.sv-pg'), function (p) {
         var t = p.querySelector('.sv-text');
