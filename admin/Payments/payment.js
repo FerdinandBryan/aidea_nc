@@ -983,8 +983,54 @@ function openViewModal(i) {
         }
     }
 
+        function confirmModal(title, message, okText, noText) {
+        return new Promise(function (resolve) {
+            var opener = document.activeElement;
+            var overlay = el('div', 'modal-backdrop');
+            var box = el('div', 'modal');
+            box.setAttribute('role', 'alertdialog');
+            box.setAttribute('aria-modal', 'true');
+
+            var head = el('div', 'modal-head');
+            head.appendChild(el('h3', 'modal-title', title));
+            box.appendChild(head);
+
+            var body = el('div', 'modal-body');
+            body.appendChild(el('p', 'vm-muted', message));
+            box.appendChild(body);
+
+            var row = el('div', '');
+            row.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;padding:0 20px 20px;flex-wrap:wrap;';
+            var no = el('button', 'btn-action', noText || 'Cancel');
+            no.type = 'button';
+            var ok = el('button', 'btn-action btn-reject', okText || 'OK');
+            ok.type = 'button';
+            row.appendChild(no);
+            row.appendChild(ok);
+            box.appendChild(row);
+
+            function done(v) {
+                document.removeEventListener('keydown', onKey);
+                overlay.remove();
+                document.body.classList.remove('no-scroll');
+                if (opener && opener.focus && document.contains(opener)) opener.focus();
+                resolve(v);
+            }
+            function onKey(e) { if (e.key === 'Escape') done(false); }
+
+            no.addEventListener('click', function () { done(false); });
+            ok.addEventListener('click', function () { done(true); });
+            overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) done(false); });
+            document.addEventListener('keydown', onKey);
+
+            overlay.appendChild(box);
+            document.body.appendChild(overlay);
+            document.body.classList.add('no-scroll');
+            no.focus();
+        });
+    }
     async function cancelAssignment(id) {
-        if (!window.confirm('Cancel this assignment? The reviewer will no longer receive it.')) return;
+        if (!(await confirmModal('Cancel assignment', 'Cancel this assignment? The reviewer will no longer receive it.', 'Cancel assignment', 'Keep'))) return;
         try {
             await apiFetch('/admin/assignments/' + id, { method: 'DELETE' });
             showToast('Assignment cancelled.', 'success');
