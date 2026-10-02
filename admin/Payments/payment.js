@@ -304,7 +304,7 @@
     // ── Status badge ────────────────────────────────────────────────────────
     function statusBadge(s) {
         const display = s === 'Paid' ? 'Completed' : s === 'Rejected' ? 'Cancelled' : s;
-        const cls = { Completed: 'badge-success', Pending: 'badge-warning', Cancelled: 'badge-danger' };
+        const cls = { Completed: 'badge-success', Ongoing: 'badge-ongoing', Pending: 'badge-warning', Cancelled: 'badge-danger' };
         return '<span class="badge ' + (cls[display] || '') + '">' + escHtml(display) + '</span>';
     }
 
@@ -479,7 +479,7 @@
                 actions = '<button class="btn-action" onclick="AideaPayments.openView(' + i + ')">View</button>' +
                     '<button class="btn-action btn-approve" onclick="AideaPayments.approve(' + p.id + ')">Approve</button>' +
                     '<button class="btn-action btn-reject" onclick="AideaPayments.reject(' + p.id + ')">Reject</button>';
-            } else if (p.status === 'Completed' || p.status === 'Paid') {
+            } else if (p.status === 'Completed' || p.status === 'Paid' || p.status === 'Ongoing') {
                 actions = '<button class="btn-action" onclick="AideaPayments.openView(' + i + ')">View</button>' +
                     '<button class="btn-action btn-receipt" onclick="AideaPayments.sendCertificate(' + p.id + ')">Certificate</button>';
             } else {
@@ -550,7 +550,7 @@
     })();
 
     async function approvePayment(id) {
-        const ok = await openConfirm({ title: 'Approve payment?', message: 'This marks the payment as completed.', confirmText: 'Approve' });
+        const ok = await openConfirm({ title: 'Approve payment?', message: 'Approving marks the payment as ongoing. It becomes completed once you send the files.', confirmText: 'Approve' });
         if (!ok) return;
         try {
             await updatePaymentStatus(id, 'approve');
@@ -765,7 +765,7 @@ function openViewModal(i) {
     function isAllowedFile(f) {
         return f.type === 'application/pdf' || f.type.indexOf('image/') === 0;
     }
-    function isDoneStatus(p) { return p.status === 'Completed' || p.status === 'Paid'; }
+    function isDoneStatus(p) { return p.status === 'Completed' || p.status === 'Paid' || p.status === 'Ongoing'; }
     function dataUrlToFile(dataUrl, name) {
         try {
             const comma = String(dataUrl).indexOf(',');
@@ -1082,6 +1082,7 @@ function openViewModal(i) {
                 const result = await uploadFetch('/payments/' + p.id + '/send-files', fd);
                 close();
                 showSendResult(isCert, p.student, result);
+                reload().catch(function () {});
             } catch (err) {
                 console.error(err);
                 send.disabled = false;
@@ -1154,7 +1155,7 @@ function openViewModal(i) {
         if (!sv || !st || document.getElementById('nfWrap')) return;
         sv.style.display = 'none';
         st.style.display = 'none';
-        const STATUSES = [['', 'All status'], ['Pending', 'Pending'], ['Completed', 'Completed'], ['Cancelled', 'Cancelled']];
+        const STATUSES = [['', 'All status'], ['Pending', 'Pending'], ['Ongoing', 'Ongoing'], ['Completed', 'Completed'], ['Cancelled', 'Cancelled']];
         let curService = '', curStatus = '', openService = '';
 
         const wrap = document.createElement('div');

@@ -1466,3 +1466,5 @@ td.empty {
     margin: 0;
     text-align: left;
 }
+/* Ongoing status badge */
+.badge-ongoing { background: #dbeafe; color: #1d4ed8; }
