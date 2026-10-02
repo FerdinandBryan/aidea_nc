@@ -511,6 +511,98 @@
       '<div id="pages">' + body + '</div></body></html>';
   }
 
+  function svToolbar(ov, scroll) {
+    var cols = ov.querySelector('.sv-cols');
+    if (!cols || ov.querySelector('.sv-tb')) return;
+    if (!document.getElementById('svTbCss')) {
+      var st = document.createElement('style');
+      st.id = 'svTbCss';
+      st.textContent = '.sv-tb{display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:6px 16px;background:#edf2fa;border-bottom:1px solid #d1d5db;flex-shrink:0}' +
+        '.sv-tb button,.sv-tb select{height:28px;border:0;border-radius:6px;background:transparent;color:#1f2937;font-size:13px;cursor:pointer;padding:0 8px}' +
+        '.sv-tb button:hover,.sv-tb select:hover{background:#dde3ee}' +
+        '.sv-tb .sep{width:1px;height:20px;background:#c7ccd6;margin:0 6px}' +
+        '.sv-tb input[type=color]{width:28px;height:28px;border:0;padding:2px;background:transparent;cursor:pointer}';
+      document.head.appendChild(st);
+    }
+    var tb = document.createElement('div');
+    tb.className = 'sv-tb';
+    var fonts = ['Arial', 'Times New Roman', 'Georgia', 'Calibri', 'Cambria', 'Verdana', 'Tahoma', 'Courier New'];
+    var sizes = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36];
+    var btn = function (c, label, title, style) { return '<button type="button" data-c="' + c + '" title="' + title + '" style="' + (style || '') + '">' + label + '</button>'; };
+    tb.innerHTML =
+      btn('undo', '&#8630;', 'Undo') + btn('redo', '&#8631;', 'Redo') + '<span class="sep"></span>' +
+      '<select data-f="font" title="Font"><option value="">Font</option>' + fonts.map(function (x) { return '<option value="' + x + '" style="font-family:\'' + x + '\'">' + x + '</option>'; }).join('') + '</select>' +
+      '<select data-f="size" title="Font size"><option value="">Size</option>' + sizes.map(function (x) { return '<option value="' + x + '">' + x + '</option>'; }).join('') + '</select>' +
+      '<span class="sep"></span>' +
+      btn('bold', 'B', 'Bold (Ctrl+B)', 'font-weight:bold') + btn('italic', 'I', 'Italic (Ctrl+I)', 'font-style:italic') +
+      btn('underline', 'U', 'Underline (Ctrl+U)', 'text-decoration:underline') + btn('strikeThrough', 'S', 'Strikethrough', 'text-decoration:line-through') +
+      '<input type="color" data-k="foreColor" value="#000000" title="Text color"><input type="color" data-k="hiliteColor" value="#ffff00" title="Highlight color">' +
+      '<span class="sep"></span>' +
+      btn('justifyLeft', '&#8676;', 'Align left') + btn('justifyCenter', '&#8596;', 'Center') + btn('justifyRight', '&#8677;', 'Align right') + btn('justifyFull', '&#9776;', 'Justify') +
+      '<span class="sep"></span>' +
+      btn('insertUnorderedList', '&#8226;&#8801;', 'Bulleted list') + btn('insertOrderedList', '1.&#8801;', 'Numbered list') +
+      btn('outdent', '&#8678;', 'Decrease indent') + btn('indent', '&#8680;', 'Increase indent') +
+      '<span class="sep"></span>' + btn('removeFormat', 'Tx', 'Clear formatting');
+    cols.parentNode.insertBefore(tb, cols);
+
+    var saved = null;
+    function blankOf(n) {
+      while (n) { if (n.nodeType === 1 && n.classList && n.classList.contains('sv-blank')) return n; n = n.parentNode; }
+      return null;
+    }
+    function onSel() {
+      if (!ov.isConnected) { document.removeEventListener('selectionchange', onSel); return; }
+      var s = window.getSelection();
+      if (s && s.rangeCount && blankOf(s.anchorNode)) saved = s.getRangeAt(0).cloneRange();
+    }
+    document.addEventListener('selectionchange', onSel);
+    function restore() {
+      var b = saved && blankOf(saved.startContainer);
+      if (!b) return null;
+      b.focus();
+      var s = window.getSelection();
+      s.removeAllRanges(); s.addRange(saved);
+      return b;
+    }
+    function run(cmd, val) {
+      if (!restore()) return;
+      try { document.execCommand('styleWithCSS', false, true); } catch (e) { }
+      document.execCommand(cmd, false, val);
+    }
+    function setSize(px) {
+      var b = restore();
+      if (!b || saved.collapsed) return;
+      try { document.execCommand('styleWithCSS', false, false); } catch (e) { }
+      document.execCommand('fontSize', false, '7');
+      Array.prototype.forEach.call(b.querySelectorAll('font[size="7"], span[style*="xxx-large"]'), function (f) {
+        var sp = document.createElement('span');
+        sp.style.fontSize = px + 'px';
+        while (f.firstChild) sp.appendChild(f.firstChild);
+        f.parentNode.replaceChild(sp, f);
+      });
+      b.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    tb.addEventListener('mousedown', function (e) {
+      var t = e.target.tagName;
+      if (t === 'SELECT' || t === 'INPUT' || t === 'OPTION') return;
+      e.preventDefault();
+    });
+    tb.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('button[data-c]') : null;
+      if (b) run(b.getAttribute('data-c'));
+    });
+    tb.addEventListener('change', function (e) {
+      var t = e.target, f = t.getAttribute('data-f');
+      if (f === 'font' && t.value) run('fontName', t.value);
+      else if (f === 'size' && t.value) setSize(parseInt(t.value, 10));
+      if (f) t.selectedIndex = 0;
+    });
+    tb.addEventListener('input', function (e) {
+      var k = e.target.getAttribute && e.target.getAttribute('data-k');
+      if (k) run(k, e.target.value);
+    });
+  }
+
   function openViewer(url, title, src) {
     injectCss();
     notesKey = src ? ('svNotes:' + src.id + ':' + src.n) : ('svNotes:' + url);
@@ -528,7 +620,7 @@
     var prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    var scroll = ov.querySelector('.sv-scroll');
+    var scroll = ov.querySelector('.sv-scroll'); svToolbar(ov, scroll);
     var stat = ov.querySelector('.sv-stat');
     ov.querySelector('.sv-title').textContent = title || 'Thesis paper';
     var openA = ov.querySelector('.sv-open');
