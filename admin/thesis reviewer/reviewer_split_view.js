@@ -603,6 +603,40 @@
     });
   }
 
+  function svSaveInit(ov, scroll, title, src) {
+    var btn = ov.querySelector('.sv-save');
+    if (!btn) return;
+    var id = src ? src.id : null;
+    function notify() {
+      try { document.dispatchEvent(new CustomEvent('sv-saved', { detail: { id: id, dirty: !!(window.svSaved && window.svSaved.dirty) } })); } catch (e) { }
+    }
+    function flash(msg) {
+      btn.textContent = msg;
+      setTimeout(function () { btn.textContent = 'Save'; }, 1800);
+    }
+    function build() {
+      var pages = [];
+      Array.prototype.forEach.call(scroll.querySelectorAll('.sv-blank'), function (b) {
+        if (svBodyText(b).replace(/\s+/g, '')) pages.push('<div class="pg">' + svBodyHtml(b) + '</div>');
+      });
+      if (!pages.length) return null;
+      var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>div.pg{page-break-after:always}</style></head><body>' + pages.join('') + '</body></html>';
+      var name = ((title || 'paper').replace(/[^\w\- ]+/g, '').trim() || 'paper') + '-edited.doc';
+      return new File(['\ufeff' + html], name, { type: 'application/msword' });
+    }
+    btn.addEventListener('click', function () {
+      var f = build();
+      if (!f) { flash('Nothing to save'); return; }
+      window.svSaved = { id: id, file: f, name: f.name, dirty: false };
+      flash('Saved \u2713');
+      notify();
+    });
+    scroll.addEventListener('input', function () {
+      var s = window.svSaved;
+      if (s && String(s.id) === String(id) && !s.dirty) { s.dirty = true; notify(); }
+    });
+  }
+
   function openViewer(url, title, src) {
     injectCss();
     notesKey = src ? ('svNotes:' + src.id + ':' + src.n) : ('svNotes:' + url);
@@ -612,7 +646,7 @@
       '<div class="sv-win" role="dialog" aria-modal="true" aria-label="Paper viewer">' +
       '<div class="sv-head"><div class="sv-title"></div><span class="sv-stat">Loading</span>' +
       
-      '<a class="sv-btn sv-open" target="_blank" rel="noopener">Open in new tab</a>' +
+      '<button type="button" class="sv-btn sv-open sv-save">Save</button>' +
       '<button type="button" class="sv-btn sv-close">Close</button></div>' +
       '<div class="sv-cols"><div>Original paper</div><div>Your page (type here)</div></div>' +
       '<div class="sv-scroll"></div></div>';
@@ -623,9 +657,9 @@
     var scroll = ov.querySelector('.sv-scroll'); svToolbar(ov, scroll);
     var stat = ov.querySelector('.sv-stat');
     ov.querySelector('.sv-title').textContent = title || 'Thesis paper';
-    var openA = ov.querySelector('.sv-open');
+    var openA = ov.querySelector('.sv-open'); svSaveInit(ov, scroll, title, src);
     openA.href = url;
-    openA.addEventListener('click', function (e) {
+    openA.addEventListener('click-legacy-disabled', function (e) {
       var pages = [], pw = 0, ph = 0;
       Array.prototype.forEach.call(scroll.querySelectorAll('.sv-pg'), function (p) {
         var t = p.querySelector('.sv-text'), h = '';
@@ -697,7 +731,7 @@
       scroll.innerHTML = '';
       var m = document.createElement('div');
       m.className = 'sv-msg';
-      m.textContent = "Couldn't load this paper here. Use Open in new tab instead.";
+      m.textContent = "Couldn't load this paper here. Close it and try again.";
       scroll.appendChild(m);
       if (window.console) console.error('Split viewer:', err);
     }

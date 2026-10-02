@@ -459,6 +459,42 @@ async function loadHistory() {
 let sendBackTargetId = null;
 let selectedFile = null;
 
+function svApplySaved(id) {
+    const chip = document.getElementById('svSavedChip');
+    if (!chip) return;
+    chip.hidden = true;
+    const s = window.svSaved;
+    if (!s || String(s.id) !== String(id)) return;
+    chip.hidden = false;
+    if (s.dirty) {
+        chip.textContent = 'Unsaved changes in your pages. Open the viewer and click Save again.';
+        chip.style.color = '#b45309';
+        return;
+    }
+    selectedFile = s.file;
+    document.getElementById('fileDropLabel').classList.add('has-file');
+    setText('fileDropText', s.file.name);
+    chip.textContent = 'Saved \u2713 ' + s.file.name + ' will be attached.';
+    chip.style.color = '#15803d';
+}
+
+document.addEventListener('sv-saved', function (e) {
+    var d = e.detail || {};
+    document.querySelectorAll('[data-send-back]').forEach(function (b) {
+        if (String(b.dataset.sendBack) !== String(d.id)) return;
+        var m = b.parentNode.querySelector('.sv-mark[data-for="' + d.id + '"]');
+        if (!m) {
+            m = document.createElement('span');
+            m.className = 'sv-mark';
+            m.setAttribute('data-for', d.id);
+            m.style.cssText = 'font-size:12px;font-weight:600;margin-left:8px';
+            b.insertAdjacentElement('afterend', m);
+        }
+        m.textContent = d.dirty ? 'Unsaved changes' : 'Saved \u2713';
+        m.style.color = d.dirty ? '#b45309' : '#15803d';
+    });
+});
+
 function openSendBackModal(id, title) {
     sendBackTargetId = id;
     selectedFile = null;
@@ -473,6 +509,7 @@ function openSendBackModal(id, title) {
     modal.hidden = false;
     document.body.classList.add('no-scroll');
     document.getElementById('reviewNote').focus();
+    svApplySaved(id);
 }
 
 function closeSendBackModal() {
