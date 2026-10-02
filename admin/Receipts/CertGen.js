@@ -99,7 +99,7 @@
         var L = 138 * k, R = 1018 * k, MW = R - L, px = Math.round(25 * k), lh = 29 * k, C = 585 * k;
         var analyst = d.role !== 'grammarian';
         function f(b, s, i) { return (i ? 'italic ' : '') + (b ? 'bold ' : '') + Math.round(s) + 'px ' + F; }
-        ctx.fillStyle = '#000'; ctx.strokeStyle = '#000'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = '#000'; ctx.strokeStyle = '#000'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#fff'; [[690,185,350,50],[120,322,930,58],[120,468,930,432],[290,925,590,92],[290,1138,590,82]].forEach(function (r) { ctx.fillRect(r[0] * k, r[1] * k, r[2] * k, r[3] * k); }); ctx.fillStyle = '#000';
 
         function para(parts, x, y, justify) {
             var toks = [];
