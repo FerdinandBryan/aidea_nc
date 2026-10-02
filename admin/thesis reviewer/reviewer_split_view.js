@@ -376,6 +376,21 @@
     });
   }
 
+  function svEditorDoc(pages, w, h, title) {
+    var css = 'body{margin:0;background:#e5e7eb;font-family:Arial,sans-serif}' +
+      '.bar{position:sticky;top:0;z-index:5;display:flex;gap:8px;align-items:center;padding:8px 16px;background:#fff;border-bottom:1px solid #d1d5db}' +
+      '.bar b{flex:1;min-width:0;font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+      '.bar button{font-size:13px;padding:6px 12px;border:1px solid #9ca3af;border-radius:8px;background:#fff;color:#111827;cursor:pointer}' +
+      '.pg{box-sizing:border-box;width:' + w + 'px;max-width:100%;min-height:' + h + 'px;margin:16px auto;padding:7%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25);color:#000;line-height:1.35;outline:none;overflow-wrap:break-word;cursor:text}' +
+      '@media print{body{background:#fff}.bar{display:none}.pg{margin:0;box-shadow:none;page-break-after:always;width:auto;min-height:0}}';
+    var body = pages.map(function (p) {
+      return '<div class="pg" contenteditable="true" spellcheck="true">' + (p || '<div><br></div>') + '</div>';
+    }).join('');
+    return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + svEsc((title || 'Paper') + ' (editable)') + '</title><style>' + css + '</style></head><body>' +
+      '<div class="bar"><b>' + svEsc(title || 'Paper') + ' - editable copy</b><button id="dl" type="button">Download Word</button><button id="pr" type="button">Print / Save as PDF</button></div>' +
+      '<div id="pages">' + body + '</div></body></html>';
+  }
+
   function openViewer(url, title, src) {
     injectCss();
     notesKey = src ? ('svNotes:' + src.id + ':' + src.n) : ('svNotes:' + url);
@@ -396,7 +411,35 @@
     var scroll = ov.querySelector('.sv-scroll');
     var stat = ov.querySelector('.sv-stat');
     ov.querySelector('.sv-title').textContent = title || 'Thesis paper';
-    ov.querySelector('.sv-open').href = url;
+    var openA = ov.querySelector('.sv-open');
+    openA.href = url;
+    openA.addEventListener('click', function (e) {
+      var pages = [], pw = 0, ph = 0;
+      Array.prototype.forEach.call(scroll.querySelectorAll('.sv-pg'), function (p) {
+        var t = p.querySelector('.sv-text'), h = '';
+        if (t) h = svLinesHtml(t, null);
+        else { var sec = p.querySelector('section') || p; h = svDomHtml(sec, sec._svk || 1); }
+        if (!pw) { pw = p.offsetWidth; ph = p.offsetHeight; }
+        pages.push(h);
+      });
+      if (!pages.some(Boolean)) return;
+      var w = window.open('', '_blank');
+      if (!w) return;
+      e.preventDefault();
+      w.document.open();
+      w.document.write(svEditorDoc(pages, pw || 700, ph || 900, title));
+      w.document.close();
+      var dl = w.document.getElementById('dl'), pr = w.document.getElementById('pr');
+      if (dl) dl.addEventListener('click', function () {
+        var body = w.document.getElementById('pages').innerHTML;
+        var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>div.pg{page-break-after:always}</style></head><body>' + body + '</body></html>';
+        var a = w.document.createElement('a');
+        a.href = URL.createObjectURL(new Blob(['\ufeff' + html], { type: 'application/msword' }));
+        a.download = ((title || 'paper').replace(/[^\w\- ]+/g, '').trim() || 'paper') + '-edited.doc';
+        w.document.body.appendChild(a); a.click(); w.document.body.removeChild(a);
+      });
+      if (pr) pr.addEventListener('click', function () { w.print(); });
+    });
 
     function close() {
       document.removeEventListener('keydown', onKey, true);
