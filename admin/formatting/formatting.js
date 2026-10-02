@@ -697,3 +697,161 @@ window.getFormatRulesForThesis = function (thesis) {
 
     return [...builtIn, ...customRules];
 };
+
+/* LOAD_THESIS_CHECKLIST: fills the rule rows from the Thesis Format and Assessment Checklist */
+const THESIS_CHECKLIST = [
+  "# General Guidelines",
+  "S|The font style used in all parts of the manuscript is Times New Roman.",
+  "S|The font size used in all parts of the manuscript is 12.",
+  "S|Margins are strictly followed (left 1.5 inches, right 1 inch, top and bottom 1 inch).",
+  "S|The manuscript is printed on short bond paper (8.5 by 11 inches).",
+  "S|Pagination is found in the upper right corner on every page EXCEPT on the Chapter pages.",
+  "S|Pagination in the preliminary pages uses small-letter Roman numerals.",
+  "S|Pagination on the Title Page and Approval Sheet is not shown.",
+  "S|The manuscript is double-spaced.",
+  "R|The references used are within the last ten (10) years, except for theories.",
+  "R|The manuscript contains correct and proper citations.",
+  "# Preliminary Pages",
+  "R|The manuscript has the required TITLE PAGE.",
+  "R|The manuscript has the required APPROVAL SHEET.",
+  "L|The manuscript has the required ACKNOWLEDGEMENT. Maximum of 2 pages.",
+  "R|The manuscript has the required ABSTRACT.",
+  "L|The abstract is one paragraph, single-spaced, about 250 to 350 words in length.",
+  "R|The abstract contains the general purpose of the study, participants and sampling technique, research design, statistical treatment, significant/major findings, conclusions, and recommendations.",
+  "O|The abstract may contain recommendations for a universal or broader application or implications of the study.",
+  "S|Keywords (5 words, italicized): must include the critical concept/variables, respondents, research design and research locale.",
+  "R|The manuscript has the required TABLE OF CONTENTS.",
+  "R|The manuscript has the required LIST OF TABLES.",
+  "R|The manuscript has the required LIST OF FIGURES.",
+  "R|The manuscript has the required LIST OF APPENDICES.",
+  "# Chapter 1 - Introduction",
+  "R|The Introduction leads the reader from a general subject area to a specific topic of inquiry.",
+  "R|The Introduction includes a Literature Review.",
+  "L|The Introduction has a maximum of 3 pages.",
+  "R|The first paragraph contains a global situation analysis of the problem, cohesively written and supported by related literature and studies from different continents, with at least ten (10) in-text citations.",
+  "R|The second paragraph presents an ASEAN situational analysis of the problem, including local studies in the country, with at least ten (10) in-text citations.",
+  "R|The third paragraph compares or contrasts global and ASEAN literature or studies. It includes the research gap (what is known and what is missing) and states the importance of addressing it. Gaps may be theoretical/conceptual, methodological, or contextual.",
+  "R|The fourth paragraph states the importance of the study, including the main objective, scope, possible key results, solutions, and implications based on the literature analysis.",
+  "# Chapter 1 - Theoretical Framework / Philosophical Underpinning",
+  "R|The Theoretical Framework (quantitative) or Philosophical Underpinning (qualitative) is presented and discussed in textual form with at least one (1) in-text citation, using the SEC format.",
+  "R|S - State: states the theory or philosophical underpinning, its proponent/s, and its main idea or principle, with at least one (1) in-text citation.",
+  "R|E - Explain: explains the key concepts or principles of the theory in relation to the study and how they help explain the variables, concepts, or phenomenon. Avoids merely defining or describing the theory.",
+  "R|C - Connect: connects the theory directly to the study, showing why it is appropriate and how it serves as the foundation of the study.",
+  "# Chapter 1 - Conceptual Framework",
+  "R|A model or research paradigm shows a visual representation of the expected relationship between variables.",
+  "R|There is a written or textual description of the model or research paradigm.",
+  "# Chapter 1 - Statement of the Problem",
+  "R|The Statement of the Problem states the general objective/purpose of the study.",
+  "R|The 2nd paragraph provides the specific objectives in question form that are measurable and attainable.",
+  "# Chapter 1 - Hypothesis (Quantitative Research)",
+  "R|The Hypothesis/Hypotheses states the numbered null hypothesis of the study.",
+  "# Chapter 1 - Scope and Limitations",
+  "R|The Scope and Limitations are in one to three paragraphs and contain the general purpose, participants and sampling technique, research design, instrument, limitations, and statistical treatment.",
+  "# Chapter 1 - Significance of the Study",
+  "R|There is a preliminary statement.",
+  "R|The Significance convinces the reader that the study contributes to stakeholders: solving educational problems, bridging a knowledge gap, improving social conditions, enriching research instruments and methods, and supporting government thrusts.",
+  "R|Beneficiaries are arranged from those who benefit the most to the least.",
+  "# Chapter 1 - Definition of Terms",
+  "R|There is a preliminary statement on how the terms or variables are used (operationally or contextually).",
+  "S|The terms are in bold text.",
+  "S|The terms are alphabetically arranged.",
+  "S|Each definition starts with the statement \"This refers to...\".",
+  "# Chapter 2 - Review of Related Literature and Studies",
+  "R|There is a preliminary statement or short description of what to expect in Chapter 2.",
+  "R|The literature review synthesizes the meaning of the study variables through in-text citations.",
+  "R|The literature review is in a thematic format based on the variables.",
+  "R|The Synthesis summarizes the main findings and insights of the reviewed literature and studies, highlighting common themes, trends, and gaps.",
+  "R|The Synthesis connects the findings to the researcher's own topic.",
+  "# Chapter 3 - Methodology",
+  "R|There is a preliminary statement or short description of what to expect in Chapter 3.",
+  "R|Method of Research: the type of research is presented and discussed with at least two (2) in-text citations.",
+  "R|Method of Research: the research design used is explained.",
+  "R|Population and Sampling: the respondents and the research locale are presented and discussed.",
+  "R|Population and Sampling: the sampling technique is explained.",
+  "O|Population and Sampling: a table for the distribution of respondents is presented and discussed (if any).",
+  "R|Research Instrument: the first paragraph describes the survey questionnaire (adapted/adopted or researcher-made), including construction, development, parts, contents, and scales used.",
+  "R|Research Instrument: for adapted/adopted instruments, the source is discussed with at least one (1) in-text citation; for researcher-made questionnaires, the construction is explained thoroughly.",
+  "R|Research Instrument: the second paragraph describes the validity and reliability test results, indicating the appendix letter.",
+  "R|Data Gathering: the first part presents the procedure, including approval and permission from the head of the institution/agency and the actual data collection.",
+  "R|Data Gathering: the second part discusses ethical considerations, including the Data Protection Act, Data Privacy Notice (for Google Form or online collection), and Informed Consent.",
+  "R|Data Analysis: the first paragraph presents how the data is analyzed.",
+  "R|Data Analysis (quantitative): descriptive and inferential statistical tools are presented with their use and formulas.",
+  "O|Data Analysis (qualitative): the process of coding and creating themes is described in paragraph form.",
+  "R|Ethical Considerations - Ethical Approval and Consent: states the permission secured and explains informed consent/assent and voluntary participation.",
+  "R|Ethical Considerations - Protection of Participants: explains how rights, welfare, confidentiality, and data privacy were protected.",
+  "R|Ethical Considerations - Research Integrity: states how academic integrity, proper citation, honest reporting, and ethical standards were observed.",
+  "# Chapter 4 - Presentation, Analysis and Interpretation of Data",
+  "R|There is a preliminary statement or short description of what to expect in Chapter 4.",
+  "S|The presentation follows the order of the SOP, with the appropriate number and a heading/title in sentence case, bold, without a period.",
+  "S|The tables are correctly numbered and titled.",
+  "S|There are no hanging tables.",
+  "R|The presentation of each variable indicates interesting and significant facts (in textual format) found in every table.",
+  "R|There is a discussion and interpretation of results in each table, answering the research question and critically evaluating the results.",
+  "R|The discussion reviews previous findings and existing knowledge for each table with at least 2 or 3 in-text citations.",
+  "R|Hypothesis testing results are interpreted and reviewed against related findings that corroborate or contradict each significant variable, with at least 2-3 in-text citations.",
+  "R|The discussion presents the implications of the findings for policy and practice.",
+  "# Chapter 5 - Summary of Findings, Conclusions, and Recommendations",
+  "R|There is a preliminary statement or short description of what to expect in Chapter 5.",
+  "R|Summary of Findings follows the order of the SOP, with appropriate numbering, in textual format.",
+  "R|Conclusions: the first part provides an introductory statement.",
+  "R|Conclusions follow the order of the SOP with appropriate numbering, discussing the practical implications of the study.",
+  "R|Recommendations: the first part provides an introductory statement.",
+  "R|Recommendations follow the order from the most to the least beneficial entity, with appropriate numbering, based on the limitations/weaknesses.",
+  "R|The last recommendation suggests topics for further research.",
+  "# References",
+  "S|The word REFERENCES is bold, capital, font size 38, centered, and in the middle of the page.",
+  "R|References are alphabetically arranged with hanging indention (APA 6th or 7th edition), and only traceable/online sources are used in Chapters 1 to 4.",
+  "# Appendices",
+  "S|The word APPENDICES is bold, capital, font size 38, centered, and in the middle of the page.",
+  "R|Appendix A - Permission/Approval Letter: scanned and signed letter from the head of the institution/agency, secured before data gathering.",
+  "R|Appendix B - Questionnaire/Interview Guide: the instruments are included.",
+  "R|Appendix C - Informed Consent/Assent Form: the consent/assent form is included.",
+  "R|Appendix D - Certificate of Validation: scanned and signed validation form from the panel.",
+  "R|Appendix E - Certificate of Editing: signed grammarian's certificate.",
+  "O|Appendix F - Reliability Test Results (if any): scanned and signed results with a summary of computations.",
+  "R|Appendix G - Certificate of Data Analysis: signed statistician's certificate.",
+  "O|Appendix G - Qualitative research: certificate that the data were thematically analyzed with proper codes and themes.",
+  "L|Appendix H - Certificate of Similarity and AI Checking: Turnitin or PlagScan used; at most 15% similarity and AI result.",
+  "R|Appendix I - Documentation: pictures of the data gathering.",
+  "R|Appendix J - Sample Tally Sheet: the sample tally sheet used in the study.",
+  "L|Appendix K - Curriculum Vitae: a CV with a 1.5 by 1.5 inch picture, maximum of one (1) page per author."
+];
+
+function loadThesisChecklist() {
+    const typeMap = { R: 'Required', S: 'Style', L: 'Length', O: 'Optional', F: 'File' };
+    const container = document.getElementById('rulesContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    let section = '';
+    let count = 0;
+    THESIS_CHECKLIST.forEach(function (line) {
+        if (line.charAt(0) === '#') { section = line.slice(2); return; }
+        const code = line.charAt(0);
+        const text = line.slice(2);
+        const words = text.split(' ');
+        const label = section + ': ' + words.slice(0, 6).join(' ') + (words.length > 6 ? '...' : '');
+        addRuleRow(label, typeMap[code] || 'Required', text);
+        count++;
+    });
+    const nameEl = document.getElementById('tplName');
+    const descEl = document.getElementById('tplDesc');
+    if (nameEl && !nameEl.value.trim()) nameEl.value = 'Thesis Format and Assessment Checklist';
+    if (descEl && !descEl.value.trim()) descEl.value = 'Standard criteria for the thesis manuscript: general guidelines, preliminary pages, Chapters 1 to 5, references, and appendices.';
+    showToast(count + ' checklist rules loaded. Review them, then Save.', 'success');
+}
+
+(function initChecklistButton() {
+    function add() {
+        const addBtn = document.querySelector('.btn-add-rule');
+        if (!addBtn || document.getElementById('btnLoadChecklist')) return;
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.id = 'btnLoadChecklist';
+        b.className = addBtn.className;
+        b.style.marginRight = '8px';
+        b.textContent = 'Load thesis checklist';
+        b.addEventListener('click', loadThesisChecklist);
+        addBtn.parentNode.insertBefore(b, addBtn);
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', add); else add();
+})();
