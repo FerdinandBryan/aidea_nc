@@ -2042,3 +2042,64 @@ _getFormatRules = function () {
 async function _dvGenerateFixedPdf() {
     throw new Error('Auto-fix works on .docx files only. Upload a Word (.docx) version, or fix the PDF in Word and export it again.');
 }
+
+/* GENERATE_ERROR_MODAL: show "Could not generate ..." errors in a modal instead of a browser alert */
+(function () {
+    var nativeAlert = window.alert;
+
+    function showModal(title, message) {
+        var opener = document.activeElement;
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(3,8,24,.6);z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:20px;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);';
+
+        var box = document.createElement('div');
+        box.setAttribute('role', 'alertdialog');
+        box.setAttribute('aria-modal', 'true');
+        box.style.cssText = 'width:100%;max-width:440px;background:var(--surface,#0f1830);color:var(--text,#e7edfb);border:1px solid var(--border,#1e2a4a);border-radius:16px;box-shadow:0 24px 60px -12px rgba(0,0,0,.5);overflow:hidden;font-family:inherit;';
+
+        var head = document.createElement('div');
+        head.style.cssText = 'padding:18px 22px 14px;border-bottom:1px solid var(--border,#1e2a4a);font-size:16px;font-weight:700;display:flex;align-items:center;gap:10px;';
+        head.textContent = '\u26A0\uFE0F ' + title;
+
+        var body = document.createElement('div');
+        body.style.cssText = 'padding:18px 22px;font-size:14px;line-height:1.55;color:var(--muted,#93a2c6);';
+        body.textContent = message;
+
+        var row = document.createElement('div');
+        row.style.cssText = 'padding:0 22px 20px;display:flex;justify-content:flex-end;';
+        var ok = document.createElement('button');
+        ok.type = 'button';
+        ok.textContent = 'OK';
+        ok.style.cssText = 'padding:9px 24px;border:none;border-radius:9px;background:#22c55e;color:#04210f;font-size:13px;font-weight:700;cursor:pointer;';
+        row.appendChild(ok);
+
+        box.appendChild(head);
+        box.appendChild(body);
+        box.appendChild(row);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        function close() {
+            document.removeEventListener('keydown', onKey, true);
+            overlay.remove();
+            if (opener && opener.focus && document.contains(opener)) opener.focus();
+        }
+        function onKey(e) {
+            if (e.key === 'Escape' || e.key === 'Enter') { e.stopPropagation(); close(); }
+        }
+        ok.addEventListener('click', close);
+        overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) close(); });
+        document.addEventListener('keydown', onKey, true);
+        ok.focus();
+    }
+
+    window.alert = function (msg) {
+        var s = String(msg == null ? '' : msg);
+        var m = s.match(/^Could not generate the (auto-fixed|redlined) copy:\s*([\s\S]*)$/i);
+        if (m) {
+            showModal(m[1].toLowerCase() === 'auto-fixed' ? 'Auto-fix not available' : 'Redlined copy not available', m[2]);
+            return;
+        }
+        return nativeAlert.call(window, msg);
+    };
+})();
