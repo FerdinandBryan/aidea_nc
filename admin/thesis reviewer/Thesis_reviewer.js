@@ -459,7 +459,75 @@ async function loadHistory() {
 let sendBackTargetId = null;
 let selectedFile = null;
 
+let commentsFile = null;
+
+function resetCommentsDrop() {
+    const l = document.getElementById('commentsDropLabel');
+    if (!l) return;
+    l.classList.remove('has-file', 'is-dragover');
+    setText('commentsDropText', 'Click to choose a file, or drag it here');
+}
+
+function svPlace() {
+    const s = window.svSaved;
+    const chip = document.getElementById('svSavedChip');
+    if (!s || !chip) return;
+    if (selectedFile === s.file) { selectedFile = null; resetFileDrop(); }
+    if (commentsFile === s.file) { commentsFile = null; resetCommentsDrop(); }
+    if (s.dirty) {
+        chip.textContent = 'Unsaved changes in your pages. Open the viewer and click Save again.';
+        chip.style.color = '#b45309';
+        return;
+    }
+    const as = (document.querySelector('input[name="svAs"]:checked') || {}).value || 'reviewed';
+    if (as === 'comments') {
+        commentsFile = s.file;
+        document.getElementById('commentsDropLabel').classList.add('has-file');
+        setText('commentsDropText', s.file.name);
+    } else {
+        selectedFile = s.file;
+        document.getElementById('fileDropLabel').classList.add('has-file');
+        setText('fileDropText', s.file.name);
+    }
+    chip.textContent = 'Saved \u2713 ' + s.file.name + ' will be attached as ' + (as === 'comments' ? 'comments' : 'your reviewed file') + '.';
+    chip.style.color = '#15803d';
+}
+
 function svApplySaved(id) {
+    commentsFile = null;
+    resetCommentsDrop();
+    const chip = document.getElementById('svSavedChip');
+    const wrap = document.getElementById('svAsWrap');
+    if (chip) chip.hidden = true;
+    if (wrap) wrap.hidden = true;
+    const s = window.svSaved;
+    if (!chip || !wrap || !s || String(s.id) !== String(id)) return;
+    chip.hidden = false;
+    wrap.hidden = !!s.dirty;
+    svPlace();
+}
+
+function svInitComments() {
+    const input = document.getElementById('commentsFile');
+    const label = document.getElementById('commentsDropLabel');
+    if (!input || !label) return;
+    input.addEventListener('change', () => {
+        commentsFile = input.files[0] || null;
+        if (commentsFile) { label.classList.add('has-file'); setText('commentsDropText', commentsFile.name); }
+        else resetCommentsDrop();
+    });
+    ['dragover', 'dragenter'].forEach(evt =>
+        label.addEventListener(evt, e => { e.preventDefault(); label.classList.add('is-dragover'); }));
+    ['dragleave', 'drop'].forEach(evt =>
+        label.addEventListener(evt, e => { e.preventDefault(); label.classList.remove('is-dragover'); }));
+    label.addEventListener('drop', e => {
+        const f = e.dataTransfer.files[0];
+        if (f) { input.files = e.dataTransfer.files; commentsFile = f; label.classList.add('has-file'); setText('commentsDropText', f.name); }
+    });
+    document.querySelectorAll('input[name="svAs"]').forEach(r => r.addEventListener('change', svPlace));
+}
+
+function svApplySavedOld(id) {
     const chip = document.getElementById('svSavedChip');
     if (!chip) return;
     chip.hidden = true;
@@ -572,6 +640,7 @@ function initSendBackModal() {
         const body = new FormData();
         body.append('note', document.getElementById('reviewNote').value.trim());
         if (selectedFile) body.append('reviewed_file', selectedFile);
+        if (commentsFile) body.append('comments_file', commentsFile);
 
         try {
             const res = await fetch(`${ADMIN_API}/reviewer/assignments/${sendBackTargetId}/complete`, {
@@ -612,7 +681,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initDrawer();
     initProfileMenu();
     initSignOutModal();
-    initSendBackModal();
+    initSendBackModal(); svInitComments();
     initTabs();
 
     loadPending();

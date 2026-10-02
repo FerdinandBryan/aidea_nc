@@ -34,8 +34,9 @@ class AssignmentController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'reviewed_file' => ['required_without:reviewed_files', 'file', 'max:20480'],
-            'reviewed_files' => ['required_without:reviewed_file', 'array', 'max:5'],
+            'reviewed_file' => ['required_without_all:reviewed_files,comments_file', 'file', 'max:20480'],
+            'reviewed_files' => ['required_without_all:reviewed_file,comments_file', 'array', 'max:5'],
+            'comments_file' => ['nullable', 'file', 'max:20480'],
             'reviewed_files.*' => ['file', 'max:20480'],
             'note' => ['nullable', 'string'],
         ]);
@@ -53,10 +54,12 @@ class AssignmentController extends Controller
             $paths[] = $request->file('reviewed_file')->store('assignments', 'public');
         }
         $path = $paths[0] ?? null;
+        $commentsPath = $request->hasFile('comments_file') ? $request->file('comments_file')->store('assignments', 'public') : null;
 
         $assignment->update([
             'reviewed_file_path' => $path,
             'reviewed_files' => $paths,
+            'comments_file_path' => $commentsPath,
             'reviewer_note' => $request->input('note'),
             'status' => 'completed',
         ]);
@@ -103,6 +106,7 @@ class AssignmentController extends Controller
             'status' => 'pending',
             'reviewed_file_path' => null,
             'reviewed_files' => null,
+            'comments_file_path' => null,
             'reviewer_note' => null,
         ]);
 

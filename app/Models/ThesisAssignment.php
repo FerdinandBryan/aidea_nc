@@ -18,10 +18,11 @@ class ThesisAssignment extends Model
         'files',
         'reviewed_file_path',
         'reviewed_files',
+        'comments_file_path',
         'status',
     ];
 
-    protected $appends = ['file_url', 'file_items', 'reviewed_file_url', 'reviewed_file_urls'];
+    protected $appends = ['file_url', 'file_items', 'reviewed_file_url', 'reviewed_file_urls', 'comments_file_url'];
 
     protected $casts = [
         'reviewed_files' => 'array',
@@ -45,6 +46,11 @@ class ThesisAssignment extends Model
         return array_values(array_map(function ($p) {
             return Storage::disk('public')->url($p);
         }, $paths));
+    }
+
+    public function getCommentsFileUrlAttribute()
+    {
+        return $this->comments_file_path ? Storage::disk('public')->url($this->comments_file_path) : null;
     }
 
     public function getFileItemsAttribute()
