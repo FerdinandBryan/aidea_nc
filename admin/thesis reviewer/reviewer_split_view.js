@@ -73,8 +73,8 @@
     try { var saved = localStorage.getItem(skey); var savedH = localStorage.getItem(skey + ':h'); if (savedH) { right.innerHTML = savedH; } else if (saved) { right.textContent = saved; } } catch (e) { }
     right.addEventListener('input', function () {
       try {
-        var v = right.innerText.replace(/\n$/, '');
-        if (v) { localStorage.setItem(skey, v); localStorage.setItem(skey + ':h', right.innerHTML); } else { localStorage.removeItem(skey); localStorage.removeItem(skey + ':h'); }
+        var v = svBodyText(right).replace(/\n$/, '');
+        if (v) { localStorage.setItem(skey, v); localStorage.setItem(skey + ':h', svBodyHtml(right)); } else { localStorage.removeItem(skey); localStorage.removeItem(skey + ':h'); }
       } catch (e) { }
     });
     right.addEventListener('paste', function (e) {
@@ -310,6 +310,62 @@
     return out;
   }
 
+  function svBodyHtml(right) {
+    var c = right.cloneNode(true);
+    Array.prototype.forEach.call(c.querySelectorAll('.sv-hf'), function (x) { x.parentNode.removeChild(x); });
+    return c.innerHTML;
+  }
+
+  function svBodyText(right) {
+    var hs = right.querySelectorAll('.sv-hf'), i;
+    for (i = 0; i < hs.length; i++) hs[i].style.display = 'none';
+    var t = right.innerText;
+    for (i = 0; i < hs.length; i++) hs[i].style.display = '';
+    return t;
+  }
+
+  function svHfPrep(right) {
+    if (getComputedStyle(right).position === 'static') right.style.position = 'relative';
+  }
+
+  function svHfPdf(tl, right) {
+    try {
+      var box = tl.getBoundingClientRect(), H = box.height;
+      if (!H || right.querySelector('.sv-hf')) return;
+      svHfPrep(right);
+      Array.prototype.forEach.call(tl.querySelectorAll('span'), function (s) {
+        if (s.querySelector('span') || !s.textContent.trim()) return;
+        var r = s.getBoundingClientRect(), bt = r.top - box.top, bb = r.bottom - box.top;
+        if (!(bb < H * 0.085 || bt > H * 0.915)) return;
+        var f = svSpanStyleOf(s), d = document.createElement('div');
+        d.className = 'sv-hf';
+        d.setAttribute('contenteditable', 'false');
+        d.style.cssText = 'position:absolute;left:' + (r.left - box.left).toFixed(1) + 'px;top:' + bt.toFixed(1) + 'px;white-space:pre;line-height:1;transform-origin:0 0;color:#111827;pointer-events:none;user-select:none;-webkit-user-select:none;' + f.st + (s.style.transform ? ';transform:' + s.style.transform : '');
+        d.textContent = s.textContent;
+        right.appendChild(d);
+      });
+    } catch (e) { }
+  }
+
+  function svHfDocx(sec, left, right, k) {
+    try {
+      var els = sec.querySelectorAll('header, footer');
+      if (!els.length) return;
+      svHfPrep(right);
+      var cb = left.getBoundingClientRect();
+      Array.prototype.forEach.call(els, function (el) {
+        if (!el.textContent.trim()) return;
+        var r = el.getBoundingClientRect(), d = document.createElement('div'), c = el.cloneNode(true);
+        c.style.margin = '0'; c.style.position = 'static';
+        d.className = 'sv-hf docx';
+        d.setAttribute('contenteditable', 'false');
+        d.style.cssText = 'position:absolute;left:' + (r.left - cb.left).toFixed(1) + 'px;top:' + (r.top - cb.top).toFixed(1) + 'px;width:' + el.offsetWidth + 'px;transform:scale(' + k + ');transform-origin:0 0;pointer-events:none;user-select:none;-webkit-user-select:none;color:#000';
+        d.appendChild(c);
+        right.appendChild(d);
+      });
+    } catch (e) { }
+  }
+
   function renderPdf(buf, scroll, stat) {
     return loadScript(LIBS.pdf).then(function () {
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = LIBS.worker;
@@ -341,7 +397,7 @@
               tl._tlp = window.pdfjsLib.renderTextLayer({ textContentSource: page.streamTextContent(), container: tl, viewport: cssVp, textDivs: [] });
             }
           } catch (e) { }
-          return page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise.then(function () { svFontsFor(page, tl); });
+          return page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise.then(function () { svFontsFor(page, tl).then(function () { svHfPdf(tl, row.right); }); });
         }).then(next);
       }
       return next();
@@ -369,7 +425,7 @@
           sec.style.transformOrigin = 'top left';
           sec.style.transform = 'scale(' + k + ')'; sec._svk = k;
           sec.style.margin = '0';
-          row.left.appendChild(sec);
+          row.left.appendChild(sec); svHfDocx(sec, row.left, row.right, k);
         });
         stat.textContent = secs.length + (secs.length === 1 ? ' page' : ' pages');
       });
