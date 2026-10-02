@@ -1570,3 +1570,42 @@ select.form-input option {
         transition: none !important;
     }
 }
+
+/* LIGHT_MODAL_FIX: light-mode colors for the format template modals */
+:root:not([data-theme="dark"]) .modal-box,
+:root:not([data-theme="dark"]) .modal-box form,
+:root:not([data-theme="dark"]) .modal-header,
+:root:not([data-theme="dark"]) .modal-body,
+:root:not([data-theme="dark"]) .modal-footer {
+    background: var(--surface) !important;
+    color: var(--text) !important;
+}
+
+:root:not([data-theme="dark"]) .modal-header h3 {
+    color: var(--text) !important;
+}
+
+:root:not([data-theme="dark"]) .modal-box .form-label,
+:root:not([data-theme="dark"]) .modal-box .rules-hint,
+:root:not([data-theme="dark"]) .modal-box .rules-empty {
+    color: var(--muted) !important;
+}
+
+:root:not([data-theme="dark"]) .modal-box .dropzone {
+    background: var(--surface-2) !important;
+    border-color: var(--border) !important;
+    color: var(--muted) !important;
+}
+
+:root:not([data-theme="dark"]) .modal-box .rule-row {
+    background: var(--surface-2) !important;
+    border-color: var(--border) !important;
+}
+
+:root:not([data-theme="dark"]) .modal-box input,
+:root:not([data-theme="dark"]) .modal-box select,
+:root:not([data-theme="dark"]) .modal-box textarea {
+    background: var(--surface) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+}
