@@ -899,7 +899,7 @@ function _dvDrawLine(page, font, words, x0, y, size, usableWidth, indent, align,
     }
 }
 
-async function _dvGenerateFixedPdf(file, rules, formattingProfile) {
+async function _dvGenerateFixedPdfOriginal(file, rules, formattingProfile) {
     return new Promise((resolve, reject) => {
         _validatorDeps.ensurePdfLib(async () => {
             if (!window.PDFLib) { reject(new Error('pdf-lib unavailable')); return; }
@@ -2037,3 +2037,8 @@ _getActiveFormatTemplates = function () { return [_CHECKLIST_PSEUDO]; };
 _getFormatRules = function () {
     return { rules: _DEFAULT_FORMAT_RULES, source: 'Thesis Format and Assessment Checklist', template: _CHECKLIST_PSEUDO };
 };
+
+/* PDF_FIX_DISABLED: a PDF cannot be corrected faithfully, so the rebuilt copy is turned off */
+async function _dvGenerateFixedPdf() {
+    throw new Error('Auto-fix works on .docx files only. Upload a Word (.docx) version, or fix the PDF in Word and export it again.');
+}
