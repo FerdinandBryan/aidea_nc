@@ -1468,3 +1468,7 @@ td.empty {
 }
 /* Ongoing status badge */
 .badge-ongoing { background: #dbeafe; color: #1d4ed8; }
+
+/* wide view modal */
+.modal:has(#viewModalBody) { width: min(900px, 100%); }
+.modal:has(#viewModalBody) .vm-image { max-width: 100%; height: auto; }
