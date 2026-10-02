@@ -2114,3 +2114,114 @@ async function _dvGenerateFixedPdf() {
         return nativeAlert.call(window, msg);
     };
 })();
+
+/* CHECKLIST_FULL_FIX: .docx auto-fix applies the thesis checklist */
+(function () {
+    var W = _WORD_NS;
+    var PPR = ['pStyle','keepNext','keepLines','pageBreakBefore','framePr','widowControl','numPr','suppressLineNumbers','pBdr','shd','tabs','suppressAutoHyphens','kinsoku','wordWrap','overflowPunct','topLinePunct','autoSpaceDE','autoSpaceDN','bidi','adjustRightInd','snapToGrid','spacing','ind','contextualSpacing','mirrorIndents','suppressOverlap','jc','textDirection','textAlignment','textboxTightWrap','outlineLvl','divId','cnfStyle','rPr','sectPr','pPrChange'];
+    var RPR = ['rStyle','rFonts','b','bCs','i','iCs','caps','smallCaps','strike','dstrike','outline','shadow','emboss','imprint','noProof','snapToGrid','vanish','webHidden','color','spacing','w','kern','position','sz','szCs','highlight','u','effect','bdr','shd','fitText','vertAlign','rtl','cs','em','lang','eastAsianLayout','specVanish','oMath'];
+    var SECT = ['headerReference','footerReference','footnotePr','endnotePr','type','pgSz','pgMar','paperSrc','pgBorders','lnNumType','pgNumType','cols','formProt','vAlign','noEndnote','titlePg','textDirection','bidi','rtlGutter','docGrid','printerSettings','sectPrChange'];
+    var HEAD_END = /^(TABLE OF CONTENTS|LIST OF TABLES|LIST OF FIGURES|LIST OF APPENDICES|CHAPTER\s*\d|INTRODUCTION|ACKNOWLEDGEMENTS?)/;
+
+    function kid(parent, name) {
+        for (var c = parent.firstChild; c; c = c.nextSibling) {
+            if (c.nodeType === 1 && c.localName === name && c.namespaceURI === W) return c;
+        }
+        return null;
+    }
+    function getOrCreate(doc, parent, order, name) {
+        var ex = kid(parent, name);
+        if (ex) return ex;
+        var el = doc.createElementNS(W, 'w:' + name);
+        var idx = order.indexOf(name), ref = null;
+        for (var c = parent.firstChild; c; c = c.nextSibling) {
+            if (c.nodeType === 1 && order.indexOf(c.localName) > idx) { ref = c; break; }
+        }
+        parent.insertBefore(el, ref);
+        return el;
+    }
+    function setA(el, n, v) { el.setAttributeNS(W, 'w:' + n, String(v)); }
+    function ptext(p) {
+        return Array.from(p.getElementsByTagNameNS(W, 't')).map(function (n) { return n.textContent; }).join('').trim();
+    }
+    function inTable(p) {
+        for (var n = p.parentNode; n; n = n.parentNode) { if (n.localName === 'tc') return true; }
+        return false;
+    }
+    function pPrOf(doc, p) {
+        var x = kid(p, 'pPr');
+        if (!x) { x = doc.createElementNS(W, 'w:pPr'); p.insertBefore(x, p.firstChild); }
+        return x;
+    }
+
+    _dvGenerateFixedDocx = async function (file, rules, formattingProfile) {
+        var useChecklist = (rules || []).some(function (r) { return r && (r.id === 'checklist-spacing' || r.id === 'checklist-margin'); });
+        if (!useChecklist) return _dvGenerateFixedDocxOriginal(file, rules, formattingProfile);
+        if (!window.JSZip) await new Promise(function (res) { _validatorDeps.ensureJSZip(res); });
+
+        var zip = await JSZip.loadAsync(await _resolveArrayBuffer(file));
+        var xf = zip.file('word/document.xml');
+        if (!xf) throw new Error('Not a valid DOCX');
+        var doc = new DOMParser().parseFromString(await xf.async('string'), 'application/xml');
+
+        var zone = 'front';
+        Array.from(doc.getElementsByTagNameNS(W, 'p')).forEach(function (p) {
+            var t = ptext(p), up = t.toUpperCase(), tbl = inTable(p), kind = 'body';
+            if (!tbl && t) {
+                if (t.length <= 20 && up === 'ABSTRACT') { zone = 'abstract'; kind = 'head'; }
+                else if (t.length <= 20 && up === 'REFERENCES') { zone = 'references'; kind = 'big'; }
+                else if (t.length <= 20 && up === 'APPENDICES') { zone = 'appendices'; kind = 'big'; }
+                else if (t.length <= 60 && HEAD_END.test(up) && zone !== 'appendices') { zone = 'body'; }
+                else if (zone === 'abstract' && /^keywords?\b/i.test(t)) { kind = 'keywords'; }
+            }
+            var pPr = pPrOf(doc, p);
+
+            if (!tbl && t) {
+                var skip = (zone === 'appendices' && kind !== 'big');
+                if (!skip) {
+                    var single = (zone === 'abstract' && kind !== 'head') || kind === 'keywords';
+                    var sp = getOrCreate(doc, pPr, PPR, 'spacing');
+                    setA(sp, 'line', single ? 240 : 480);
+                    setA(sp, 'lineRule', 'auto');
+                }
+                if (kind === 'big') {
+                    setA(getOrCreate(doc, pPr, PPR, 'jc'), 'val', 'center');
+                    Array.from(p.getElementsByTagNameNS(W, 't')).forEach(function (n) { n.textContent = n.textContent.toUpperCase(); });
+                }
+                if (zone === 'references' && kind === 'body') {
+                    var ind = getOrCreate(doc, pPr, PPR, 'ind');
+                    ind.removeAttributeNS(W, 'firstLine');
+                    setA(ind, 'left', 720);
+                    setA(ind, 'hanging', 720);
+                }
+            }
+
+            Array.from(p.getElementsByTagNameNS(W, 'r')).forEach(function (r) {
+                var rPr = kid(r, 'rPr');
+                if (!rPr) { rPr = doc.createElementNS(W, 'w:rPr'); r.insertBefore(rPr, r.firstChild); }
+                var f = getOrCreate(doc, rPr, RPR, 'rFonts');
+                ['asciiTheme', 'hAnsiTheme', 'cstheme', 'eastAsiaTheme'].forEach(function (a) { f.removeAttributeNS(W, a); });
+                ['ascii', 'hAnsi', 'cs', 'eastAsia'].forEach(function (a) { setA(f, a, 'Times New Roman'); });
+                var size = (kind === 'big') ? 76 : 24;
+                setA(getOrCreate(doc, rPr, RPR, 'sz'), 'val', size);
+                setA(getOrCreate(doc, rPr, RPR, 'szCs'), 'val', size);
+                if (kind === 'big') {
+                    var b = getOrCreate(doc, rPr, RPR, 'b'); b.removeAttributeNS(W, 'val');
+                }
+                if (kind === 'keywords') {
+                    var it = getOrCreate(doc, rPr, RPR, 'i'); it.removeAttributeNS(W, 'val');
+                }
+            });
+        });
+
+        Array.from(doc.getElementsByTagNameNS(W, 'sectPr')).forEach(function (s) {
+            var mar = getOrCreate(doc, s, SECT, 'pgMar');
+            setA(mar, 'top', 1440); setA(mar, 'bottom', 1440); setA(mar, 'left', 2160); setA(mar, 'right', 1440);
+            var sz = getOrCreate(doc, s, SECT, 'pgSz');
+            if (sz.getAttributeNS(W, 'orient') !== 'landscape') { setA(sz, 'w', 12240); setA(sz, 'h', 15840); }
+        });
+
+        zip.file('word/document.xml', new XMLSerializer().serializeToString(doc));
+        return zip.generateAsync({ type: 'blob' });
+    };
+})();
