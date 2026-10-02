@@ -726,7 +726,7 @@ async function _dvGenerateRedlinedDocx(file, violationsByParagraph) {
 }
 
 /* ---------- DOCX: auto-fixed copy (rewrites pPr/sectPr to target values) ---------- */
-async function _dvGenerateFixedDocx(file, rules, formattingProfile) {
+async function _dvGenerateFixedDocxOriginal(file, rules, formattingProfile) {
     return new Promise((resolve, reject) => {
         _validatorDeps.ensureJSZip(async () => {
             if (!window.JSZip) { reject(new Error('JSZip unavailable')); return; }
@@ -1983,3 +1983,57 @@ function _getActiveFormatTemplates() {
     });
     return [_CHECKLIST_PSEUDO].concat(list);
 }
+
+/* CHECKLIST_FIX_FONT: auto-fixed DOCX also gets Times New Roman 12 when the checklist is used */
+async function _dvGenerateFixedDocx(file, rules, formattingProfile) {
+    var blob = await _dvGenerateFixedDocxOriginal(file, rules, formattingProfile);
+    var useChecklist = (rules || []).some(function (r) { return r && (r.id === 'checklist-spacing' || r.id === 'checklist-margin'); });
+    if (!useChecklist || !window.JSZip) return blob;
+    try {
+        var zip = await JSZip.loadAsync(blob);
+        var xmlFile = zip.file('word/document.xml');
+        if (!xmlFile) return blob;
+        var xmlDoc = new DOMParser().parseFromString(await xmlFile.async('string'), 'application/xml');
+        var W = _WORD_NS;
+        var AFTER_SZ = ['highlight', 'u', 'effect', 'bdr', 'shd', 'fitText', 'vertAlign', 'rtl', 'cs', 'em', 'lang', 'eastAsianLayout', 'specVanish', 'oMath'];
+        var runs = xmlDoc.getElementsByTagNameNS(W, 'r');
+        for (var i = 0; i < runs.length; i++) {
+            var r = runs[i];
+            var rPr = null;
+            for (var c = r.firstChild; c; c = c.nextSibling) {
+                if (c.localName === 'rPr' && c.namespaceURI === W) { rPr = c; break; }
+            }
+            if (!rPr) {
+                rPr = xmlDoc.createElementNS(W, 'w:rPr');
+                r.insertBefore(rPr, r.firstChild);
+            }
+            ['rFonts', 'sz', 'szCs'].forEach(function (nm) {
+                Array.from(rPr.getElementsByTagNameNS(W, nm)).forEach(function (x) { if (x.parentNode === rPr) rPr.removeChild(x); });
+            });
+            var fonts = xmlDoc.createElementNS(W, 'w:rFonts');
+            ['ascii', 'hAnsi', 'cs', 'eastAsia'].forEach(function (a2) { fonts.setAttributeNS(W, 'w:' + a2, 'Times New Roman'); });
+            var first = rPr.firstChild;
+            if (first && first.localName === 'rStyle') rPr.insertBefore(fonts, first.nextSibling);
+            else rPr.insertBefore(fonts, first);
+            var sz = xmlDoc.createElementNS(W, 'w:sz'); sz.setAttributeNS(W, 'w:val', '24');
+            var szCs = xmlDoc.createElementNS(W, 'w:szCs'); szCs.setAttributeNS(W, 'w:val', '24');
+            var ref = null;
+            for (var k = rPr.firstChild; k; k = k.nextSibling) {
+                if (k.namespaceURI === W && AFTER_SZ.indexOf(k.localName) !== -1) { ref = k; break; }
+            }
+            rPr.insertBefore(sz, ref);
+            rPr.insertBefore(szCs, ref);
+        }
+        zip.file('word/document.xml', new XMLSerializer().serializeToString(xmlDoc));
+        return await zip.generateAsync({ type: 'blob' });
+    } catch (e) {
+        console.warn('[Validator] font fix skipped', e);
+        return blob;
+    }
+}
+
+/* CHECKLIST_ONLY: the checklist is the only format used for checking and auto-fix */
+_getActiveFormatTemplates = function () { return [_CHECKLIST_PSEUDO]; };
+_getFormatRules = function () {
+    return { rules: _DEFAULT_FORMAT_RULES, source: 'Thesis Format and Assessment Checklist', template: _CHECKLIST_PSEUDO };
+};
