@@ -1433,3 +1433,36 @@ td.empty {
 .ac-viewer-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border, #e3e6ee); }
 .ac-viewer-foot .ac-btn { flex: 0 0 auto; min-width: 100px; background: #e5e7eb; color: #111827; }
 .ac-viewer-foot .ac-primary { background: #1d4ed8; color: #fff; }
+/* 3-dots actions menu */
+.kebab { display: inline-block; position: relative; }
+.kebab-btn {
+    width: 34px; height: 34px;
+    border: 1px solid rgba(128,128,128,.35);
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-size: 20px; line-height: 1;
+    cursor: pointer;
+}
+.kebab-btn:hover { background: rgba(128,128,128,.15); }
+.kebab-menu {
+    display: none;
+    position: fixed;
+    z-index: 3000;
+    min-width: 160px;
+    padding: 6px;
+    flex-direction: column;
+    gap: 4px;
+    background: #fff;
+    color: #111;
+    border: 1px solid rgba(128,128,128,.35);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.18);
+}
+.kebab-menu.open { display: flex; }
+.kebab-menu .btn-action {
+    display: block;
+    width: 100%;
+    margin: 0;
+    text-align: left;
+}

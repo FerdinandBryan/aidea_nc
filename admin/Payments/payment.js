@@ -500,13 +500,56 @@
                 '<td data-label="GCash ref"><code>' + escHtml(p.gcash_ref || p.gcashRef || '—') + '</code></td>' +
                 '<td data-label="Status">' + statusBadge(p.status) + '</td>' +
                 '<td data-label="Date">' + escHtml(p.date || p.date_iso || p.dateISO || '—') + '</td>' +
-                '<td data-label="Actions" class="action-cell">' + actions + '</td>' +
+                '<td data-label="Actions" class="action-cell">' + kebabMenu(actions) + '</td>' +
                 '<td data-label="Send files" class="action-cell">' + sendCell(p) + '</td>' +
                 '</tr>';
         }).join('');
     }
 
     // ── Approve / reject ─────────────────────────────────────────────────────
+    // 3-dots actions menu
+    function kebabMenu(inner) {
+        inner = String(inner).replace(/<span class="none">[^<]*<\/span>/g, '');
+        return '<div class="kebab">' +
+            '<button type="button" class="kebab-btn" aria-label="Actions" aria-haspopup="true" aria-expanded="false">&#8942;</button>' +
+            '<div class="kebab-menu" role="menu">' + inner + '</div>' +
+            '</div>';
+    }
+    (function () {
+        function closeAll() {
+            document.querySelectorAll('.kebab-menu.open').forEach(function (m) {
+                m.classList.remove('open');
+                var b = m.parentNode.querySelector('.kebab-btn');
+                if (b) b.setAttribute('aria-expanded', 'false');
+            });
+        }
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest ? e.target.closest('.kebab-btn') : null;
+            if (btn) {
+                var menu = btn.parentNode.querySelector('.kebab-menu');
+                var wasOpen = menu.classList.contains('open');
+                closeAll();
+                if (!wasOpen) {
+                    var r = btn.getBoundingClientRect();
+                    menu.classList.add('open');
+                    var mh = menu.offsetHeight, mw = menu.offsetWidth;
+                    var top = r.bottom + 4;
+                    if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 4);
+                    var left = Math.max(8, Math.min(r.right - mw, window.innerWidth - mw - 8));
+                    menu.style.top = top + 'px';
+                    menu.style.left = left + 'px';
+                    btn.setAttribute('aria-expanded', 'true');
+                }
+                return;
+            }
+            if (e.target.closest && e.target.closest('.kebab-menu')) { setTimeout(closeAll, 0); return; }
+            closeAll();
+        });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+        window.addEventListener('resize', closeAll);
+        window.addEventListener('scroll', closeAll, true);
+    })();
+
     async function approvePayment(id) {
         const ok = await openConfirm({ title: 'Approve payment?', message: 'This marks the payment as completed.', confirmText: 'Approve' });
         if (!ok) return;
