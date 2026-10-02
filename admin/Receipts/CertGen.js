@@ -648,7 +648,7 @@
 
     window.AideaCertGen = { open: function (opts) { cgExtra = opts || {}; openChooser(); } };
     var tabs = document.getElementById('certTabs');
-    if (tabs) {
+    if (false && tabs) {
         var b = document.createElement('button');
         b.type = 'button';
         b.textContent = '+ Generate certificate';
