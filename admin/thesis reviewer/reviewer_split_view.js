@@ -366,6 +366,31 @@
     } catch (e) { }
   }
 
+  function svHfPdf(tl, right) {
+    try {
+      var cv = tl.parentNode && tl.parentNode.querySelector('canvas');
+      if (!cv || right.querySelector('.sv-hf')) return;
+      svHfPrep(right);
+      var W = cv.width, H = cv.height, z = Math.round(H * 0.12);
+      [0, H - z].forEach(function (y, idx) {
+        var t = document.createElement('canvas');
+        t.width = W; t.height = z;
+        var c = t.getContext('2d');
+        c.fillStyle = '#fff'; c.fillRect(0, 0, W, z);
+        c.drawImage(cv, 0, y, W, z, 0, 0, W, z);
+        var d = c.getImageData(0, 0, W, z).data, any = false;
+        for (var i = 0; i < d.length; i += 16) { if (d[i] < 245 || d[i + 1] < 245 || d[i + 2] < 245) { any = true; break; } }
+        if (!any) return;
+        var im = document.createElement('img');
+        im.className = 'sv-hf';
+        im.setAttribute('contenteditable', 'false');
+        im.src = t.toDataURL('image/jpeg', 0.92);
+        im.style.cssText = 'position:absolute;left:0;width:100%;height:auto;' + (idx === 0 ? 'top:0;' : 'bottom:0;') + 'pointer-events:none;user-select:none;-webkit-user-select:none;';
+        right.appendChild(im);
+      });
+    } catch (e) { }
+  }
+
   function renderPdf(buf, scroll, stat) {
     return loadScript(LIBS.pdf).then(function () {
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = LIBS.worker;
