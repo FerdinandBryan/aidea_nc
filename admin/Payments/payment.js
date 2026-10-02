@@ -465,11 +465,11 @@
         if (!tbody) return;
 
         if (!allPayments.length) {
-            tbody.innerHTML = '<tr><td colspan="8" class="empty">No payments yet.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="empty">No payments yet.</td></tr>';
             return;
         }
         if (!filtered.length) {
-            tbody.innerHTML = '<tr><td colspan="8" class="empty">No payments match your filter.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="empty">No payments match your filter.</td></tr>';
             return;
         }
 
@@ -500,8 +500,7 @@
                 '<td data-label="GCash ref"><code>' + escHtml(p.gcash_ref || p.gcashRef || '—') + '</code></td>' +
                 '<td data-label="Status">' + statusBadge(p.status) + '</td>' +
                 '<td data-label="Date">' + escHtml(p.date || p.date_iso || p.dateISO || '—') + '</td>' +
-                '<td data-label="Actions" class="action-cell">' + kebabMenu(actions) + '</td>' +
-                '<td data-label="Send files" class="action-cell">' + sendCell(p) + '</td>' +
+                '<td data-label="Actions" class="action-cell">' + kebabMenu(actions + sendCell(p)) + '</td>' +
                 '</tr>';
         }).join('');
     }
