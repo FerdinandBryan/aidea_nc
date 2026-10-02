@@ -489,7 +489,7 @@
             const svcName = String(p.service || '').toLowerCase();
             const reviewerRole = /grammar/.test(svcName) ? 'grammarian' : (/data analysis|statistic/.test(svcName) ? 'statistician' : '');
             if (reviewerRole && p.status !== 'Cancelled' && p.status !== 'Rejected') {
-                actions += '<button type="button" class="btn-action" onclick="AideaPayments.sendReviewer(' + p.id + ',\'' + reviewerRole + '\')">' + (reviewerRole === 'grammarian' ? 'Grammarian' : 'Statistician') + '</button>';
+                actions += '<button type="button" class="btn-action" onclick="AideaPayments.sendReviewer(' + p.id + ',\'' + reviewerRole + '\')">' + 'Assigned' + '</button>';
             }
         return '<tr class="' + (isPending(p) ? 'row-pending' : '') + '">' +
                 '<td data-label="Student"><strong>' + escHtml(p.student) + '</strong>' +
