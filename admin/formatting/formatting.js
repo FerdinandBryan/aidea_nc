@@ -866,3 +866,42 @@ function loadThesisChecklist() {
         if (kept.length !== list.length) localStorage.setItem('aidea_format_templates', JSON.stringify(kept));
     } catch (e) { console.warn('demo cleanup skipped', e); }
 })();
+
+/* AUTO_APPLY_CHECKLIST: saves the thesis checklist as a ready-to-use active template (runs once per browser) */
+(function () {
+    try {
+        var KEY = 'aidea_format_templates';
+        var FLAG = 'aidea_checklist_applied';
+        if (localStorage.getItem(FLAG)) return;
+        var typeMap = { R: 'Required', S: 'Style', L: 'Length', O: 'Optional', F: 'File' };
+        var rules = [];
+        var section = '';
+        THESIS_CHECKLIST.forEach(function (line) {
+            if (line.charAt(0) === '#') { section = line.slice(2); return; }
+            var text = line.slice(2);
+            var words = text.split(' ');
+            rules.push({
+                name: section + ': ' + words.slice(0, 6).join(' ') + (words.length > 6 ? '...' : ''),
+                type: typeMap[line.charAt(0)] || 'Required',
+                detail: text
+            });
+        });
+        var list = JSON.parse(localStorage.getItem(KEY) || '[]');
+        var exists = list.some(function (x) { return x.name === 'Thesis Format and Assessment Checklist'; });
+        if (!exists) {
+            var id = list.length ? Math.max.apply(null, list.map(function (x) { return x.id; })) + 1 : 1;
+            list.push({
+                id: id,
+                name: 'Thesis Format and Assessment Checklist',
+                type: 'Final Defense',
+                description: 'Standard criteria for the thesis manuscript: general guidelines, preliminary pages, Chapters 1 to 5, references, and appendices.',
+                active: true,
+                rules: rules,
+                file: null,
+                createdAt: new Date().toISOString()
+            });
+            localStorage.setItem(KEY, JSON.stringify(list));
+        }
+        localStorage.setItem(FLAG, '1');
+    } catch (e) { console.warn('checklist auto-apply skipped', e); }
+})();
