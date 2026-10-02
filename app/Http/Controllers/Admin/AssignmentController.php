@@ -29,6 +29,7 @@ class AssignmentController extends Controller
             'thesis_id' => ['nullable', 'exists:thesis_submissions,id'],
             'title' => ['nullable', 'string', 'max:255'],
             'student_name' => ['nullable', 'string', 'max:255'],
+            'payment_id' => ['nullable', 'string', 'max:64'],
             'reviewer_id' => ['required', 'exists:users,id'],
             'note' => ['nullable', 'string'],
             'file_label' => ['nullable', 'string', 'max:2000'],
@@ -58,6 +59,7 @@ class AssignmentController extends Controller
             'thesis_submission_id' => $request->input('thesis_id'),
             'title' => $request->input('title'),
             'student_name' => $request->input('student_name'),
+            'payment_id' => $request->input('payment_id'),
             'note' => $request->input('note'),
             'file_label' => $request->input('file_label'),
             'reviewer_id' => $request->input('reviewer_id'),
@@ -67,6 +69,25 @@ class AssignmentController extends Controller
         ]);
 
         return response()->json(['data' => $assignment], 201);
+    }
+
+    // DELETE /api/admin/assignments/{id}  (cancel while still pending)
+    public function destroy($id)
+    {
+        $assignment = ThesisAssignment::findOrFail($id);
+
+        if ($assignment->status !== 'pending') {
+            return response()->json(['message' => 'Only pending assignments can be cancelled.'], 422);
+        }
+
+        $paths = collect($assignment->files ?: [])->pluck('path')->push($assignment->file_path)->filter()->unique();
+        foreach ($paths as $p) {
+            Storage::disk('public')->delete($p);
+        }
+
+        $assignment->delete();
+
+        return response()->json(['message' => 'Assignment cancelled.']);
     }
 
     // GET /api/admin/assignments/{id}/download?type=original|reviewed

@@ -129,6 +129,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('assignments', [App\Http\Controllers\Admin\AssignmentController::class, 'index']);
     Route::post('assignments', [App\Http\Controllers\Admin\AssignmentController::class, 'store']);
     Route::get('assignments/{id}/download', [App\Http\Controllers\Admin\AssignmentController::class, 'download']);
+    Route::delete('assignments/{id}', [App\Http\Controllers\Admin\AssignmentController::class, 'destroy']);
 
     // AIDEA_ADMIN_ACCOUNT_ROUTES
     // Manage Account (admin's own profile + password)

@@ -11,6 +11,7 @@ class ThesisAssignment extends Model
         'thesis_submission_id',
         'title',
         'student_name',
+        'payment_id',
         'reviewer_id',
         'note',
         'file_label',

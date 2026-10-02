@@ -489,6 +489,8 @@
             const svcName = String(p.service || '').toLowerCase();
             const reviewerRole = /grammar/.test(svcName) ? 'grammarian' : (/data analysis|statistic/.test(svcName) ? 'statistician' : '');
             if (reviewerRole && p.status !== 'Cancelled' && p.status !== 'Rejected') {
+                actions += assignButtons(p, reviewerRole);
+            } if (false) {
                 actions += '<button type="button" class="btn-action" onclick="AideaPayments.sendReviewer(' + p.id + ',\'' + reviewerRole + '\')">' + 'Assigned' + '</button>';
             }
         return '<tr class="' + (isPending(p) ? 'row-pending' : '') + '">' +
@@ -911,6 +913,7 @@ function openViewModal(i) {
                 fd.append('note', buildReviewerNote(p, note.value.trim()));
                 fd.append('title', (p.service || 'Request') + ' - ' + (p.student || ''));
                 fd.append('student_name', p.student || '');
+                fd.append('payment_id', String(p.id));
                 if (!rFiles.length) {
                     await uploadFetch('/admin/assignments', fd);
                 } else {
@@ -919,6 +922,7 @@ function openViewModal(i) {
                     many.append('note', buildReviewerNote(p, note.value.trim()));
                     many.append('title', (p.service || 'Request') + ' - ' + (p.student || ''));
                     many.append('student_name', p.student || '');
+                    many.append('payment_id', String(p.id));
                     rFiles.forEach(function (rf) {
                         many.append('files[]', rf.file);
                         many.append('file_labels[]', rf.label);
@@ -927,6 +931,12 @@ function openViewModal(i) {
                 }
                 close();
                 showToast('Sent to the ' + label.toLowerCase() + '.', 'success');
+                var old = assignmentFor(p);
+                if (old && old.status === 'pending') {
+                    apiFetch('/admin/assignments/' + old.id, { method: 'DELETE' }).catch(function () {}).then(loadAssignments);
+                } else {
+                    loadAssignments();
+                }
             } catch (err) {
                 console.error(err);
                 send.textContent = 'Send';
@@ -939,6 +949,50 @@ function openViewModal(i) {
         overlay.appendChild(box);
         document.body.appendChild(overlay);
         document.body.classList.add('no-scroll');
+    }
+        var assignmentList = [];
+
+    function assignmentFor(p) {
+        var list = assignmentList || [];
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].payment_id != null && String(list[i].payment_id) === String(p.id)) return list[i];
+        }
+        return null;
+    }
+
+    function assignButtons(p, role) {
+        var a = assignmentFor(p);
+        var open = 'AideaPayments.sendReviewer(' + p.id + ',\'' + role + '\')';
+        if (!a) {
+            return '<button type="button" class="btn-action" onclick="' + open + '">Assigned</button>';
+        }
+        var html = '<button type="button" class="btn-action" onclick="' + open + '">Re-assign</button>';
+        if (a.status === 'pending') {
+            html += '<button type="button" class="btn-action btn-reject" onclick="AideaPayments.cancelAssignment(' + a.id + ')">Cancel assignment</button>';
+        }
+        return html;
+    }
+
+    async function loadAssignments() {
+        try {
+            var json = await apiFetch('/admin/assignments');
+            assignmentList = Array.isArray(json) ? json : (json.data || []);
+            render();
+        } catch (err) {
+            console.warn('[Requests] assignments not loaded', err);
+        }
+    }
+
+    async function cancelAssignment(id) {
+        if (!window.confirm('Cancel this assignment? The reviewer will no longer receive it.')) return;
+        try {
+            await apiFetch('/admin/assignments/' + id, { method: 'DELETE' });
+            showToast('Assignment cancelled.', 'success');
+            await loadAssignments();
+        } catch (err) {
+            console.error(err);
+            showToast(err && err.message ? err.message : 'Could not cancel. Try again.', 'error');
+        }
     }
     function sendCell(p) {
         return isDoneStatus(p)
@@ -1132,6 +1186,7 @@ function openViewModal(i) {
         rejectFromView: rejectFromView,
         sendFiles: function (id) { openSendDialog(id, 'files'); },
         sendReviewer: function (id, role) { openReviewerDialog(id, role); },
+        cancelAssignment: function (id) { cancelAssignment(id); },
         sendCertificate: function (id) { openSendDialog(id, 'certificate'); },
     };
 
@@ -1143,6 +1198,7 @@ function openViewModal(i) {
         initTheme();
         initDrawer();
         initProfileMenu();
+        loadAssignments();
 
         document.getElementById('searchInput').addEventListener('input', function (e) {
             searchTerm = e.target.value;
