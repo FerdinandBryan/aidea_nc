@@ -325,7 +325,7 @@
   }
 
   function svHfPrep(right) {
-    if (getComputedStyle(right).position === 'static') right.style.position = 'relative';
+    if (getComputedStyle(right).position === 'static') right.style.position = 'relative'; var hasBody = false; Array.prototype.forEach.call(right.childNodes, function (n) { if (!(n.nodeType === 1 && n.classList.contains('sv-hf'))) hasBody = true; }); if (!hasBody) { var anchor = document.createElement('div'); anchor.innerHTML = '<br>'; right.insertBefore(anchor, right.firstChild); }
   }
 
   function svHfPdf(tl, right) {
