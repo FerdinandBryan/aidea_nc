@@ -56,7 +56,7 @@ class PaymentController extends Controller
 
     public function approve(Payment $payment)
     {
-        $payment->update(['status' => 'Paid']);
+        $payment->update(['status' => 'Ongoing']);
         return response()->json($payment);
     }
 
@@ -105,6 +105,7 @@ class PaymentController extends Controller
         }
 
         $payment->update([
+            'status'           => 'Paid',
             'certificate_url'  => $firstUrl,
             'certificate_name' => $firstName,
             'certificate_type' => $data['type'],
