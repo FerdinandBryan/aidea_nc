@@ -222,6 +222,7 @@ require __DIR__ . '/profile.php';
         $data = $request->validate([
             'name'  => 'required|string|max:120',
             'image' => 'required|file|mimes:png,jpg,jpeg,webp|max:10240',
+            'fields' => 'nullable|string|max:20000',
         ]);
         $file = $request->file('image');
         $mime = $file->getMimeType();
@@ -230,6 +231,7 @@ require __DIR__ . '/profile.php';
         $id = \Illuminate\Support\Facades\DB::table('certificate_templates')->insertGetId([
             'name' => $data['name'], 'path' => $path, 'mime' => $mime, 'created_at' => now(), 'updated_at' => now(),
         ]);
+        if (!empty($data['fields']) && \Illuminate\Support\Facades\Schema::hasColumn('certificate_templates', 'fields')) { \Illuminate\Support\Facades\DB::table('certificate_templates')->where('id', $id)->update(['fields' => $data['fields']]); }
         return response()->json(['ok' => true, 'id' => $id], 201);
     });
     \Illuminate\Support\Facades\Route::get('/{id}/image', function ($id) {
@@ -237,8 +239,15 @@ require __DIR__ . '/profile.php';
         abort_unless($row, 404);
         $disk = \Illuminate\Support\Facades\Storage::disk('public');
         abort_unless($disk->exists($row->path), 404);
-        return response()->json(['image' => 'data:' . ($row->mime ?: 'image/png') . ';base64,' . base64_encode($disk->get($row->path))]);
+        return response()->json(['image' => 'data:' . ($row->mime ?: 'image/png') . ';base64,' . base64_encode($disk->get($row->path)), 'fields' => json_decode((string) ($row->fields ?? ''), true)]);
     })->whereNumber('id');
+    \Illuminate\Support\Facades\Route::put('/{id}/fields', function (\Illuminate\Http\Request $request, $id) {
+    $data = $request->validate(['fields' => 'required|string|max:20000']);
+    abort_unless(\Illuminate\Support\Facades\DB::table('certificate_templates')->where('id', $id)->exists(), 404);
+    abort_unless(\Illuminate\Support\Facades\Schema::hasColumn('certificate_templates', 'fields'), 409);
+    \Illuminate\Support\Facades\DB::table('certificate_templates')->where('id', $id)->update(['fields' => $data['fields'], 'updated_at' => now()]);
+    return response()->json(['ok' => true]);
+})->whereNumber('id');
     \Illuminate\Support\Facades\Route::delete('/{id}', function ($id) {
         $row = \Illuminate\Support\Facades\DB::table('certificate_templates')->where('id', $id)->first();
         abort_unless($row, 404);
