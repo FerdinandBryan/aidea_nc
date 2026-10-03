@@ -356,3 +356,7 @@ form {
 #abstractFile:hover, #imradFile:hover { border-color: #3b82f6; background: rgba(59,130,246,.06); }
 #abstractFile::file-selector-button, #imradFile::file-selector-button { margin-right: 12px; padding: 5px 12px; border: 0; border-radius: 7px; background: #3b82f6; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
 #abstractFile::file-selector-button:hover, #imradFile::file-selector-button:hover { background: #2563eb; }
+
+/* RESEARCHERS-V1 */
+#authors { width: 100%; box-sizing: border-box; min-height: 84px; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(128,128,128,.35); background: rgba(128,128,128,.08); color: inherit; font: inherit; line-height: 1.5; resize: vertical; }
+#authors:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.18); }

@@ -234,7 +234,7 @@ function initForm(token) {
         formData.append('abstract', abstract);
         formData.append('adviser_name', adviser);
         formData.append('submission_type', $('submissionType').value);
-        formData.append('authors', $('authors').value.trim());
+        formData.append('authors', $('authors').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean).join(', '));
         formData.append('file', file);
 
         submitBtn.disabled = true;
@@ -475,7 +475,7 @@ function initThesisForm(token) {
         formData.append('academic_year', year);
         formData.append('adviser_name', adviser);
         formData.append('submission_type', type);
-        formData.append('authors', $('authors').value.trim());
+        formData.append('authors', $('authors').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean).join(', '));
         formData.append('file', file);
         if (useText) formData.append('abstract', abstract);
         else formData.append('abstract_file', abstractUpload);
