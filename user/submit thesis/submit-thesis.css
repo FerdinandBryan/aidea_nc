@@ -360,3 +360,18 @@ form {
 /* RESEARCHERS-V1 */
 #authors { width: 100%; box-sizing: border-box; height: 40px; min-height: 40px; max-height: 160px; padding: 9px 12px; border-radius: 8px; border: 1px solid rgba(128,128,128,.35); background: rgba(128,128,128,.08); color: inherit; font: inherit; font-size: 13px; line-height: 20px; resize: vertical; overflow-y: auto; }
 #authors:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.18); }
+
+/* FILE-REMOVE-FIX: text "Remove" button stays inside the file row */
+.file-preview { min-width: 0; }
+.file-preview .file-name { flex: 1 1 auto; min-width: 0; }
+.file-preview .file-size { flex: none; }
+.file-preview .file-remove {
+  width: auto; height: 32px; min-width: 0; flex: none;
+  margin-left: 0; padding: 0 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(128,128,128,.35);
+  background: transparent; color: inherit;
+  font: inherit; font-size: 13px; font-weight: 600;
+  white-space: nowrap; line-height: 1;
+}
+.file-preview .file-remove:hover { background: var(--hover); color: var(--text); }
