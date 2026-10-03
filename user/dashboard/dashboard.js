@@ -325,6 +325,10 @@ async function viewThesis(id) {
     const dateText = isNaN(when) ? '-' : when.toLocaleString('en-PH', { year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     const fileName = d.file_name || d.original_name || (d.file_path ? String(d.file_path).split('/').pop() : '');
     const fileExt = fileName.includes('.') ? fileName.split('.').pop().toUpperCase() : '';
+    const abstractFileUrl = previewUrlOf(d.abstract_file_path);
+    const abstractHtml = abstractFileUrl
+        ? `<p style="margin:0"><a href="${escHtml(abstractFileUrl)}" target="_blank" rel="noopener">${escHtml(String(d.abstract_file_path).split('/').pop())}</a> <span style="opacity:.6">(uploaded file)</span></p>`
+        : `<p style="margin:0;white-space:pre-wrap">${escHtml(d.abstract || 'No abstract available.')}</p>`;
 
     // title heading removed (duplicate of the first row)
     body.innerHTML = `
@@ -336,6 +340,10 @@ async function viewThesis(id) {
             <dt>Status</dt><dd>${statusBadge(key)}</dd>
             <dt>Date Submitted</dt><dd>${escHtml(dateText)}</dd>
         </dl>
+        <div style="margin-top:16px">
+            <h4 style="margin:0 0 6px">Abstract</h4>
+            ${abstractHtml}
+        </div>
         ${d.remarks ? `
         <div class="remarks">
             <h4>Admin remarks</h4>
