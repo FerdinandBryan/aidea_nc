@@ -334,13 +334,21 @@ form {
 .field-hint.count-bad { color: #ef4444; }
 #abstractTextWrap[hidden], #abstractFileWrap[hidden], #imradReq[hidden], #imradOpt[hidden] { display: none !important; }
 
-/* UI-FIX-V2: underline tabs for abstract mode, badge counter, upload boxes */
-.mode-toggle { display: flex; gap: 28px; flex-wrap: nowrap; margin: 6px 0 14px; padding: 0; border: 0; border-bottom: 1px solid rgba(128,128,128,.3); border-radius: 0; background: transparent; }
-.mode-opt { position: relative; display: inline-flex; align-items: center; padding: 10px 2px; margin: 0 0 -1px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; box-shadow: none; color: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; opacity: .6; cursor: pointer; width: auto; height: auto; transition: opacity .15s, color .15s, border-color .15s; }
-.mode-opt:hover { opacity: 1; }
+/* UI-FIX-V3: option cards for abstract mode, badge counter, upload boxes */
+.mode-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 8px 0 14px; padding: 0; border: 0; background: transparent; }
+.mode-opt { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 16px; margin: 0; border: 1.5px solid rgba(128,128,128,.35); border-radius: 14px; background: rgba(128,128,128,.05); color: inherit; font-size: 14px; font-weight: 700; white-space: normal; cursor: pointer; width: auto; height: auto; box-shadow: none; transition: border-color .15s, background .15s, box-shadow .15s; }
+.mode-opt:hover { border-color: rgba(59,130,246,.7); }
 .mode-opt input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
-.mode-opt:has(input:checked) { opacity: 1; color: #3b82f6; border-bottom-color: #3b82f6; }
-.mode-opt:has(input:focus-visible) { outline: 2px solid #3b82f6; outline-offset: 2px; border-radius: 4px; }
+.mode-opt::before { content: ""; width: 38px; height: 38px; margin-bottom: 8px; border-radius: 10px; background-color: currentColor; opacity: .55; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; -webkit-mask-size: 22px; mask-size: 22px; }
+.mode-opt:first-child::before { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z'/%3E%3C/svg%3E"); }
+.mode-opt:last-child::before { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpath d='m17 8-5-5-5 5'/%3E%3Cpath d='M12 3v12'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpath d='m17 8-5-5-5 5'/%3E%3Cpath d='M12 3v12'/%3E%3C/svg%3E"); }
+.mode-opt::after { font-size: 12px; font-weight: 400; opacity: .65; line-height: 1.4; }
+.mode-opt:first-child::after { content: "Write or paste it here"; }
+.mode-opt:last-child::after { content: "PDF or DOCX, up to 20 MB"; }
+.mode-opt:has(input:checked) { border-color: #3b82f6; background: rgba(59,130,246,.12); box-shadow: 0 0 0 3px rgba(59,130,246,.18); }
+.mode-opt:has(input:checked)::before { color: #3b82f6; opacity: 1; }
+.mode-opt:has(input:focus-visible) { outline: 2px solid #3b82f6; outline-offset: 2px; }
+@media (max-width: 480px) { .mode-toggle { grid-template-columns: 1fr; } }
 
 #thesisAbstract { width: 100%; box-sizing: border-box; padding: 14px 16px; border-radius: 12px; line-height: 1.55; resize: vertical; }
 #abstractCount { display: block; width: fit-content; margin: 10px 0 0 auto; padding: 4px 12px; border-radius: 999px; background: rgba(128,128,128,.14); font-size: 12px; font-weight: 600; }
