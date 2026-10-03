@@ -1160,4 +1160,15 @@ td.empty {
 .stat { padding: 28px 30px; }
 @media (max-width: 900px) { .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .stat-grid { grid-template-columns: 1fr; gap: 16px; } .content { padding: 20px 16px; } }
+/* DASH-PANEL-SPACING */
+.bottom-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; width: 100%; max-width: none !important; box-sizing: border-box; }
+.panel { width: 100%; max-width: none !important; box-sizing: border-box; }
+.panel-head { margin-bottom: 20px; }
+.table-wrap { width: 100%; overflow-x: auto; }
+.table-wrap table { width: 100%; }
+@media (min-width: 769px) {
+  .panel { padding: 28px 32px; }
+  thead th, tbody td { padding: 16px 18px; }
+  td.empty { padding: 56px 18px; text-align: center; }
+}
 /* DASH-SPACING-OVERRIDE end */
