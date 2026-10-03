@@ -333,3 +333,15 @@ form {
 .field-hint.count-ok { color: #22c55e; }
 .field-hint.count-bad { color: #ef4444; }
 #abstractTextWrap[hidden], #abstractFileWrap[hidden], #imradReq[hidden], #imradOpt[hidden] { display: none !important; }
+
+/* UI-FIX-V1: segmented abstract toggle + styled file inputs */
+.mode-toggle { display: inline-flex; flex-wrap: nowrap; gap: 4px; padding: 4px; margin: 6px 0 12px; border: 1px solid rgba(128,128,128,.35); border-radius: 12px; background: rgba(128,128,128,.08); max-width: 100%; }
+.mode-opt { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 8px; cursor: pointer; white-space: nowrap; font-size: 13px; font-weight: 600; border: 0; background: transparent; color: inherit; width: auto; height: auto; }
+.mode-opt input { margin: 0; accent-color: #3b82f6; }
+.mode-opt:has(input:checked) { background: rgba(59,130,246,.18); box-shadow: inset 0 0 0 1px rgba(59,130,246,.6); }
+@media (max-width: 480px) { .mode-toggle { display: flex; } .mode-opt { flex: 1; justify-content: center; padding: 8px 10px; white-space: normal; text-align: center; } }
+
+#abstractFile, #imradFile { padding: 18px 16px; border: 1.5px dashed rgba(128,128,128,.5); border-radius: 12px; font-size: 13px; cursor: pointer; transition: border-color .15s, background .15s; }
+#abstractFile:hover, #imradFile:hover { border-color: #3b82f6; background: rgba(59,130,246,.06); }
+#abstractFile::file-selector-button, #imradFile::file-selector-button { margin-right: 14px; padding: 8px 16px; border: 0; border-radius: 8px; background: #3b82f6; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+#abstractFile::file-selector-button:hover, #imradFile::file-selector-button:hover { background: #2563eb; }
