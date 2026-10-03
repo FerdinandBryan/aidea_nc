@@ -1184,3 +1184,9 @@ td.empty {
 .remarks h4 { margin: 0 0 6px; }
 .remarks p { margin: 0; }
 @media (max-width: 520px) { .detail-list { grid-template-columns: 1fr; gap: 2px; } .detail-list dd { margin-bottom: 10px; } }
+
+/* DASH-VIEW-V2: tidy close button + title in the details modal */
+.modal-head { align-items: flex-start; }
+.modal-head .modal-title { flex: 1; min-width: 0; font-size: 17px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.modal-head .icon-btn { flex: none; align-self: flex-start; width: 32px; height: 32px; min-width: 32px; padding: 0; margin: 0; display: inline-grid; place-items: center; border-radius: 50%; cursor: pointer; }
+.modal-head .icon-btn svg { width: 16px; height: 16px; }
