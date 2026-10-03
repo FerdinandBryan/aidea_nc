@@ -358,5 +358,5 @@ form {
 #abstractFile::file-selector-button:hover, #imradFile::file-selector-button:hover { background: #2563eb; }
 
 /* RESEARCHERS-V1 */
-#authors { width: 100%; box-sizing: border-box; min-height: 84px; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(128,128,128,.35); background: rgba(128,128,128,.08); color: inherit; font: inherit; line-height: 1.5; resize: vertical; }
+#authors { width: 100%; box-sizing: border-box; height: 40px; min-height: 40px; max-height: 160px; padding: 9px 12px; border-radius: 8px; border: 1px solid rgba(128,128,128,.35); background: rgba(128,128,128,.08); color: inherit; font: inherit; font-size: 13px; line-height: 20px; resize: vertical; overflow-y: auto; }
 #authors:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.18); }
