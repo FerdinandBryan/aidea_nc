@@ -193,6 +193,12 @@ function initSubmissions(token) {
     }
 
     // — details modal —
+    const previewUrlOf = p => {
+        if (!p) return '';
+        if (/^https?:\/\//i.test(p)) return p;
+        return new URL(SUBMISSIONS_URL, location.href).origin + '/storage/' + String(p).replace(/^\/+/, '').replace(/^storage\//, '');
+    };
+
     function openModal(i, trigger) {
         const d = visible[i];
         if (!d) return;
@@ -216,6 +222,30 @@ function initSubmissions(token) {
                 <h4>Admin remarks</h4>
                 <p class="remarks-${key}">${escHtml(d.remarks)}</p>
             </div>` : ''}`;
+
+        const pUrl = previewUrlOf(d.file_path);
+        if (pUrl) {
+            const isPdf = /\.pdf$/i.test(String(d.file_path));
+            $('modalBody').insertAdjacentHTML('beforeend', `
+                <div style="margin-top:16px">
+                    <h4 style="margin:0 0 8px">File preview</h4>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+                        <button type="button" class="btn-action" id="previewToggle">Preview</button>
+                        <a class="btn-action" href="${escHtml(pUrl)}" target="_blank" rel="noopener">Open in new tab</a>
+                    </div>
+                    <div id="previewWrap"></div>
+                </div>`);
+            $('previewToggle').addEventListener('click', ev => {
+                const wrap = $('previewWrap');
+                if (wrap.firstChild) { wrap.replaceChildren(); ev.target.textContent = 'Preview'; return; }
+                const fr = document.createElement('iframe');
+                fr.src = isPdf ? pUrl : 'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(pUrl);
+                fr.title = 'File preview';
+                fr.style.cssText = 'width:100%;height:460px;border:1px solid rgba(128,128,128,.35);border-radius:8px;background:#fff';
+                wrap.appendChild(fr);
+                ev.target.textContent = 'Hide preview';
+            });
+        }
 
         overlay.hidden = false;
         document.body.classList.add('no-scroll');
