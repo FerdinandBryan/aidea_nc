@@ -14,6 +14,8 @@ class ThesisSubmission extends Model
         'abstract',
         'adviser_name',
         'submission_type',
+        'abstract_file_path',
+        'imrad_file_path',
         'authors',
         'file_path',
         'original_filename',

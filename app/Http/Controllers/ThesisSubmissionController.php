@@ -14,23 +14,38 @@ class ThesisSubmissionController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:500',
             'course' => 'required|string',
-            'academic_year' => 'required|string|max:20',
-            'abstract' => 'required|string|min:50',
+            'academic_year' => 'required|in:2026-2027,2027-2028,2028-2029,2029-2030',
+            'abstract' => 'nullable|string|required_without:abstract_file',
             'adviser_name' => 'required|string|max:255',
-            'submission_type' => 'required|in:initial,revision,final',
+            'submission_type' => 'required|in:thesis,research',
             'authors' => 'nullable|string|max:500',
             'file' => 'required|file|mimes:pdf,docx|max:20480',
+            'abstract_file' => 'nullable|file|mimes:pdf,docx|max:20480',
+            'imrad_file' => 'required_if:submission_type,research|nullable|file|mimes:pdf,docx|max:20480',
         ]);
 
         $file = $request->file('file');
+        $abstractText = trim((string) ($validated['abstract'] ?? ''));
+        if ($abstractText !== '') {
+            $wordCount = count(preg_split('/\s+/u', $abstractText, -1, PREG_SPLIT_NO_EMPTY));
+            if ($wordCount < 150 || $wordCount > 200) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'abstract' => ["Abstract must be 150 to 200 words (you entered {$wordCount})."],
+                ]);
+            }
+        }
         $path = $file->store('thesis_files', 'public');
+        $abstractFilePath = $request->hasFile('abstract_file') ? $request->file('abstract_file')->store('thesis_files', 'public') : null;
+        $imradFilePath = $request->hasFile('imrad_file') ? $request->file('imrad_file')->store('thesis_files', 'public') : null;
 
         $submission = ThesisSubmission::create([
             'user_id' => auth()->id(),
             'title' => $validated['title'],
             'course' => $validated['course'],
             'academic_year' => $validated['academic_year'],
-            'abstract' => $validated['abstract'],
+            'abstract' => $abstractText !== '' ? $abstractText : 'Abstract submitted as an attached file.',
+            'abstract_file_path' => $abstractFilePath,
+            'imrad_file_path' => $imradFilePath,
             'adviser_name' => $validated['adviser_name'],
             'submission_type' => $validated['submission_type'],
             'authors' => $validated['authors'] ?? null,
