@@ -254,9 +254,9 @@ function initSubmissions(token) {
                 title.textContent = pName;
                 title.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
                 const dlBtn = document.createElement('button');
-                dlBtn.type = 'button'; dlBtn.className = 'btn-action'; dlBtn.textContent = 'Download';
+                dlBtn.type = 'button'; dlBtn.textContent = 'Download'; dlBtn.style.cssText = 'padding:8px 18px;border-radius:8px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;border:1px solid #3b82f6;background:#3b82f6;color:#fff';
                 const closeBtn = document.createElement('button');
-                closeBtn.type = 'button'; closeBtn.className = 'btn-action'; closeBtn.textContent = 'Close';
+                closeBtn.type = 'button'; closeBtn.textContent = 'Close'; closeBtn.style.cssText = 'padding:8px 18px;border-radius:8px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;border:1px solid #cbd5e1;background:#fff;color:#111';
                 head.append(title, dlBtn, closeBtn);
                 const fr = document.createElement('iframe');
                 fr.title = 'File preview';
