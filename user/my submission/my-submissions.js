@@ -228,22 +228,38 @@ function initSubmissions(token) {
             const pName = d.file_name || d.original_name || String(d.file_path).split('/').pop();
             const isPdf = /\.pdf$/i.test(String(d.file_path));
             const downloadFile = async () => {
+                const ext = pName.includes('.') ? '.' + pName.split('.').pop() : '';
+                const base = String(d.title || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100);
+                const suggested = (base || pName.replace(/\.[^.]+$/, '')) + ext;
+                let handle = null;
+                if (window.showSaveFilePicker) {
+                    try {
+                        handle = await window.showSaveFilePicker({ suggestedName: suggested });
+                    } catch (err) {
+                        return; // student cancelled the Save As window
+                    }
+                }
                 try {
                     const r = await fetch(pUrl);
                     if (!r.ok) throw new Error('bad response');
                     const blob = await r.blob();
-                    const a = document.createElement('a');
-                    a.href = URL.createObjectURL(blob);
-                    a.download = pName;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+                    if (handle) {
+                        const w = await handle.createWritable();
+                        await w.write(blob);
+                        await w.close();
+                    } else {
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(blob);
+                        a.download = suggested;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+                    }
                 } catch (err) {
-                    window.open(pUrl, '_blank', 'noopener');
+                    alert('The file could not be downloaded. Please try again.');
                 }
-            };
-            const openWidePreview = () => {
+            };            const openWidePreview = () => {
                 const bg = document.createElement('div');
                 bg.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:2vh 2vw';
                 const box = document.createElement('div');
