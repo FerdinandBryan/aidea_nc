@@ -360,7 +360,7 @@ function certPreview(p) {
         <img src="${escHtml(secureUrl(c.url))}" alt="${escHtml(certKind(c))}" loading="lazy" /></button>`;
 }
 
-let certTab = 'certificate';
+let certTab = 'files';
 let certTabTouched = false;
 let certTabsWired = false;
 

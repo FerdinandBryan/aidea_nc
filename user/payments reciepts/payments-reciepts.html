@@ -126,7 +126,7 @@
                 </button>
                 <div class="page-title">
                     <h1>Requests <span class="badge-role">Student</span></h1>
-                    <p>Track your requests history and download certificate</p>
+                    <p>Track your requests history</p>
                 </div>
             </div>
             <div class="topbar-right">
@@ -159,23 +159,16 @@
                     <div class="stat-label">Pending requests</div>
                     <div class="stat-value" id="summaryPending">0</div>
                 </div>
-                <div class="stat stat-blue">
-                    <div class="stat-label">Certificate available</div>
-                    <div class="stat-value" id="summaryReceipts">0</div>
-                </div>
+                <span id="summaryReceipts" hidden>0</span>
             </section>
 
             <!-- MY CERTIFICATES & FILES -->
             <section class="panel">
                 <div class="panel-head">
                     <div>
-                        <h3 class="panel-title">My certificates &amp; files</h3>
+                        <h3 class="panel-title">My files</h3>
                         <p class="panel-sub">Sent by the admin once a service you availed is completed</p>
                     </div>
-                </div>
-<div class="cert-tabs" id="certTabs" role="tablist">
-                    <button type="button" class="cert-tab active" data-tab="certificate" role="tab">Certificates <span class="cert-count" id="certCountCert">0</span></button>
-                    <button type="button" class="cert-tab" data-tab="files" role="tab">Files <span class="cert-count" id="certCountFiles">0</span></button>
                 </div>
                                 <div id="certGrid" class="cert-grid" aria-busy="true">
                     <p class="cert-loading">Loading…</p>
