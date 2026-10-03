@@ -250,7 +250,7 @@ async function loadRecentSubmissions() {
             const type = TYPE_LABELS[t.submission_type] || t.submission_type || '';
             return `
             <tr>
-                <td data-label="Title"><strong>${escHtml(t.title)}</strong>${type ? `<br><small style="opacity:.65">${escHtml(type)}</small>` : ''}</td>
+                <td data-label="Title"><div class="title-wrap"><strong>${escHtml(t.title)}</strong>${type ? `<small class="title-type">${escHtml(type)}</small>` : ''}</div></td>
                 <td data-label="Submitted">${formatMonth(t.created_at)}</td>
                 <td data-label="Status">${statusBadge(status)}</td>
                 <td data-label="Actions"><button class="btn-action" type="button" onclick="viewThesis(${Number(t.id)})">View</button></td>

@@ -1194,3 +1194,16 @@ td.empty {
 /* DASH-VIEW-V3: no duplicate heading, close button stays top-right */
 #modalOverlay .modal-head { justify-content: flex-end; margin-bottom: 8px; }
 #modalOverlay .modal-title[hidden] { display: none; }
+
+/* DASH-RESP-V1: mobile fixes for recent list and details modal */
+.title-wrap { min-width: 0; overflow-wrap: anywhere; }
+.title-type { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; opacity: .65; }
+#modalOverlay .modal-wide { max-height: 90vh; overflow-y: auto; box-sizing: border-box; }
+#modalOverlay .detail-list dd,
+#modalOverlay #modalBody a { overflow-wrap: anywhere; word-break: break-word; }
+@media (max-width: 520px) {
+  #modalOverlay .modal-wide { width: calc(100vw - 24px); max-width: calc(100vw - 24px); padding: 16px; }
+  #modalOverlay .detail-list { grid-template-columns: 1fr; gap: 2px; }
+  #modalOverlay .detail-list dd { margin-bottom: 10px; }
+  #thesis-tbody .title-wrap { text-align: right; }
+}
