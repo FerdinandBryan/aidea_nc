@@ -326,7 +326,7 @@ async function viewThesis(id) {
     const fileName = d.file_name || d.original_name || (d.file_path ? String(d.file_path).split('/').pop() : '');
     const fileExt = fileName.includes('.') ? fileName.split('.').pop().toUpperCase() : '';
 
-    document.getElementById('modalTitle').textContent = d.title || 'Submission details';
+    // title heading removed (duplicate of the first row)
     body.innerHTML = `
         <dl class="detail-list">
             <dt>Research/Thesis title</dt><dd>${escHtml(d.title || '-')}</dd>
