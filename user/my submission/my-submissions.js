@@ -200,15 +200,16 @@ function initSubmissions(token) {
         lastTrigger = trigger;
 
         $('modalTitle').textContent = d.title || 'Thesis details';
+        const fileName = d.file_name || d.original_name || (d.file_path ? String(d.file_path).split('/').pop() : '');
+        const fileExt = fileName.includes('.') ? fileName.split('.').pop().toUpperCase() : '';
         $('modalBody').innerHTML = `
             <dl class="detail-list">
-                <dt>Course</dt><dd>${escHtml(d.course)}</dd>
-                <dt>Academic year</dt><dd>${escHtml(d.academic_year || '—')}</dd>
-                <dt>Submitted</dt><dd>${formatDate(d.created_at, true)}</dd>
-                <dt>Type</dt><dd>${escHtml(typeLabel(d.submission_type))}</dd>
-                <dt>Adviser</dt><dd>${escHtml(d.adviser_name || '—')}</dd>
-                <dt>Authors</dt><dd>${escHtml(d.authors || '—')}</dd>
+                <dt>Research/Thesis title</dt><dd>${escHtml(d.title || '-')}</dd>
+                <dt>Research Type</dt><dd>${escHtml(typeLabel(d.submission_type))}</dd>
+                <dt>File Name</dt><dd>${escHtml(fileName || '-')}</dd>
+                <dt>File Type</dt><dd>${escHtml(fileExt || '-')}</dd>
                 <dt>Status</dt><dd>${badge(key)}</dd>
+                <dt>Date Submitted</dt><dd>${formatDate(d.created_at, true)}</dd>
             </dl>
             ${d.remarks ? `
             <div class="remarks">
