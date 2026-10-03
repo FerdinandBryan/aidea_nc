@@ -187,7 +187,19 @@ function paperTitleFor(btn) {
     || document.getElementById('paperTitle')?.textContent || 'paper';
 }
 
-function saveBlob(blob, suggested) {
+// REPO-SAVEAS: Save As window so the student can pick the folder and file name
+async function saveBlob(blob, suggested) {
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({ suggestedName: suggested });
+      const w = await handle.createWritable();
+      await w.write(blob);
+      await w.close();
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return; // student cancelled
+    }
+  }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = suggested;
@@ -196,7 +208,6 @@ function saveBlob(blob, suggested) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
-
 function paperFileName(title, type, ext) {
   const base = String(title || 'paper').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100) || 'paper';
   return base + (type === 'imrad' ? ' - IMRAD' : '') + ext;
@@ -214,11 +225,9 @@ function showPaperPreview(file, title, type) {
   t.textContent = title + (type === 'imrad' ? ' (IMRAD)' : '');
   t.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
   const btnCss = 'padding:8px 18px;border-radius:8px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;border:1px solid #cbd5e1;background:#fff;color:#111';
-  const dl = document.createElement('button');
-  dl.type = 'button'; dl.textContent = 'Download'; dl.style.cssText = btnCss;
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button'; closeBtn.textContent = 'Close'; closeBtn.style.cssText = btnCss;
-  head.append(t, dl, closeBtn);
+  head.append(t, closeBtn);
   box.appendChild(head);
   if (file.isPdf) {
     const fr = document.createElement('iframe');
@@ -239,7 +248,6 @@ function showPaperPreview(file, title, type) {
   document.addEventListener('keydown', onKey, true);
   bg.addEventListener('click', ev => { if (ev.target === bg) close(); });
   closeBtn.addEventListener('click', close);
-  dl.addEventListener('click', () => saveBlob(file.blob, paperFileName(title, type, file.ext)));
 }
 
 async function openPaperFile(id, btn, type) {
@@ -260,7 +268,7 @@ async function downloadPaperFile(id, btn, type) {
   if (btn) { btn.disabled = true; btn.textContent = 'Downloading...'; }
   try {
     const file = await fetchPaperBlob(id, type);
-    if (file) saveBlob(file.blob, paperFileName(paperTitleFor(btn), type, file.ext));
+    if (file) await saveBlob(file.blob, paperFileName(paperTitleFor(btn), type, file.ext));
   } catch {
     alert('The file could not be downloaded. Please try again.');
   } finally {
