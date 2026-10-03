@@ -205,15 +205,29 @@ function renderUserIdentity(user) {
 
 // ── Data ───────────────────────────────────────────────────────────────────
 
+let mySubmissionsPromise = null;
+function getMySubmissions() {
+    if (!mySubmissionsPromise) {
+        mySubmissionsPromise = api('/thesis/my-submissions').then(asList);
+    }
+    return mySubmissionsPromise;
+}
+
+const TYPE_LABELS = { thesis: 'Thesis paper', research: 'Research paper', initial: 'Initial', revision: 'Revision', final: 'Final' };
+
 async function loadDashboardStats() {
     try {
-        const d = await api('/dashboard/stats');
-        setText('stat-submissions', d.submissions ?? '—');
-        setText('stat-approved', d.approved ?? '—');
-        setText('stat-paid', '₱' + Number(d.total_paid || 0).toLocaleString('en-PH'));
-        setText('stat-rating', d.avg_rating ?? '—');
+        const list = await getMySubmissions();
+        setText('stat-submissions', list.length);
+        setText('stat-approved', list.filter(t => String(t.status).toLowerCase() === 'approved').length);
     } catch (err) {
         console.warn('Stats error:', err);
+    }
+    try {
+        const d = await api('/dashboard/stats');
+        setText('stat-rating', d.avg_rating ?? '-');
+    } catch (err) {
+        console.warn('Rating error:', err);
     }
 }
 
@@ -222,24 +236,31 @@ async function loadRecentSubmissions() {
     if (!tbody) return;
 
     try {
-        const list = asList(await api('/submissions?limit=5'));
+        const list = (await getMySubmissions())
+            .slice()
+            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+            .slice(0, 5);
         if (!list.length) {
-            tbody.innerHTML = `<tr><td colspan="4" class="empty">No submissions yet. Submit your first thesis to get started.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="4" class="empty">No submissions yet. Submit your first document to get started.</td></tr>`;
             return;
         }
-        tbody.innerHTML = list.map(t => `
+        tbody.innerHTML = list.map(t => {
+            const s = String(t.status || '').toLowerCase();
+            const status = (s === 'approved' || s === 'rejected') ? s : 'under_review';
+            const type = TYPE_LABELS[t.submission_type] || t.submission_type || '';
+            return `
             <tr>
-                <td data-label="Title"><strong>${escHtml(t.title)}</strong></td>
-                <td data-label="Submitted">${formatMonth(t.submitted_at)}</td>
-                <td data-label="Status">${statusBadge(t.status)}</td>
+                <td data-label="Title"><strong>${escHtml(t.title)}</strong>${type ? `<br><small style="opacity:.65">${escHtml(type)}</small>` : ''}</td>
+                <td data-label="Submitted">${formatMonth(t.created_at)}</td>
+                <td data-label="Status">${statusBadge(status)}</td>
                 <td data-label="Actions"><button class="btn-action" type="button" onclick="viewThesis(${Number(t.id)})">View</button></td>
-            </tr>`).join('');
+            </tr>`;
+        }).join('');
     } catch (err) {
         console.warn('Submissions error:', err);
-        tbody.innerHTML = `<tr><td colspan="4" class="empty">Couldn’t load submissions. Check your connection and refresh.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" class="empty">Couldn't load submissions. Check your connection and refresh.</td></tr>`;
     }
 }
-
 async function loadUpcomingEvents() {
     const listEl = document.getElementById('event-list');
     if (!listEl) return;
