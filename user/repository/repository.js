@@ -159,11 +159,12 @@ async function fetchPapers() {
     abstract: t.abstract || '',
     addedAt: t.created_at || '',
     hasFile: Boolean(t.has_file) && t.id != null,
+    hasImrad: Boolean(t.has_imrad) && t.id != null,
   }));
 }
 
 // Streams the file with the student's token, then opens it in a new tab.
-async function openPaperFile(id, btn) {
+async function openPaperFile(id, btn, type) {
   const token = getToken();
   if (!token) { window.location.href = LOGIN_URL; return; }
 
@@ -172,7 +173,7 @@ async function openPaperFile(id, btn) {
   const win = window.open('', '_blank'); // open synchronously so popup blockers allow it
 
   try {
-    const res = await fetch(`${API_BASE}/thesis/file/${encodeURIComponent(id)}`, {
+    const res = await fetch(`${API_BASE}/thesis/file/${encodeURIComponent(id)}${type ? '?type=' + type : ''}`, {
       headers: { 'Authorization': `Bearer ${token}`, 'Accept': '*/*' },
     });
     if (res.status === 401) { win?.close(); window.location.href = LOGIN_URL; return; }
@@ -292,8 +293,11 @@ async function initRepository() {
                 ${p.hasFile
         ? `<button class="btn-primary" type="button" data-read="${escHtml(p.id)}">Read paper</button>`
         : `<span class="btn-disabled">No file available</span>`}
+                ${p.hasImrad ? `<button class="btn-secondary" type="button" id="paperImrad">Read IMRAD</button>` : ''}
             </div>`;
     $('paperDone').addEventListener('click', closeModal);
+    const imBtn = $('paperImrad');
+    if (imBtn) imBtn.addEventListener('click', () => openPaperFile(p.id, imBtn, 'imrad'));
 
     modal.hidden = false;
     document.body.classList.add('no-scroll');
