@@ -1172,3 +1172,15 @@ td.empty {
   td.empty { padding: 56px 18px; text-align: center; }
 }
 /* DASH-SPACING-OVERRIDE end */
+
+/* DASH-VIEW-V1: details modal (matches My Submissions) */
+.modal-wide { width: min(640px, 94vw); max-width: 94vw; text-align: left; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.modal-head .modal-title { margin: 0; text-align: left; }
+.detail-list { display: grid; grid-template-columns: 160px 1fr; gap: 10px 16px; margin: 0; }
+.detail-list dt { font-size: 12px; font-weight: 600; opacity: .65; }
+.detail-list dd { margin: 0; word-break: break-word; }
+.remarks { margin-top: 16px; padding: 12px 14px; border-radius: 10px; background: rgba(128,128,128,.1); }
+.remarks h4 { margin: 0 0 6px; }
+.remarks p { margin: 0; }
+@media (max-width: 520px) { .detail-list { grid-template-columns: 1fr; gap: 2px; } .detail-list dd { margin-bottom: 10px; } }
