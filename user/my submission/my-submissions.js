@@ -186,7 +186,7 @@ function initSubmissions(token) {
                 <td data-label="Status">${badge(key)}</td>
                 <td data-label="Actions" class="actions-cell">
                     <button class="btn-action" type="button" data-i="${i}">View</button>
-                    ${key === 'approved' ? `<button class="btn-action btn-review" type="button" data-i="${i}">Review</button>` : ''}
+                    
                 </td>
             </tr>`;
         }).join('');
