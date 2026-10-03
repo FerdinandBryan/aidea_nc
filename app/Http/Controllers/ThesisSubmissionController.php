@@ -125,6 +125,7 @@ class ThesisSubmissionController extends Controller
                     'status' => $t->status,
                     'created_at' => optional($t->created_at)->toDateString(),
                     'has_file' => !empty($t->file_path),
+                'has_imrad' => !empty($t->imrad_file_path),
                 ];
             })
         ]);
@@ -179,7 +180,9 @@ class ThesisSubmissionController extends Controller
     {
         $thesis = \App\Models\ThesisSubmission::findOrFail($id);
 
-        $path = storage_path('app/public/' . $thesis->file_path);
+        $requested = request()->query('type') === 'imrad' ? $thesis->imrad_file_path : $thesis->file_path;
+        if (!$requested) { abort(404); }
+        $path = storage_path('app/public/' . $requested);
 
         if (!file_exists($path)) {
             return response()->json(['error' => 'File not found'], 404);
