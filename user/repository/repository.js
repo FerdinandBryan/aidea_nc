@@ -374,7 +374,6 @@ async function initRepository() {
                 <p>${escHtml(p.abstract || 'No abstract available.')}</p>
             </div>
             <div class="modal-foot">
-                <button class="btn-secondary" type="button" id="paperDone">Close</button>
                 ${p.hasFile
         ? `<button class="btn-primary" type="button" data-read="${escHtml(p.id)}">Read paper</button>`
         : `<span class="btn-disabled">No file available</span>`}
@@ -382,7 +381,6 @@ async function initRepository() {
                 ${p.hasFile ? `<button class="btn-secondary" type="button" id="paperDownload">Download</button>` : ''}
                 ${p.hasImrad ? `<button class="btn-secondary" type="button" id="paperImradDownload">Download IMRAD</button>` : ''}
             </div>`;
-    $('paperDone').addEventListener('click', closeModal);
     const imBtn = $('paperImrad');
     if (imBtn) imBtn.addEventListener('click', () => openPaperFile(p.id, imBtn, 'imrad'));
     const dlBtn = $('paperDownload');
