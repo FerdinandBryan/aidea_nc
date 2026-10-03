@@ -322,3 +322,14 @@ form {
         justify-content: center;
     }
 }
+
+/* SUBMIT-FORM-V2 */
+#thesisTitle { resize: vertical; min-height: 64px; font: inherit; }
+.mode-toggle { display: flex; gap: 12px; flex-wrap: wrap; margin: 6px 0 12px; }
+.mode-opt { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid rgba(128,128,128,.4); border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 14px; }
+.mode-opt:has(input:checked) { border-color: #3b82f6; background: rgba(59,130,246,.12); }
+.mode-opt input { accent-color: #3b82f6; }
+#abstractFile, #imradFile { width: 100%; padding: 12px; border: 1px dashed rgba(128,128,128,.5); border-radius: 10px; background: transparent; color: inherit; font: inherit; box-sizing: border-box; }
+.field-hint.count-ok { color: #22c55e; }
+.field-hint.count-bad { color: #ef4444; }
+#abstractTextWrap[hidden], #abstractFileWrap[hidden], #imradReq[hidden], #imradOpt[hidden] { display: none !important; }

@@ -117,7 +117,7 @@ const STATUS = {
     rejected: { cls: 'badge-danger', label: 'Rejected' },
     under_review: { cls: 'badge-warning', label: 'Under review' },
 };
-const TYPES = { initial: 'Initial', revision: 'Revision', final: 'Final copy' };
+const TYPES = { thesis: 'Thesis paper', research: 'Research paper', initial: 'Initial', revision: 'Revision', final: 'Final copy' };
 
 // API status -> one of the three display buckets (pending counts as under review)
 const statusKey = s => (s === 'approved' || s === 'rejected') ? s : 'under_review';

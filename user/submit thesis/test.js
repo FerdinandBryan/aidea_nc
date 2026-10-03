@@ -281,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initDrawer();
     initProfileMenu();
     initSignOutModal();
-    initForm(token);
+    initThesisForm(token);
 });
 
 // ── Check Formatting ───────────────────────────────────────────────────────
@@ -298,3 +298,221 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     });
 });
+// SUBMIT-FORM-V2: submission types, abstract mode (text or file), IMRAD file
+const ABSTRACT_MIN_WORDS = 150;
+const ABSTRACT_MAX_WORDS = 200;
+const TYPE_FILE_LABELS = { thesis: 'Thesis paper file', research: 'Research paper file' };
+
+const countWords = s => s.trim().split(/\s+/).filter(Boolean).length;
+
+function limitWords(text, max) {
+    const re = /\S+/g;
+    let m, n = 0, end = text.length;
+    while ((m = re.exec(text)) !== null) {
+        n++;
+        if (n === max) end = m.index + m[0].length;
+        else if (n > max) return text.slice(0, end);
+    }
+    return text;
+}
+
+function initThesisForm(token) {
+    const form = $('thesisForm');
+    const fileDrop = $('fileDrop');
+    const fileInput = $('fileInput');
+    const filePreview = $('filePreview');
+    const abstractEl = $('thesisAbstract');
+    const abstractFile = $('abstractFile');
+    const imradFile = $('imradFile');
+    const typeEl = $('submissionType');
+    const submitBtn = $('submitBtn');
+
+    const fileError = file => {
+        const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+        if (!ALLOWED_EXTS.includes(ext)) return 'Only PDF or DOCX files are allowed.';
+        if (file.size > MAX_SIZE) return 'File exceeds the 20 MB limit.';
+        return null;
+    };
+    const abstractMode = () => (form.querySelector('input[name="abstractMode"]:checked') || {}).value || 'text';
+
+    function clearFile() {
+        fileInput.value = '';
+        filePreview.hidden = true;
+        filePreview.replaceChildren();
+        fileDrop.classList.remove('invalid');
+    }
+
+    function showFile(file) {
+        const err = fileError(file);
+        if (err) { clearFile(); showToast(err, 'error'); return; }
+        const name = document.createElement('span');
+        name.className = 'file-name';
+        name.textContent = file.name;
+        const size = document.createElement('span');
+        size.className = 'file-size';
+        size.textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'file-remove';
+        remove.setAttribute('aria-label', 'Remove file');
+        remove.textContent = 'Remove';
+        remove.addEventListener('click', clearFile);
+        filePreview.replaceChildren(name, size, remove);
+        filePreview.hidden = false;
+    }
+
+    function syncType() {
+        const t = typeEl.value;
+        $('fileLabelText').textContent = TYPE_FILE_LABELS[t] || TYPE_FILE_LABELS.thesis;
+        const research = t === 'research';
+        $('imradReq').hidden = !research;
+        $('imradOpt').hidden = research;
+    }
+
+    function syncAbstractMode() {
+        const text = abstractMode() === 'text';
+        $('abstractTextWrap').hidden = !text;
+        $('abstractFileWrap').hidden = text;
+    }
+
+    function updateCount() {
+        const w = countWords(abstractEl.value);
+        const el = $('abstractCount');
+        el.textContent = `${w} ${w === 1 ? 'word' : 'words'} - required: ${ABSTRACT_MIN_WORDS} to ${ABSTRACT_MAX_WORDS} words`;
+        el.classList.toggle('count-ok', w >= ABSTRACT_MIN_WORDS && w <= ABSTRACT_MAX_WORDS);
+        el.classList.toggle('count-bad', w > 0 && w < ABSTRACT_MIN_WORDS);
+    }
+
+    const openPicker = () => fileInput.click();
+    fileDrop.addEventListener('click', openPicker);
+    fileDrop.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPicker(); }
+    });
+    fileDrop.addEventListener('dragover', e => { e.preventDefault(); fileDrop.classList.add('dragover'); });
+    fileDrop.addEventListener('dragleave', () => fileDrop.classList.remove('dragover'));
+    fileDrop.addEventListener('drop', e => {
+        e.preventDefault();
+        fileDrop.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+        fileInput.files = e.dataTransfer.files;
+        showFile(file);
+    });
+    fileInput.addEventListener('change', () => { if (fileInput.files[0]) showFile(fileInput.files[0]); });
+
+    typeEl.addEventListener('change', syncType);
+    form.querySelectorAll('input[name="abstractMode"]').forEach(r => r.addEventListener('change', syncAbstractMode));
+    abstractEl.addEventListener('input', () => {
+        if (countWords(abstractEl.value) > ABSTRACT_MAX_WORDS) {
+            abstractEl.value = limitWords(abstractEl.value, ABSTRACT_MAX_WORDS);
+        }
+        updateCount();
+    });
+
+    form.addEventListener('input', e => e.target.classList.remove('invalid'));
+    form.addEventListener('change', e => e.target.classList.remove('invalid'));
+
+    $('resetBtn').addEventListener('click', () => {
+        form.reset();
+        clearFile();
+        syncType();
+        syncAbstractMode();
+        updateCount();
+        form.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
+    });
+
+    const fail = (el, msg) => {
+        el.classList.add('invalid');
+        el.focus?.();
+        showToast(msg, 'error');
+    };
+
+    form.addEventListener('submit', async e => {
+        e.preventDefault();
+
+        const title = $('thesisTitle').value.trim();
+        const course = $('thesisCourse').value;
+        const year = $('thesisYear').value;
+        const type = typeEl.value;
+        const adviser = $('adviserName').value.trim();
+        const file = fileInput.files[0];
+        const useText = abstractMode() === 'text';
+        const abstract = abstractEl.value.trim();
+        const abstractUpload = abstractFile.files[0];
+        const imrad = imradFile.files[0];
+        const fileLabel = TYPE_FILE_LABELS[type] || TYPE_FILE_LABELS.thesis;
+
+        if (!title) return fail($('thesisTitle'), 'Thesis title is required.');
+        if (!course) return fail($('thesisCourse'), 'Please select a course.');
+        if (!year) return fail($('thesisYear'), 'Please select an academic year.');
+        if (!TYPE_FILE_LABELS[type]) return fail(typeEl, 'Please choose a submission type.');
+
+        if (useText) {
+            const words = countWords(abstract);
+            if (words < ABSTRACT_MIN_WORDS || words > ABSTRACT_MAX_WORDS) {
+                return fail(abstractEl, `Abstract must be ${ABSTRACT_MIN_WORDS} to ${ABSTRACT_MAX_WORDS} words (you have ${words}).`);
+            }
+        } else {
+            if (!abstractUpload) return fail(abstractFile, 'Please upload your abstract file.');
+            const abErr = fileError(abstractUpload);
+            if (abErr) return fail(abstractFile, 'Abstract file: ' + abErr);
+        }
+
+        if (!adviser) return fail($('adviserName'), 'Adviser name is required.');
+        if (!file) { fileDrop.classList.add('invalid'); fileDrop.focus(); return showToast(`Please upload the ${fileLabel.toLowerCase()}.`, 'error'); }
+        const badFile = fileError(file);
+        if (badFile) return showToast(badFile, 'error');
+
+        if (type === 'research' && !imrad) return fail(imradFile, 'The IMRAD file is required for a research paper.');
+        if (imrad) {
+            const imErr = fileError(imrad);
+            if (imErr) return fail(imradFile, 'IMRAD file: ' + imErr);
+        }
+
+        const formData = new FormData();
+        formData.append('title', title);
+        formData.append('course', course);
+        formData.append('academic_year', year);
+        formData.append('adviser_name', adviser);
+        formData.append('submission_type', type);
+        formData.append('authors', $('authors').value.trim());
+        formData.append('file', file);
+        if (useText) formData.append('abstract', abstract);
+        else formData.append('abstract_file', abstractUpload);
+        if (imrad) formData.append('imrad_file', imrad);
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+
+        try {
+            const response = await fetch(SUBMIT_URL, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: formData,
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                console.warn('Submission rejected:', response.status, result);
+                const msg = result.errors
+                    ? Object.entries(result.errors).map(([f, m]) => `- ${f}: ${m.join(', ')}`).join('\n')
+                    : result.message;
+                showToast(msg || 'Submission failed.', 'error');
+                return;
+            }
+
+            showToast('Thesis submitted. You will be notified of the status.');
+            setTimeout(() => { window.location.href = '../my submission/my-submissions.html'; }, 1800);
+        } catch (err) {
+            console.error('Network / parse error:', err);
+            showToast('Network error. Please try again.', 'error');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit thesis';
+        }
+    });
+
+    syncType();
+    syncAbstractMode();
+    updateCount();
+}
