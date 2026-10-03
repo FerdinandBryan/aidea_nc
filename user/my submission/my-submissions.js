@@ -205,9 +205,13 @@ function initSubmissions(token) {
         const key = statusKey(d.status);
         lastTrigger = trigger;
 
-        $('modalTitle').textContent = d.title || 'Thesis details';
+        // title heading removed (duplicate of the first row)
         const fileName = d.file_name || d.original_name || (d.file_path ? String(d.file_path).split('/').pop() : '');
         const fileExt = fileName.includes('.') ? fileName.split('.').pop().toUpperCase() : '';
+        const abstractFileUrl = previewUrlOf(d.abstract_file_path);
+        const abstractHtml = abstractFileUrl
+            ? `<p style="margin:0"><a href="${escHtml(abstractFileUrl)}" data-preview="${escHtml(abstractFileUrl)}" data-name="${escHtml(String(d.abstract_file_path).split('/').pop())}" style="cursor:pointer">${escHtml(String(d.abstract_file_path).split('/').pop())}</a> <span style="opacity:.6">(uploaded file)</span></p>`
+            : `<p style="margin:0;white-space:pre-wrap">${escHtml(d.abstract || 'No abstract available.')}</p>`;
         $('modalBody').innerHTML = `
             <dl class="detail-list">
                 <dt>Research/Thesis title</dt><dd>${escHtml(d.title || '-')}</dd>
@@ -217,6 +221,10 @@ function initSubmissions(token) {
                 <dt>Status</dt><dd>${badge(key)}</dd>
                 <dt>Date Submitted</dt><dd>${formatDate(d.created_at, true)}</dd>
             </dl>
+            <div style="margin-top:16px">
+                <h4 style="margin:0 0 6px">Abstract</h4>
+                ${abstractHtml}
+            </div>
             ${d.remarks ? `
             <div class="remarks">
                 <h4>Admin remarks</h4>
@@ -303,6 +311,35 @@ function initSubmissions(token) {
         $('modalClose').focus();
     }
 
+    function openFilePreview(url, name) {
+        const isPdf = /\.pdf$/i.test(String(name));
+        const bg = document.createElement('div');
+        bg.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:2vh 2vw';
+        const box = document.createElement('div');
+        box.style.cssText = 'width:96vw;height:94vh;display:flex;flex-direction:column;background:#fff;color:#111;border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)';
+        const head = document.createElement('div');
+        head.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #ddd';
+        const title = document.createElement('strong');
+        title.textContent = name;
+        title.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button'; closeBtn.textContent = 'Close';
+        closeBtn.style.cssText = 'padding:8px 18px;border-radius:8px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;border:1px solid #cbd5e1;background:#fff;color:#111';
+        head.append(title, closeBtn);
+        const fr = document.createElement('iframe');
+        fr.title = 'File preview';
+        fr.src = isPdf ? url : 'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(url);
+        fr.style.cssText = 'flex:1;width:100%;border:0;background:#fff';
+        box.append(head, fr);
+        bg.appendChild(box);
+        document.body.appendChild(bg);
+        const close = () => { bg.remove(); document.removeEventListener('keydown', onKey, true); };
+        const onKey = ev => { if (ev.key === 'Escape') { ev.stopImmediatePropagation(); close(); } };
+        document.addEventListener('keydown', onKey, true);
+        bg.addEventListener('click', ev => { if (ev.target === bg) close(); });
+        closeBtn.addEventListener('click', close);
+    }
+
     function closeModal() {
         overlay.hidden = true;
         if (!$('sidebar')?.classList.contains('open')) document.body.classList.remove('no-scroll');
@@ -314,6 +351,12 @@ function initSubmissions(token) {
         if (btn) openModal(Number(btn.dataset.i), btn);
     });
     $('modalClose').addEventListener('click', closeModal);
+    $('modalBody').addEventListener('click', e => {
+        const a = e.target.closest('a[data-preview]');
+        if (!a) return;
+        e.preventDefault();
+        openFilePreview(a.dataset.preview, a.dataset.name);
+    });
     overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && !overlay.hidden) closeModal(); });
 
