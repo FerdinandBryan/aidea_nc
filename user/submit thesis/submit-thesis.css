@@ -334,14 +334,20 @@ form {
 .field-hint.count-bad { color: #ef4444; }
 #abstractTextWrap[hidden], #abstractFileWrap[hidden], #imradReq[hidden], #imradOpt[hidden] { display: none !important; }
 
-/* UI-FIX-V1: segmented abstract toggle + styled file inputs */
-.mode-toggle { display: inline-flex; flex-wrap: nowrap; gap: 4px; padding: 4px; margin: 6px 0 12px; border: 1px solid rgba(128,128,128,.35); border-radius: 12px; background: rgba(128,128,128,.08); max-width: 100%; }
-.mode-opt { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 8px; cursor: pointer; white-space: nowrap; font-size: 13px; font-weight: 600; border: 0; background: transparent; color: inherit; width: auto; height: auto; }
-.mode-opt input { margin: 0; accent-color: #3b82f6; }
-.mode-opt:has(input:checked) { background: rgba(59,130,246,.18); box-shadow: inset 0 0 0 1px rgba(59,130,246,.6); }
-@media (max-width: 480px) { .mode-toggle { display: flex; } .mode-opt { flex: 1; justify-content: center; padding: 8px 10px; white-space: normal; text-align: center; } }
+/* UI-FIX-V2: underline tabs for abstract mode, badge counter, upload boxes */
+.mode-toggle { display: flex; gap: 28px; flex-wrap: nowrap; margin: 6px 0 14px; padding: 0; border: 0; border-bottom: 1px solid rgba(128,128,128,.3); border-radius: 0; background: transparent; }
+.mode-opt { position: relative; display: inline-flex; align-items: center; padding: 10px 2px; margin: 0 0 -1px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; box-shadow: none; color: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; opacity: .6; cursor: pointer; width: auto; height: auto; transition: opacity .15s, color .15s, border-color .15s; }
+.mode-opt:hover { opacity: 1; }
+.mode-opt input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
+.mode-opt:has(input:checked) { opacity: 1; color: #3b82f6; border-bottom-color: #3b82f6; }
+.mode-opt:has(input:focus-visible) { outline: 2px solid #3b82f6; outline-offset: 2px; border-radius: 4px; }
 
-#abstractFile, #imradFile { padding: 18px 16px; border: 1.5px dashed rgba(128,128,128,.5); border-radius: 12px; font-size: 13px; cursor: pointer; transition: border-color .15s, background .15s; }
+#thesisAbstract { width: 100%; box-sizing: border-box; padding: 14px 16px; border-radius: 12px; line-height: 1.55; resize: vertical; }
+#abstractCount { display: block; width: fit-content; margin: 10px 0 0 auto; padding: 4px 12px; border-radius: 999px; background: rgba(128,128,128,.14); font-size: 12px; font-weight: 600; }
+#abstractCount.count-ok { background: rgba(34,197,94,.16); color: #22c55e; }
+#abstractCount.count-bad { background: rgba(245,158,11,.16); color: #f59e0b; }
+
+#abstractFile, #imradFile { width: 100%; box-sizing: border-box; padding: 22px 16px; border: 1.5px dashed rgba(128,128,128,.5); border-radius: 12px; background: transparent; color: inherit; font: inherit; font-size: 13px; cursor: pointer; transition: border-color .15s, background .15s; }
 #abstractFile:hover, #imradFile:hover { border-color: #3b82f6; background: rgba(59,130,246,.06); }
 #abstractFile::file-selector-button, #imradFile::file-selector-button { margin-right: 14px; padding: 8px 16px; border: 0; border-radius: 8px; background: #3b82f6; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
 #abstractFile::file-selector-button:hover, #imradFile::file-selector-button:hover { background: #2563eb; }
