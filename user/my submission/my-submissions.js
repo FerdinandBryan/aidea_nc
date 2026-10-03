@@ -225,26 +225,63 @@ function initSubmissions(token) {
 
         const pUrl = previewUrlOf(d.file_path);
         if (pUrl) {
+            const pName = d.file_name || d.original_name || String(d.file_path).split('/').pop();
             const isPdf = /\.pdf$/i.test(String(d.file_path));
+            const downloadFile = async () => {
+                try {
+                    const r = await fetch(pUrl);
+                    if (!r.ok) throw new Error('bad response');
+                    const blob = await r.blob();
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = pName;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+                } catch (err) {
+                    window.open(pUrl, '_blank', 'noopener');
+                }
+            };
+            const openWidePreview = () => {
+                const bg = document.createElement('div');
+                bg.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:2vh 2vw';
+                const box = document.createElement('div');
+                box.style.cssText = 'width:96vw;height:94vh;display:flex;flex-direction:column;background:#fff;color:#111;border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)';
+                const head = document.createElement('div');
+                head.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #ddd';
+                const title = document.createElement('strong');
+                title.textContent = pName;
+                title.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+                const dlBtn = document.createElement('button');
+                dlBtn.type = 'button'; dlBtn.className = 'btn-action'; dlBtn.textContent = 'Download';
+                const closeBtn = document.createElement('button');
+                closeBtn.type = 'button'; closeBtn.className = 'btn-action'; closeBtn.textContent = 'Close';
+                head.append(title, dlBtn, closeBtn);
+                const fr = document.createElement('iframe');
+                fr.title = 'File preview';
+                fr.src = isPdf ? pUrl : 'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(pUrl);
+                fr.style.cssText = 'flex:1;width:100%;border:0;background:#fff';
+                box.append(head, fr);
+                bg.appendChild(box);
+                document.body.appendChild(bg);
+                const close = () => { bg.remove(); document.removeEventListener('keydown', onKey, true); };
+                const onKey = ev => { if (ev.key === 'Escape') { ev.stopImmediatePropagation(); close(); } };
+                document.addEventListener('keydown', onKey, true);
+                bg.addEventListener('click', ev => { if (ev.target === bg) close(); });
+                closeBtn.addEventListener('click', close);
+                dlBtn.addEventListener('click', downloadFile);
+            };
             $('modalBody').insertAdjacentHTML('beforeend', `
                 <div style="margin-top:16px">
                     <h4 style="margin:0 0 8px">File preview</h4>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
                         <button type="button" class="btn-action" id="previewToggle">Preview</button>
-                        <a class="btn-action" href="${escHtml(pUrl)}" target="_blank" rel="noopener">Open in new tab</a>
+                        <button type="button" class="btn-action" id="downloadBtn">Download</button>
                     </div>
-                    <div id="previewWrap"></div>
                 </div>`);
-            $('previewToggle').addEventListener('click', ev => {
-                const wrap = $('previewWrap');
-                if (wrap.firstChild) { wrap.replaceChildren(); ev.target.textContent = 'Preview'; return; }
-                const fr = document.createElement('iframe');
-                fr.src = isPdf ? pUrl : 'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(pUrl);
-                fr.title = 'File preview';
-                fr.style.cssText = 'width:100%;height:460px;border:1px solid rgba(128,128,128,.35);border-radius:8px;background:#fff';
-                wrap.appendChild(fr);
-                ev.target.textContent = 'Hide preview';
-            });
+            $('previewToggle').addEventListener('click', openWidePreview);
+            $('downloadBtn').addEventListener('click', downloadFile);
         }
 
         overlay.hidden = false;
