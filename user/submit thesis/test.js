@@ -367,6 +367,7 @@ function initThesisForm(token) {
         const research = t === 'research';
         $('imradReq').hidden = !research;
         $('imradOpt').hidden = research;
+        submitBtn.textContent = research ? 'Submit research' : 'Submit thesis';
     }
 
     function syncAbstractMode() {
@@ -508,7 +509,7 @@ function initThesisForm(token) {
             showToast('Network error. Please try again.', 'error');
         } finally {
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Submit thesis';
+            submitBtn.textContent = typeEl.value === 'research' ? 'Submit research' : 'Submit thesis';
         }
     });
 

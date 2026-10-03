@@ -198,6 +198,12 @@
                             </div>
                         </div>
 
+                        <div class="field">
+                            <span class="label" id="imradLabel">IMRAD file <span class="req" id="imradReq" hidden>*</span><span class="opt" id="imradOpt">(optional)</span></span>
+                            <input type="file" id="imradFile" accept=".pdf,.docx" aria-labelledby="imradLabel" />
+                            <span class="field-hint">PDF or DOCX, up to 20 MB</span>
+                        </div>
+
                         <div class="form-row">
                             <div class="field">
                                 <label for="adviserName">Adviser name <span class="req">*</span></label>
@@ -232,11 +238,6 @@
                             <div id="filePreview" class="file-preview" hidden></div>
                         </div>
 
-                        <div class="field">
-                            <span class="label" id="imradLabel">IMRAD file <span class="req" id="imradReq" hidden>*</span><span class="opt" id="imradOpt">(optional)</span></span>
-                            <input type="file" id="imradFile" accept=".pdf,.docx" aria-labelledby="imradLabel" />
-                            <span class="field-hint">PDF or DOCX, up to 20 MB</span>
-                        </div>
 
                         <div class="form-actions">
                             <button type="button" class="btn-secondary" id="resetBtn">Reset</button>
