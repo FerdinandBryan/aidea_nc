@@ -584,7 +584,8 @@ let rowStudentId = null;
 function setView(mode) {
     viewMode = mode;
     const archive = mode === 'archive';
-    $('viewTitle').textContent = archive ? 'Archived students' : 'Students';
+    $('viewTitle').textContent = archive ? 'Archived users' : '';
+    $('viewTitle').style.display = archive ? '' : 'none';
     $('archiveViewBtn').textContent = archive ? 'Back to students' : 'Archive';
     $('actionsTh').hidden = !archive;
     $('searchInput').value = '';
