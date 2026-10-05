@@ -671,9 +671,37 @@ async function loadExperts() {
     }
 }
 
+// CONFIRM-MODAL: in-page replacement for window.confirm (resolves true/false)
+function askConfirm(title, text, okLabel) {
+    return new Promise(resolve => {
+        const m = $('confirmModal');
+        $('confirmTitle').textContent = title;
+        $('confirmText').textContent = text;
+        $('confirmOk').textContent = okLabel || 'Confirm';
+        let done = false;
+        const finish = val => {
+            if (done) return;
+            done = true;
+            obs.disconnect();
+            $('confirmOk').removeEventListener('click', onOk);
+            $('confirmCancel').removeEventListener('click', onNo);
+            if (!m.hidden) closeOverlay(m);
+            resolve(val);
+        };
+        const onOk = () => finish(true);
+        const onNo = () => finish(false);
+        // Escape or a click outside the box hides the modal: treat that as "no"
+        const obs = new MutationObserver(() => { if (m.hidden) finish(false); });
+        obs.observe(m, { attributes: true, attributeFilter: ['hidden'] });
+        $('confirmOk').addEventListener('click', onOk);
+        $('confirmCancel').addEventListener('click', onNo);
+        openOverlay(m, { focus: $('confirmCancel') });
+    });
+}
+
 // EXPERT-ARCHIVE: archive instead of delete; the account then shows in the Archive view
 async function removeExpert(id) {
-    if (!confirm('Archive this expert account? They will no longer be able to log in. You can restore them from the Archive view.')) return;
+    if (!(await askConfirm('Archive this expert account?', 'They will no longer be able to log in. You can restore them from the Archive view.', 'Archive'))) return;
     try {
         const res = await api(`/students/${id}/archive`, { method: 'POST' });
         if (!res.ok) throw new Error();
