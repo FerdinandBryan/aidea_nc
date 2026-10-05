@@ -301,7 +301,7 @@
     <!-- EXPERT ACCOUNTS MODAL -->
         <div class="modal-backdrop" id="expModal" hidden>
             <div class="modal" role="dialog" aria-modal="true" aria-labelledby="expTitle">
-                <h3 class="modal-title" id="expTitle">Expert accounts</h3>
+                <div class="exp-head"><h3 class="modal-title" id="expTitle">Expert accounts</h3><button class="exp-x" id="expClose" type="button" aria-label="Close"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
                 <p class="modal-text">Create login access for statisticians and grammarians.</p>
                 <form id="expForm" novalidate>
                     <div class="exp-row">
@@ -318,7 +318,7 @@
                     </div>
                     <p class="exp-msg" id="expMsg" role="status" aria-live="polite"></p>
                     <div class="modal-actions">
-                        <button class="modal-btn modal-btn-cancel" id="expClose" type="button">Close</button>
+                        
                         <button class="modal-btn modal-btn-primary" id="expSave" type="submit">Create account</button>
                     </div>
                 </form>

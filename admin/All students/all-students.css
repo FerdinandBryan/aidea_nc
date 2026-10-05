@@ -380,3 +380,9 @@ tr.row-click:hover td { background: rgba(128,128,128,.08); }
 .exp-sub { margin: 18px 0 8px; }
 .exp-table-wrap { overflow-x: auto; }
 @media (max-width: 520px) { .exp-row { grid-template-columns: 1fr; } }
+
+/* EXPERT-X: round close button at the top-right */
+.exp-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.exp-head .modal-title { margin: 0; }
+.exp-x { flex: none; width: 32px; height: 32px; padding: 0; display: inline-grid; place-items: center; border-radius: 50%; border: 1px solid rgba(128,128,128,.35); background: transparent; color: inherit; cursor: pointer; }
+.exp-x:hover { background: rgba(128,128,128,.14); }
