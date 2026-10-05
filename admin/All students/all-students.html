@@ -157,6 +157,7 @@
                     <option value="librarian">Librarian</option>
                 </select>
                 <button class="btn-primary" id="archiveViewBtn" type="button">Archive</button>
+                <button class="btn-primary" id="expertBtn" type="button">Expert accounts</button>
             </div>
 
             <!-- STUDENTS TABLE -->
@@ -297,7 +298,41 @@
         </div>
     </div>
 
-    <!-- ROW DETAILS / ARCHIVE MODAL -->
+    <!-- EXPERT ACCOUNTS MODAL -->
+        <div class="modal-backdrop" id="expModal" hidden>
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="expTitle">
+                <h3 class="modal-title" id="expTitle">Expert accounts</h3>
+                <p class="modal-text">Create login access for statisticians and grammarians.</p>
+                <form id="expForm" novalidate>
+                    <div class="exp-row">
+                        <div class="exp-field"><label for="expFname">First name</label><input type="text" id="expFname" autocomplete="off" /></div>
+                        <div class="exp-field"><label for="expLname">Last name</label><input type="text" id="expLname" autocomplete="off" /></div>
+                    </div>
+                    <div class="exp-field"><label for="expEmail">Email address</label><input type="email" id="expEmail" autocomplete="off" /></div>
+                    <div class="exp-field"><label for="expRole">Role</label>
+                        <select id="expRole"><option value="" disabled selected>Select a role</option><option value="statistician">Statistician</option><option value="grammarian">Grammarian</option></select>
+                    </div>
+                    <div class="exp-row">
+                        <div class="exp-field"><label for="expPass">Password</label><input type="password" id="expPass" autocomplete="new-password" /></div>
+                        <div class="exp-field"><label for="expPass2">Confirm password</label><input type="password" id="expPass2" autocomplete="new-password" /></div>
+                    </div>
+                    <p class="exp-msg" id="expMsg" role="status" aria-live="polite"></p>
+                    <div class="modal-actions">
+                        <button class="modal-btn modal-btn-cancel" id="expClose" type="button">Close</button>
+                        <button class="modal-btn modal-btn-primary" id="expSave" type="submit">Create account</button>
+                    </div>
+                </form>
+                <h4 class="exp-sub">Existing expert accounts</h4>
+                <div class="exp-table-wrap">
+                    <table>
+                        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
+                        <tbody id="expBody"><tr><td colspan="4" class="empty">Loading...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW DETAILS / ARCHIVE MODAL -->
         <div class="modal-backdrop" id="rowModal" hidden>
             <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rowModalTitle">
                 <h3 class="modal-title" id="rowModalTitle">Student details</h3>

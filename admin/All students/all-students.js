@@ -642,6 +642,86 @@ async function deleteArchived(id) {
     }
 }
 
+// EXPERT-ACCOUNTS: create / list / remove statistician and grammarian accounts
+const expertAsList = raw => Array.isArray(raw) ? raw : (raw?.data ?? []);
+const EXPERT_LABELS = { statistician: 'Statistician', grammarian: 'Grammarian' };
+
+function expertMsg(text, type) {
+    const el = $('expMsg');
+    el.textContent = text || '';
+    el.className = 'exp-msg' + (type ? ' ' + type : '');
+}
+
+async function loadExperts() {
+    const tbody = $('expBody');
+    try {
+        const res = await api('/admin/reviewers');
+        if (!res.ok) throw new Error();
+        const list = expertAsList(await res.json());
+        if (!list.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">No expert accounts yet.</td></tr>'; return; }
+        tbody.innerHTML = list.map(r => `
+            <tr>
+                <td><strong>${escHtml([r.fname, r.lname].filter(Boolean).join(' ') || '-')}</strong></td>
+                <td>${escHtml(r.email || '-')}</td>
+                <td>${escHtml(EXPERT_LABELS[r.role] || r.role || '-')}</td>
+                <td><button type="button" class="row-act row-act-danger" data-exp-remove="${escHtml(r.id)}">Remove</button></td>
+            </tr>`).join('');
+    } catch {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty error">Could not load expert accounts.</td></tr>';
+    }
+}
+
+async function removeExpert(id) {
+    if (!confirm('Remove this expert account? They will no longer be able to log in.')) return;
+    try {
+        const res = await api(`/admin/reviewers/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error();
+        await loadExperts();
+        await fetchStudents();
+    } catch {
+        alert('Could not remove that account. Try again.');
+    }
+}
+
+function openExperts() {
+    $('expForm').reset();
+    expertMsg('', null);
+    openOverlay($('expModal'), { focus: $('expFname') });
+    loadExperts();
+}
+
+async function createExpert(e) {
+    e.preventDefault();
+    const p = {
+        fname: $('expFname').value.trim(),
+        lname: $('expLname').value.trim(),
+        email: $('expEmail').value.trim(),
+        role: $('expRole').value,
+        password: $('expPass').value,
+        password_confirmation: $('expPass2').value,
+    };
+    if (!p.fname || !p.lname || !p.email || !p.role || !p.password) { expertMsg('Please fill in every field.', 'error'); return; }
+    if (p.password.length < 8) { expertMsg('Password must be at least 8 characters.', 'error'); return; }
+    if (p.password !== p.password_confirmation) { expertMsg('Password and confirmation do not match.', 'error'); return; }
+    $('expSave').disabled = true;
+    expertMsg('', null);
+    try {
+        const res = await api('/admin/reviewers', { method: 'POST', body: JSON.stringify(p) });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            const first = Object.values(err.errors || {})[0];
+            throw new Error(first ? first[0] : (err.message || 'Could not create this account.'));
+        }
+        $('expForm').reset();
+        expertMsg('Account created.', 'success');
+        await loadExperts();
+        await fetchStudents();
+    } catch (err) {
+        expertMsg(err.message || 'Something went wrong. Try again.', 'error');
+    }
+    $('expSave').disabled = false;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // Guard — admin only
@@ -662,6 +742,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Students
     $('searchInput').addEventListener('input', applyFilter);
     $('roleFilter').addEventListener('change', applyFilter);
+    $('expertBtn').addEventListener('click', openExperts);
+    $('expClose').addEventListener('click', () => closeOverlay($('expModal')));
+    $('expForm').addEventListener('submit', createExpert);
+    $('expBody').addEventListener('click', e => {
+        const b = e.target.closest('[data-exp-remove]');
+        if (b) removeExpert(b.dataset.expRemove);
+    });
     $('studentForm').addEventListener('submit', handleFormSubmit);
 
     // Emails are lowercase only: typed or pasted capitals are converted as you go
