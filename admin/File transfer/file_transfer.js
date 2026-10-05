@@ -345,8 +345,8 @@ async function loadThesisOptions() {
         const payments = asList(await res.json());
 
         paymentFileOptions = {};
-        let html = '<option value="" disabled selected>Select a file from Payments\u2026</option>';
-        payments.forEach(p => {
+        let html = '<option value="" disabled selected>Select an ongoing request file\u2026</option>';
+        payments.filter(p => String(p.status).toLowerCase() === 'ongoing').forEach(p => {
             let items = p.research_items;
             try { if (typeof items === 'string') items = JSON.parse(items); } catch { items = []; }
             if (!Array.isArray(items)) return;
