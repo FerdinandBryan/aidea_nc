@@ -591,7 +591,6 @@ function openRowModal(id) {
     $('rowDetails').innerHTML = `<dl class="row-detail">
         <dt>Name</dt><dd>${escHtml(fullName(s))}</dd>
         <dt>Email</dt><dd>${escHtml(s.email || '-')}</dd>
-        <dt>Status</dt><dd>${s.is_verified ? 'Verified' : 'Not verified'}</dd>
         <dt>Registered</dt><dd>${escHtml(when)}</dd>
     </dl>`;
     openOverlay($('rowModal'), { focus: $('rowArchiveBtn') });
