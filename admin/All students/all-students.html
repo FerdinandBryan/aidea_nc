@@ -139,7 +139,7 @@
 
             <div class="page-head">
                 <div>
-                    <h2>Students</h2>
+                    <h2 id="viewTitle">Students</h2>
                     <p id="studentCount">Loading students…</p>
                 </div>
             </div>
@@ -151,6 +151,7 @@
                     autocomplete="off" />
 
                 <button class="btn-primary" id="addStudentBtn" type="button">Add student</button>
+                <button id="archiveViewBtn" type="button">Archive</button>
             </div>
 
             <!-- STUDENTS TABLE -->
@@ -162,6 +163,7 @@
                                 <th>No.</th>
                                 <th>Name</th>
                                 <th>Email</th>
+                                <th id="actionsTh" hidden>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="studentsBody">
@@ -290,7 +292,19 @@
         </div>
     </div>
 
-    <!-- SIGN OUT CONFIRMATION MODAL -->
+    <!-- ROW DETAILS / ARCHIVE MODAL -->
+        <div class="modal-backdrop" id="rowModal" hidden>
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rowModalTitle">
+                <h3 class="modal-title" id="rowModalTitle">Student details</h3>
+                <div id="rowDetails"></div>
+                <div class="modal-actions">
+                    <button class="modal-btn modal-btn-cancel" id="rowCloseBtn" type="button">Close</button>
+                    <button class="modal-btn modal-btn-primary" id="rowArchiveBtn" type="button">Archive</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SIGN OUT CONFIRMATION MODAL -->
     <div class="modal-backdrop" id="signOutModal" hidden>
         <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="signOutTitle"
             aria-describedby="signOutDesc">

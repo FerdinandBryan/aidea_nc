@@ -261,32 +261,37 @@ function renderAdminIdentity(user) {
 // ── Students table ─────────────────────────────────────────────────────────
 
 function render() {
+    const archive = viewMode === 'archive';
+    const cols = archive ? 4 : 3;
     const start = (currentPage - 1) * PAGE_SIZE;
     const rows = filtered.slice(start, start + PAGE_SIZE);
     const tbody = $('studentsBody');
 
     if (!rows.length) {
-        tbody.innerHTML = `<tr><td colspan="3" class="empty">No students found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${cols}" class="empty">${archive ? 'No archived students.' : 'No students found.'}</td></tr>`;
         renderPagination();
         return;
     }
 
     tbody.innerHTML = rows.map((s, i) => `
-        <tr>
+        <tr data-id="${escHtml(s.id)}" ${archive ? '' : 'class="row-click" tabindex="0"'}>
             <td data-label="No.">${start + i + 1}</td>
             <td data-label="Name">
                 <div class="avatar-cell">
-                    <span class="avatar" aria-hidden="true" style="overflow:hidden">${s.avatar_url ? `<img src="${escHtml(s.avatar_url)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block">` : escHtml(initials(s))}</span>
+                    <span class="avatar" aria-hidden="true" style="overflow:hidden">${s.avatar_url ? `<img src="${escHtml(s.avatar_url)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : escHtml(initials(s))}</span>
                     <strong>${escHtml(fullName(s))}</strong>
                 </div>
             </td>
-            <td data-label="Email">${escHtml(s.email || '—')}</td>
+            <td data-label="Email">${escHtml(s.email || '-')}</td>
+            ${archive ? `<td data-label="Actions"><div class="row-actions">
+                <button type="button" class="row-act" data-act="unarchive" data-id="${escHtml(s.id)}">Unarchive</button>
+                <button type="button" class="row-act row-act-danger" data-act="delete" data-id="${escHtml(s.id)}">Delete</button>
+            </div></td>` : ''}
         </tr>
     `).join('');
 
     renderPagination();
 }
-
 // 1 … 4 5 6 … 12 — always first, last and the current page's neighbours
 function pageList(current, total) {
     const pages = [...new Set([1, total, current - 1, current, current + 1])]
@@ -341,22 +346,23 @@ function applyFilter() {
 // ── API calls ──────────────────────────────────────────────────────────────
 
 async function fetchStudents() {
+    const archive = viewMode === 'archive';
     try {
-        const res = await api('/students');
+        const res = await api(archive ? '/students/archived' : '/students');
         if (!res.ok) throw new Error(`Failed to fetch students (${res.status})`);
         allStudents = asList(await res.json());
         filtered = [...allStudents];
-        setText('studentCount', `${allStudents.length} registered ${allStudents.length === 1 ? 'student' : 'students'}`);
+        const n = allStudents.length;
+        setText('studentCount', `${n} ${archive ? 'archived' : 'registered'} ${n === 1 ? 'student' : 'students'}`);
         applyFilter();   // keeps any active search after a save
     } catch (err) {
         console.error(err);
         setText('studentCount', 'Unable to load students');
         $('studentsBody').innerHTML =
-            `<tr><td colspan="3" class="empty error">Couldn’t load students. Check your connection and refresh.</td></tr>`;
+            `<tr><td colspan="${archive ? 4 : 3}" class="empty error">Could not load students. Check your connection and refresh.</td></tr>`;
         $('pagination').hidden = true;
     }
 }
-
 async function saveStudent(formData, id = null) {
     const res = await api(id ? `/students/${id}` : '/students', {
         method: id ? 'PUT' : 'POST',
@@ -560,6 +566,72 @@ async function handleFormSubmit(e) {
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 
+// ARCHIVE-V1: row modal, archive view, unarchive and permanent delete
+let viewMode = 'students';
+let rowStudentId = null;
+
+function setView(mode) {
+    viewMode = mode;
+    const archive = mode === 'archive';
+    $('viewTitle').textContent = archive ? 'Archived students' : 'Students';
+    $('addStudentBtn').hidden = archive;
+    $('archiveViewBtn').textContent = archive ? 'Back to students' : 'Archive';
+    $('actionsTh').hidden = !archive;
+    $('searchInput').value = '';
+    setText('studentCount', 'Loading students...');
+    fetchStudents();
+}
+
+function openRowModal(id) {
+    const s = allStudents.find(x => String(x.id) === String(id));
+    if (!s) return;
+    rowStudentId = s.id;
+    const d = new Date(s.created_at);
+    const when = s.created_at && !isNaN(d) ? d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+    $('rowDetails').innerHTML = `<dl class="row-detail">
+        <dt>Name</dt><dd>${escHtml(fullName(s))}</dd>
+        <dt>Email</dt><dd>${escHtml(s.email || '-')}</dd>
+        <dt>Status</dt><dd>${s.is_verified ? 'Verified' : 'Not verified'}</dd>
+        <dt>Registered</dt><dd>${escHtml(when)}</dd>
+    </dl>`;
+    openOverlay($('rowModal'), { focus: $('rowArchiveBtn') });
+}
+
+async function archiveStudent(id) {
+    try {
+        const res = await api(`/students/${id}/archive`, { method: 'POST' });
+        if (!res.ok) throw new Error('Archive failed');
+        closeOverlay($('rowModal'));
+        await fetchStudents();
+    } catch (err) {
+        console.error(err);
+        alert('Could not archive this student. Please try again.');
+    }
+}
+
+async function unarchiveStudent(id) {
+    try {
+        const res = await api(`/students/${id}/unarchive`, { method: 'POST' });
+        if (!res.ok) throw new Error('Unarchive failed');
+        await fetchStudents();
+    } catch (err) {
+        console.error(err);
+        alert('Could not unarchive this student. Please try again.');
+    }
+}
+
+async function deleteArchived(id) {
+    if (!confirm('Permanently delete this student? This cannot be undone.')) return;
+    try {
+        const res = await api(`/students/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Delete failed');
+        await fetchStudents();
+    } catch (err) {
+        console.error(err);
+        alert('Could not delete this student. Please try again.');
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // Guard — admin only
@@ -614,6 +686,27 @@ document.addEventListener('DOMContentLoaded', () => {
     $('pageBtns').addEventListener('click', e => {
         const btn = e.target.closest('[data-page]');
         if (btn && !btn.disabled) goPage(Number(btn.dataset.page));
+    });
+
+    // ARCHIVE-V1 wiring
+    $('archiveViewBtn').addEventListener('click', () => setView(viewMode === 'archive' ? 'students' : 'archive'));
+    $('rowArchiveBtn').addEventListener('click', () => { if (rowStudentId != null) archiveStudent(rowStudentId); });
+    $('rowCloseBtn').addEventListener('click', () => closeOverlay($('rowModal')));
+    $('studentsBody').addEventListener('click', e => {
+        const act = e.target.closest('button[data-act]');
+        if (act) {
+            if (act.dataset.act === 'unarchive') unarchiveStudent(act.dataset.id);
+            else deleteArchived(act.dataset.id);
+            return;
+        }
+        if (viewMode !== 'students') return;
+        const tr = e.target.closest('tr[data-id]');
+        if (tr) openRowModal(tr.dataset.id);
+    });
+    $('studentsBody').addEventListener('keydown', e => {
+        if (e.key !== 'Enter' || viewMode !== 'students') return;
+        const tr = e.target.closest('tr.row-click');
+        if (tr) openRowModal(tr.dataset.id);
     });
 
     fetchStudents();
