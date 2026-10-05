@@ -12,6 +12,7 @@ class AuthController extends Controller
 {
     public function register(Request $request)
     {
+        // signup_pending: nothing is saved to the users table until the email code is confirmed
         $validated = $request->validate([
             "fname" => "required|string|max:75",
             "lname" => "required|string|max:75",
@@ -21,12 +22,8 @@ class AuthController extends Controller
         ]);
 
         $email = strtolower(trim($validated["email"]));
-        $existing = User::where("email", $email)->first();
-        $pending = $existing
-            ? \Illuminate\Support\Facades\DB::table("email_verification_codes")->where("email", $email)->exists()
-            : false;
 
-        if ($existing && !$pending) {
+        if (User::where("email", $email)->exists()) {
             return response()->json([
                 "success" => false,
                 "message" => "This email is already registered.",
@@ -34,26 +31,23 @@ class AuthController extends Controller
             ], 422);
         }
 
-        if ($existing) {
-            // Unconfirmed signup being retried: update the details and send a fresh code
-            $existing->forceFill([
-                "fname" => $validated["fname"],
-                "lname" => $validated["lname"],
-                "mi" => $validated["mi"] ?? null,
-                "password_hash" => Hash::make($validated["password"]),
-            ])->save();
-        } else {
-            User::create([
-                "fname" => $validated["fname"],
-                "lname" => $validated["lname"],
-                "mi" => $validated["mi"] ?? null,
-                "email" => $email,
-                "password_hash" => Hash::make($validated["password"]),
-                "is_verified" => 0,
-            ]);
+        $row = \Illuminate\Support\Facades\DB::table("email_verification_codes")->where("email", $email)->first();
+        if ($row && $row->last_sent_at && \Carbon\Carbon::parse($row->last_sent_at)->diffInSeconds(now(), true) < 60) {
+            return response()->json([
+                "success" => false,
+                "message" => "A code was just sent to this email. Please wait a minute before trying again.",
+            ], 429);
         }
 
-        if (!$this->issueEmailCode($email)) {
+        $sent = $this->issueEmailCode($email, [
+            "fname" => $validated["fname"],
+            "lname" => $validated["lname"],
+            "mi" => $validated["mi"] ?? null,
+            "password_hash" => Hash::make($validated["password"]),
+        ]);
+
+        if (!$sent) {
+            \Illuminate\Support\Facades\DB::table("email_verification_codes")->where("email", $email)->delete();
             return response()->json([
                 "success" => false,
                 "message" => "We could not send the verification code right now. Please try again in a moment.",
@@ -79,7 +73,7 @@ class AuthController extends Controller
         $row = \Illuminate\Support\Facades\DB::table("email_verification_codes")->where("email", $email)->first();
 
         if (!$row) {
-            return response()->json(["success" => false, "message" => "No pending verification for this email."], 400);
+            return response()->json(["success" => false, "message" => "No pending verification for this email. Please register again."], 400);
         }
         if (\Carbon\Carbon::parse($row->expires_at)->isPast()) {
             return response()->json(["success" => false, "message" => "This code has expired. Please request a new one."], 400);
@@ -96,7 +90,25 @@ class AuthController extends Controller
             ], 400);
         }
 
-        User::where("email", $email)->update(["email_verified_at" => now()]);
+        if (User::where("email", $email)->exists()) {
+            \Illuminate\Support\Facades\DB::table("email_verification_codes")->where("email", $email)->delete();
+            return response()->json(["success" => false, "message" => "This email is already registered."], 422);
+        }
+        if (empty($row->password_hash)) {
+            \Illuminate\Support\Facades\DB::table("email_verification_codes")->where("email", $email)->delete();
+            return response()->json(["success" => false, "message" => "Your sign-up expired. Please register again."], 400);
+        }
+
+        // Code is correct: only now is the account created
+        User::create([
+            "fname" => $row->fname,
+            "lname" => $row->lname,
+            "mi" => $row->mi,
+            "email" => $email,
+            "password_hash" => $row->password_hash,
+            "is_verified" => 0,
+            "email_verified_at" => now(),
+        ]);
         \Illuminate\Support\Facades\DB::table("email_verification_codes")->where("email", $email)->delete();
 
         return response()->json(["success" => true, "message" => "Email confirmed."]);
@@ -110,7 +122,7 @@ class AuthController extends Controller
         $row = \Illuminate\Support\Facades\DB::table("email_verification_codes")->where("email", $email)->first();
 
         if (!$row) {
-            return response()->json(["success" => false, "message" => "No pending verification for this email."], 400);
+            return response()->json(["success" => false, "message" => "No pending verification for this email. Please register again."], 400);
         }
 
         $wait = 60 - \Carbon\Carbon::parse($row->last_sent_at)->diffInSeconds(now(), true);
@@ -129,20 +141,20 @@ class AuthController extends Controller
         return response()->json(["success" => true, "message" => "A new code was sent.", "cooldown" => 60]);
     }
 
-    private function issueEmailCode(string $email): bool
+    private function issueEmailCode(string $email, array $data = []): bool
     {
         $code = strval(random_int(100000, 999999));
 
         \Illuminate\Support\Facades\DB::table("email_verification_codes")->updateOrInsert(
             ["email" => $email],
-            [
+            array_merge([
                 "code_hash" => Hash::make($code),
                 "attempts" => 0,
                 "expires_at" => now()->addMinutes(10),
                 "last_sent_at" => now(),
                 "created_at" => now(),
                 "updated_at" => now(),
-            ]
+            ], $data)
         );
 
         try {
