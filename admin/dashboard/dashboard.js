@@ -395,21 +395,20 @@ async function initRevenueChart() {
         asList(await load('/payments')).forEach(p => {
             if (!isPaid(p)) return;
             const d = new Date(p.date || p.created_at);
-            if (!isNaN(d) && d.getFullYear() === year) monthly[d.getMonth()] += Number(p.amount || 0);
+            if (!isNaN(d) && d.getFullYear() === year) monthly[d.getMonth()] += 1;
         });
     } catch { /* keep zeroes */ }
 
-    setText('revenueYear', `Completed payments by month, ${year}`);
+    setText('revenueYear', `Completed availments by month, ${year}`);
 
-    const compact = v => v >= 1000000 ? '₱' + (v / 1000000) + 'M'
-        : v >= 1000 ? '₱' + (v / 1000) + 'k' : '₱' + v;
+    const compact = v => Number.isInteger(v) ? String(v) : '';
 
     charts.revenue = new Chart(canvas.getContext('2d'), {
         type: 'line',
         data: {
             labels: months,
             datasets: [{
-                label: 'Revenue',
+                label: 'Availments',
                 data: monthly,
                 borderColor: cssVar('--chart-line'),
                 backgroundColor: cssVar('--chart-fill'),
@@ -431,7 +430,7 @@ async function initRevenueChart() {
                 legend: { display: false },
                 tooltip: {
                     displayColors: false,
-                    callbacks: { label: ctx => peso(ctx.parsed.y) },
+                    callbacks: { label: ctx => ctx.parsed.y + (ctx.parsed.y === 1 ? ' availment' : ' availments') },
                 },
             },
             scales: {
