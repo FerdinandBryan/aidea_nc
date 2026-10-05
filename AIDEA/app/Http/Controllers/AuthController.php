@@ -181,6 +181,14 @@ class AuthController extends Controller
             ], 403);
         }
 
+if (!empty($user->archived_at)) {
+            return response()->json([
+                "success" => false,
+                "message" => "This account has been archived. Please contact the administrator.",
+                "archived" => true,
+            ], 403);
+        }
+
 // Verification check disabled -- all users can log in regardless of is_verified
         // if (!$user->is_verified) {
         //     return response()->json([

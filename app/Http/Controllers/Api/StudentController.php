@@ -92,6 +92,7 @@ class StudentController extends Controller
     {
         $student = User::where('is_admin', 0)->findOrFail($id);
         $student->forceFill(['archived_at' => now()])->save();
+        $student->tokens()->delete();
 
         return response()->json(['message' => 'Student archived.']);
     }
