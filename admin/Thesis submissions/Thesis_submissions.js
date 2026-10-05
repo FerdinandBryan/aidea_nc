@@ -330,16 +330,9 @@
         const fileSection = document.getElementById('viewFileSection');
         if (t.file) {
             fileSection.innerHTML =
-                '<div class="submitted-file-card">' +
-                    '<div class="file-tag">' + escHtml(fileExt(t.file.name)) + '</div>' +
-                    '<div class="file-card-info">' +
-                        '<div class="file-card-name" title="' + escHtml(t.file.name) + '">' + escHtml(t.file.name) + '</div>' +
-                        '<div class="file-card-meta">' + formatSize(t.file.size) + '</div>' +
-                    '</div>' +
-                    '<div class="file-card-btns">' +
-                        '<button class="btn-file" onclick="AideaThesis.checkFile(' + t.id + ')">View</button>' +
-                        '<button class="btn-file" onclick="AideaThesis.downloadFile(' + t.id + ')">Download</button>' +
-                    '</div>' +
+                '<div class="file-card-btns" style="display:flex;gap:8px;flex-wrap:wrap">' +
+                    '<button type="button" class="btn-file" onclick="AideaThesis.checkFile(' + t.id + ')">Preview</button>' +
+                    '<button type="button" class="btn-file" onclick="AideaThesis.downloadFile(' + t.id + ')">Download</button>' +
                 '</div>';
         } else {
             fileSection.innerHTML = '<div class="no-file-notice">No file submitted by the student.</div>';
@@ -348,26 +341,73 @@
         openDialog('viewModal');
     }
 
+    function openWidePreview(url, name) {
+        const isPdf = /\.pdf(\?|$)/i.test(String(name)) || /\.pdf(\?|$)/i.test(String(url));
+        const bg = document.createElement('div');
+        bg.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:2vh 2vw';
+        const box = document.createElement('div');
+        box.style.cssText = 'width:96vw;height:94vh;display:flex;flex-direction:column;background:#fff;color:#111;border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)';
+        const head = document.createElement('div');
+        head.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #ddd';
+        const title = document.createElement('strong');
+        title.textContent = name;
+        title.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button'; closeBtn.textContent = 'Close';
+        closeBtn.style.cssText = 'padding:8px 18px;border-radius:8px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;border:1px solid #cbd5e1;background:#fff;color:#111';
+        head.append(title, closeBtn);
+        const fr = document.createElement('iframe');
+        fr.title = 'File preview';
+        fr.src = isPdf ? url : 'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(url);
+        fr.style.cssText = 'flex:1;width:100%;border:0;background:#fff';
+        box.append(head, fr);
+        bg.appendChild(box);
+        document.body.appendChild(bg);
+        const close = function () { bg.remove(); document.removeEventListener('keydown', onKey, true); };
+        const onKey = function (ev) { if (ev.key === 'Escape') { ev.stopImmediatePropagation(); close(); } };
+        document.addEventListener('keydown', onKey, true);
+        bg.addEventListener('click', function (ev) { if (ev.target === bg) close(); });
+        closeBtn.addEventListener('click', close);
+    }
+
     function checkSubmittedFile(id) {
         const t = theses.find(function (x) { return x.id === id; });
         if (!t?.file?.url) { showToast('No file available.', 'warning'); return; }
-        window.open(t.file.url, '_blank');
+        openWidePreview(t.file.url, t.file.name);
     }
 
-    function downloadSubmittedFile(id) {
+    async function downloadSubmittedFile(id) {
         const t = theses.find(function (x) { return x.id === id; });
         if (!t?.file?.url) { showToast('No file available.', 'warning'); return; }
-        const a = document.createElement('a');
-        a.href = t.file.url;
-        a.download = t.file.name;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        showToast('Downloading "' + t.file.name + '"…', 'info');
+        const ext = t.file.name.includes('.') ? '.' + t.file.name.split('.').pop() : '';
+        const base = String(t.title || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100);
+        const suggested = (base || t.file.name.replace(/\.[^.]+$/, '')) + ext;
+        let handle = null;
+        if (window.showSaveFilePicker) {
+            try { handle = await window.showSaveFilePicker({ suggestedName: suggested }); }
+            catch (err) { return; }
+        }
+        try {
+            const r = await fetch(t.file.url);
+            if (!r.ok) throw new Error('bad response');
+            const blob = await r.blob();
+            if (handle) {
+                const w = await handle.createWritable();
+                await w.write(blob);
+                await w.close();
+            } else {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = suggested;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+            }
+        } catch (err) {
+            showToast('The file could not be downloaded. Please try again.', 'error');
+        }
     }
-
     // ── Review modal ─────────────────────────────────────────────────────────
     function prepareReview(id) {
         const t = theses.find(function (x) { return x.id === id; });
