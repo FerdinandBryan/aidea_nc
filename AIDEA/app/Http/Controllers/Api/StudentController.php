@@ -81,7 +81,7 @@ class StudentController extends Controller
         $students = User::where('is_admin', 0)
             ->whereNotNull('archived_at')
             ->orderBy('archived_at', 'desc')
-            ->get(['id', 'fname', 'lname', 'mi', 'email', 'is_verified', 'created_at', 'archived_at', 'avatar_path']);
+            ->get(['id', 'fname', 'lname', 'mi', 'email', 'is_verified', 'role', 'created_at', 'archived_at', 'avatar_path']);
 
         return response()->json($students);
     }

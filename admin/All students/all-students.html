@@ -150,7 +150,12 @@
                 <input type="search" class="search-input" id="searchInput" placeholder="Search by name or email"
                     autocomplete="off" />
 
-                <button class="btn-primary" id="addStudentBtn" type="button">Add student</button>
+                <select class="btn-primary" id="roleFilter" aria-label="Filter by account type">
+                    <option value="all">All users</option>
+                    <option value="students">Students</option>
+                    <option value="experts">Experts</option>
+                    <option value="librarian">Librarian</option>
+                </select>
                 <button class="btn-primary" id="archiveViewBtn" type="button">Archive</button>
             </div>
 

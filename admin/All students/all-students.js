@@ -333,16 +333,27 @@ function goPage(n) {
     render();
 }
 
+function roleGroup(s) {
+    const r = String(s.role || '').toLowerCase();
+    if (r === 'statistician' || r === 'grammarian') return 'experts';
+    if (r === 'librarian') return 'librarian';
+    return 'students';
+}
+
 function applyFilter() {
     const q = $('searchInput').value.trim().toLowerCase();
-    filtered = allStudents.filter(s =>
+    const f = $('roleFilter') ? $('roleFilter').value : 'all';
+    const byRole = allStudents.filter(s => f === 'all' || roleGroup(s) === f);
+    filtered = byRole.filter(s =>
         fullName(s).toLowerCase().includes(q)
         || (s.email || '').toLowerCase().includes(q)
     );
+    const names = { all: ['user', 'users'], students: ['student', 'students'], experts: ['expert', 'experts'], librarian: ['librarian', 'librarians'] }[f] || ['user', 'users'];
+    const n = byRole.length;
+    setText('studentCount', `${n} ${viewMode === 'archive' ? 'archived' : 'registered'} ${n === 1 ? names[0] : names[1]}`);
     currentPage = 1;
     render();
 }
-
 // ── API calls ──────────────────────────────────────────────────────────────
 
 async function fetchStudents() {
@@ -574,7 +585,6 @@ function setView(mode) {
     viewMode = mode;
     const archive = mode === 'archive';
     $('viewTitle').textContent = archive ? 'Archived students' : 'Students';
-    $('addStudentBtn').hidden = archive;
     $('archiveViewBtn').textContent = archive ? 'Back to students' : 'Archive';
     $('actionsTh').hidden = !archive;
     $('searchInput').value = '';
@@ -650,7 +660,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Students
     $('searchInput').addEventListener('input', applyFilter);
-    $('addStudentBtn').addEventListener('click', openAddModal);
+    $('roleFilter').addEventListener('change', applyFilter);
     $('studentForm').addEventListener('submit', handleFormSubmit);
 
     // Emails are lowercase only: typed or pasted capitals are converted as you go

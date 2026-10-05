@@ -361,3 +361,7 @@ tr.row-click:hover td { background: rgba(128,128,128,.08); }
 .row-detail { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 12px 0 18px; }
 .row-detail dt { opacity: .65; }
 .row-detail dd { margin: 0; overflow-wrap: anywhere; }
+
+/* ROLE-FILTER: dropdown replaces the Add student button */
+#roleFilter { padding: 10px 14px; border-radius: 10px; font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; border: 0; }
+#roleFilter option { color: #111; background: #fff; }
