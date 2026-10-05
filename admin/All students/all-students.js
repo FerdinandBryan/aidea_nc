@@ -664,25 +664,25 @@ async function loadExperts() {
                 <td><strong>${escHtml([r.fname, r.lname].filter(Boolean).join(' ') || '-')}</strong></td>
                 <td>${escHtml(r.email || '-')}</td>
                 <td>${escHtml(EXPERT_LABELS[r.role] || r.role || '-')}</td>
-                <td><button type="button" class="row-act row-act-danger" data-exp-remove="${escHtml(r.id)}">Remove</button></td>
+                <td><button type="button" class="row-act" data-exp-remove="${escHtml(r.id)}">Archive</button></td>
             </tr>`).join('');
     } catch {
         tbody.innerHTML = '<tr><td colspan="4" class="empty error">Could not load expert accounts.</td></tr>';
     }
 }
 
+// EXPERT-ARCHIVE: archive instead of delete; the account then shows in the Archive view
 async function removeExpert(id) {
-    if (!confirm('Remove this expert account? They will no longer be able to log in.')) return;
+    if (!confirm('Archive this expert account? They will no longer be able to log in. You can restore them from the Archive view.')) return;
     try {
-        const res = await api(`/admin/reviewers/${id}`, { method: 'DELETE' });
+        const res = await api(`/students/${id}/archive`, { method: 'POST' });
         if (!res.ok) throw new Error();
         await loadExperts();
         await fetchStudents();
     } catch {
-        alert('Could not remove that account. Try again.');
+        alert('Could not archive that account. Try again.');
     }
 }
-
 function openExperts() {
     $('expForm').reset();
     expertMsg('', null);

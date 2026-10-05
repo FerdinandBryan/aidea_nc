@@ -76,7 +76,7 @@ class AccountController extends Controller
      */
     public function reviewers()
     {
-        $reviewers = User::whereIn('role', ['statistician', 'grammarian'])
+        $reviewers = User::whereIn('role', ['statistician', 'grammarian'])->whereNull('archived_at')
             ->orderByDesc('created_at')
             ->get()
             ->makeHidden(['password_hash']);
