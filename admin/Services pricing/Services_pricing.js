@@ -920,7 +920,7 @@ function renderResearchItems() {
         <div class="research-item-block">
             <div class="research-item-row">
                 <select class="research-item-type" data-idx="${i}" title="What should the student provide for this item?">
-                    ${Object.entries(ITEM_TYPE_META).map(([val, m]) =>
+                    ${Object.entries(ITEM_TYPE_META).filter(([val]) => val !== 'excel' || item.type === 'excel').map(([val, m]) =>
         `<option value="${val}" ${item.type === val ? 'selected' : ''}>${m.label}</option>`
     ).join('')}
                 </select>

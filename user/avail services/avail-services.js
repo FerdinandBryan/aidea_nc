@@ -29,7 +29,7 @@ const ALLOWED_FILE_TYPES = [
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ];
-const ALLOWED_FILE_EXT = ['.pdf', '.doc', '.docx'];
+const ALLOWED_FILE_EXT = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'];
 
 const ITEM_TYPE_META = {
     text: { icon: '📝', label: 'Text' },
@@ -473,7 +473,7 @@ function renderResearchFields(items) {
 
         if (item.type === 'file' || item.type === 'image') {
             const isImage = item.type === 'image';
-            const hint = isImage ? `PNG or JPG — max ${MAX_IMAGE_MB} MB` : `PDF, DOC, or DOCX — max ${MAX_FILE_MB} MB`;
+            const hint = isImage ? `PNG or JPG — max ${MAX_IMAGE_MB} MB` : `PDF, Word, or Excel — max ${MAX_FILE_MB} MB`;
             const upIcon = isImage ? '🖼️' : '📄';
             return `
                 <div class="form-group">
@@ -487,7 +487,7 @@ function renderResearchFields(items) {
                         <div class="gm-file-name ri-dyn-filename" style="display:none;"></div>
                     </button>
                     <input type="file" class="ri-dyn-file-input" data-idx="${i}"
-                        accept="${isImage ? 'image/*' : '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'}"
+                        accept="${isImage ? 'image/*' : '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}"
                         style="display:none;" />
                     <div class="gm-file-status ri-dyn-status" data-idx="${i}"></div>
                 </div>`;
@@ -618,7 +618,7 @@ async function handleDynamicFile(idx, file, type) {
         const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
         const typeOk = ALLOWED_FILE_TYPES.includes(file.type) || ALLOWED_FILE_EXT.includes(ext);
         if (!typeOk) {
-            statusEl.textContent = 'Only PDF, DOC, or DOCX files are accepted.';
+            statusEl.textContent = 'Only PDF, Word, or Excel files are accepted.';
             statusEl.style.color = '#ef4444';
             delete researchFieldValues[idx];
             return;
