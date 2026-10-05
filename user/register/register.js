@@ -66,6 +66,89 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     $('regPassword')?.addEventListener('input', e => updateStrength(e.target.value));
+    /* OTP-V1: email verification code step */
+    let otpEmail = '';
+    let otpTimer = null;
+
+    function otpStartCooldown(sec) {
+        clearInterval(otpTimer);
+        let left = Math.max(0, Number(sec) || 0);
+        const btn = $('otpResendBtn');
+        const tick = () => {
+            btn.disabled = left > 0;
+            btn.textContent = left > 0 ? `Resend code in ${left}s` : 'Resend code';
+            if (left <= 0) clearInterval(otpTimer);
+            left--;
+        };
+        tick();
+        otpTimer = setInterval(tick, 1000);
+    }
+
+    function openOtp(email, cooldown) {
+        otpEmail = email;
+        $('otpEmail').textContent = email;
+        $('otpInput').value = '';
+        $('otpError').textContent = '';
+        $('otpOverlay').hidden = false;
+        otpStartCooldown(cooldown || 60);
+        $('otpInput').focus();
+    }
+
+    async function otpPost(path, body) {
+        const res = await fetch(`${API}${path}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+        return { res, data };
+    }
+
+    async function otpVerify() {
+        const code = $('otpInput').value.trim();
+        if (!/^\d{6}$/.test(code)) { $('otpError').textContent = 'Enter the 6-digit code.'; return; }
+        $('otpVerifyBtn').disabled = true;
+        $('otpError').textContent = '';
+        try {
+            const { data } = await otpPost('/verify-email', { email: otpEmail, code });
+            if (data.success) {
+                clearInterval(otpTimer);
+                $('otpOverlay').hidden = true;
+                $('successOverlay').hidden = false;
+                document.querySelector('#successOverlay .btn-submit')?.focus();
+            } else {
+                const firstError = Object.values(data.errors || {})[0];
+                $('otpError').textContent = firstError ? firstError[0] : (data.message || 'Could not verify the code.');
+            }
+        } catch {
+            $('otpError').textContent = 'Could not reach the server. Try again.';
+        }
+        $('otpVerifyBtn').disabled = false;
+    }
+
+    async function otpResend() {
+        $('otpResendBtn').disabled = true;
+        $('otpError').textContent = '';
+        try {
+            const { data } = await otpPost('/resend-email-code', { email: otpEmail });
+            if (data.success) {
+                showToast('A new code was sent to your email.', 'success');
+                otpStartCooldown(data.cooldown || 60);
+            } else {
+                $('otpError').textContent = data.message || 'Could not resend the code.';
+                otpStartCooldown(data.retry_after || 0);
+            }
+        } catch {
+            $('otpError').textContent = 'Could not reach the server. Try again.';
+            otpStartCooldown(0);
+        }
+    }
+
+    $('otpInput')?.addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6); $('otpError').textContent = ''; });
+    $('otpInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); otpVerify(); } });
+    $('otpVerifyBtn')?.addEventListener('click', otpVerify);
+    $('otpResendBtn')?.addEventListener('click', otpResend);
+    $('otpChangeBtn')?.addEventListener('click', () => { clearInterval(otpTimer); $('otpOverlay').hidden = true; $('regEmail')?.focus(); });
 
     /* ── FORM SUBMIT ── */
     $('registerForm')?.addEventListener('submit', async e => {
@@ -94,8 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setLoading(false);
 
             if (data.success) {
-                $('successOverlay').hidden = false;
-                document.querySelector('#successOverlay .btn-submit')?.focus();
+                openOtp(data.email || payload.email, data.cooldown);
             } else {
                 const firstError = Object.values(data.errors || {})[0];
                 showToast(firstError ? firstError[0] : (data.message || 'Registration failed.'), 'error');

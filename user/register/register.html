@@ -379,8 +379,26 @@
                 </svg>
             </div>
             <h2 id="successTitle">Account created</h2>
-            <p id="successDesc">We sent a verification email to your address. Verify it to start using AIDEA.</p>
+            <p id="successDesc">Your email is confirmed. You can now sign in to AIDEA.</p>
             <a href="../login/login.html" class="btn-submit">Go to sign in</a>
+        </div>
+    </div>
+
+    <!-- OTP-V1: email verification code -->
+    <style>
+        #otpOverlay #otpInput { width: 100%; box-sizing: border-box; margin: 14px 0 4px; padding: 12px; text-align: center; font: inherit; font-size: 26px; font-weight: 700; letter-spacing: 10px; border-radius: 10px; border: 1px solid rgba(128,128,128,.4); background: transparent; color: inherit; }
+        #otpOverlay .btn-submit, #otpOverlay .btn-ghost { width: 100%; margin-top: 10px; }
+        #otpOverlay .field-error { display: block; min-height: 18px; text-align: center; }
+    </style>
+    <div class="modal-backdrop" id="otpOverlay" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="otpTitle">
+            <h2 id="otpTitle">Verify your email</h2>
+            <p id="otpDesc">Enter the 6-digit code we sent to <strong id="otpEmail"></strong>. It expires in 10 minutes.</p>
+            <input type="text" id="otpInput" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-label="6-digit code" />
+            <span class="field-error" id="otpError" aria-live="polite"></span>
+            <button type="button" class="btn-submit" id="otpVerifyBtn">Verify email</button>
+            <button type="button" class="btn-ghost" id="otpResendBtn" disabled>Resend code</button>
+            <button type="button" class="btn-ghost" id="otpChangeBtn">Change email</button>
         </div>
     </div>
 

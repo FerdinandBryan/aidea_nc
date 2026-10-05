@@ -49,6 +49,8 @@ Route::prefix('students')->group(function () {
 });
 
 Route::post('/register', [AuthController::class, 'register']);
+Route::post('/verify-email', [AuthController::class, 'verifyEmail'])->middleware('throttle:20,1');
+Route::post('/resend-email-code', [AuthController::class, 'resendEmailCode'])->middleware('throttle:10,1');
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
