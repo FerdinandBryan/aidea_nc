@@ -369,6 +369,27 @@
     }
 
     // ── Review modal ─────────────────────────────────────────────────────────
+    function prepareReview(id) {
+        const t = theses.find(function (x) { return x.id === id; });
+        if (!t) return;
+        activeReviewId = id;
+        selectedStatus = t.status;
+        const statusCls = { Approved: 'status-approved', Pending: 'status-pending', Rejected: 'status-rejected' };
+        document.getElementById('reviewCurrentStatus').innerHTML =
+            '<span class="' + (statusCls[t.status] || '') + '">' + escHtml(t.status) + '</span>';
+        document.querySelectorAll('.btn-status').forEach(function (b) { b.classList.remove('selected'); });
+        const match = document.querySelector('.btn-status.' + String(t.status).toLowerCase());
+        if (match) match.classList.add('selected');
+        document.getElementById('reviewRemarks').value = '';
+    }
+
+    function refreshReviewPanel(t) {
+        prepareReview(t.id);
+        const statusCls = { Approved: 'status-approved', Pending: 'status-pending', Rejected: 'status-rejected' };
+        document.getElementById('viewStatus').innerHTML =
+            '<span class="' + (statusCls[t.status] || '') + '">' + escHtml(t.status) + '</span>';
+    }
+
     function reviewThesis(id) {
         const t = theses.find(function (x) { return x.id === id; });
         if (!t) return;
@@ -420,7 +441,7 @@
             }
 
             thesis.status = selectedStatus;
-            closeDialog('reviewModal');
+            refreshReviewPanel(thesis);
             applyFilter();
             updateStats();
             showToast('"' + thesis.title + '" marked as ' + selectedStatus + '.', 'success');
@@ -596,7 +617,6 @@
                 '<td data-label="Status">' + statusBadge(t.status) + '</td>' +
                 '<td data-label="Actions" class="action-cell">' +
                     '<button class="btn-action" onclick="AideaThesis.viewThesis(' + t.id + ')">View</button>' +
-                    '<button class="btn-action" onclick="AideaThesis.reviewThesis(' + t.id + ')">Review</button>' +
                     repoBtnHtml(t) +
                 '</td>' +
             '</tr>';
@@ -628,7 +648,7 @@
 
     // ── Public bridge for inline handlers in generated markup ──────────────
     window.AideaThesis = {
-        viewThesis: viewThesis,
+        viewThesis: function (id) { viewThesis(id); prepareReview(id); },
         reviewThesis: reviewThesis,
         addToRepository: addToRepository,
         removeFromRepository: removeFromRepository,

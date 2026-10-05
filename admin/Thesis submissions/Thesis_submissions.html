@@ -234,32 +234,9 @@
                     <span class="detail-label">Submitted file</span>
                     <div id="viewFileSection"></div>
                 </div>
-            </div>
-            <div class="modal-actions">
-                <button class="modal-btn modal-btn-cancel" type="button" data-close="viewModal">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- REVIEW MODAL -->
-    <div class="modal-backdrop" id="reviewModal" hidden>
-        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="reviewModalTitle">
-            <div class="modal-head">
-                <h3 class="modal-title" id="reviewModalTitle">Review thesis</h3>
-                <button class="modal-x" type="button" data-close="reviewModal" aria-label="Close">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round">
-                        <path d="M6 6l12 12M18 6L6 18" />
-                    </svg>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="detail-row"><span class="detail-label">Title</span><span class="detail-value"
-                        id="reviewTitle"></span></div>
-                <div class="detail-row"><span class="detail-label">Student</span><span class="detail-value"
-                        id="reviewStudent"></span></div>
-                <div class="detail-row"><span class="detail-label">Current status</span><span class="detail-value"
-                        id="reviewCurrentStatus"></span></div>
+                <div class="detail-col" style="border-top:1px solid rgba(128,128,128,.25);padding-top:14px;margin-top:6px">
+                    <div class="detail-row"><span class="detail-label">Current status</span><span class="detail-value" id="reviewCurrentStatus"></span></div>
+                </div>
                 <div class="detail-col">
                     <span class="detail-label">Set status</span>
                     <div class="status-options">
@@ -270,16 +247,20 @@
                 </div>
                 <div class="detail-col">
                     <label class="detail-label" for="reviewRemarks">Remarks</label>
-                    <textarea class="form-control" id="reviewRemarks" rows="4"
-                        placeholder="Add review comments or feedback"></textarea>
+                    <textarea class="form-control" id="reviewRemarks" rows="4" placeholder="Add review comments or feedback"></textarea>
+                </div>
+                <div style="display:flex;justify-content:flex-end;margin-top:8px">
+                    <button class="modal-btn modal-btn-primary" type="button" id="submitReviewBtn">Submit review</button>
                 </div>
             </div>
             <div class="modal-actions">
-                <button class="modal-btn modal-btn-cancel" type="button" data-close="reviewModal">Cancel</button>
-                <button class="modal-btn modal-btn-primary" type="button" id="submitReviewBtn">Submit review</button>
+                <button class="modal-btn modal-btn-cancel" type="button" data-close="viewModal">Close</button>
             </div>
         </div>
     </div>
+
+    <!-- REVIEW MODAL (moved into the View modal; empty stub keeps old references safe) -->
+    <div class="modal-backdrop" id="reviewModal" hidden></div>
 
     <!-- REPOSITORY MODAL -->
     <div class="modal-backdrop" id="repoModal" hidden>
