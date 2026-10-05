@@ -43,6 +43,9 @@ Route::prefix('students')->group(function () {
     Route::post('/', [StudentController::class, 'store']);
     Route::put('/{id}', [StudentController::class, 'update']);
     Route::delete('/{id}', [StudentController::class, 'destroy']);
+    Route::get('/archived', [StudentController::class, 'archived']);
+    Route::post('/{id}/archive', [StudentController::class, 'archive']);
+    Route::post('/{id}/unarchive', [StudentController::class, 'unarchive']);
 });
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -263,3 +266,4 @@ require __DIR__ . '/profile.php';
 Route::get('/pricing-sheet', [\App\Http\Controllers\PricingSheetController::class, 'show'])->middleware('auth:sanctum');
 Route::post('/pricing-sheet', [\App\Http\Controllers\PricingSheetController::class, 'store'])->middleware(['auth:sanctum', 'admin']);
 Route::delete('/pricing-sheet', [\App\Http\Controllers\PricingSheetController::class, 'destroy'])->middleware(['auth:sanctum', 'admin']);
+Route::post('/docx/format', [App\Http\Controllers\DocxFormatController::class, 'format'])->middleware('throttle:20,1');

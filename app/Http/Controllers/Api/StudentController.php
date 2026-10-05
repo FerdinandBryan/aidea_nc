@@ -13,6 +13,7 @@ class StudentController extends Controller
     public function index()
     {
         $students = User::where('is_admin', 0)
+            ->whereNull('archived_at')
             ->orderBy('created_at', 'desc')
             ->get(['id', 'fname', 'lname', 'mi', 'email', 'is_verified', 'created_at', 'avatar_path'])
             ->each->append('avatar_url');
@@ -74,5 +75,32 @@ class StudentController extends Controller
         $student->delete();
 
         return response()->json(['message' => 'Student deleted successfully.']);
+    }
+
+    public function archived()
+    {
+        $students = User::where('is_admin', 0)
+            ->whereNotNull('archived_at')
+            ->orderBy('archived_at', 'desc')
+            ->get(['id', 'fname', 'lname', 'mi', 'email', 'is_verified', 'created_at', 'archived_at', 'avatar_path'])
+            ->each->append('avatar_url');
+
+        return response()->json($students);
+    }
+
+    public function archive($id)
+    {
+        $student = User::where('is_admin', 0)->findOrFail($id);
+        $student->forceFill(['archived_at' => now()])->save();
+
+        return response()->json(['message' => 'Student archived.']);
+    }
+
+    public function unarchive($id)
+    {
+        $student = User::where('is_admin', 0)->findOrFail($id);
+        $student->forceFill(['archived_at' => null])->save();
+
+        return response()->json(['message' => 'Student restored.']);
     }
 }

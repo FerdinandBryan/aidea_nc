@@ -42,6 +42,9 @@ Route::prefix('students')->group(function () {
     Route::post('/', [StudentController::class, 'store']);
     Route::put('/{id}', [StudentController::class, 'update']);
     Route::delete('/{id}', [StudentController::class, 'destroy']);
+    Route::get('/archived', [StudentController::class, 'archived']);
+    Route::post('/{id}/archive', [StudentController::class, 'archive']);
+    Route::post('/{id}/unarchive', [StudentController::class, 'unarchive']);
 });
 
 Route::post('/register', [AuthController::class, 'register']);
