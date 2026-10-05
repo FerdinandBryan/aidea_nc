@@ -269,6 +269,8 @@ function renderReviewerIdentity(user) {
     setText('footerName', fullName);
     setText('footerRole', roleLabel);
     setText('roleBadge', roleLabel);
+    // GRAM-NOFT: grammarians cannot use this page
+    if (user.role === 'grammarian') { window.location.replace('../thesis reviewer/Thesis_reviewer.html'); }
 }
 
 //  Tabs (Send / Received) 

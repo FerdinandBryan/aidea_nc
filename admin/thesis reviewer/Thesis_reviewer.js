@@ -206,6 +206,8 @@ function renderReviewerIdentity(user) {
     setText('footerName', fullName);
     setText('footerRole', roleLabel);
     setText('roleBadge', roleLabel);
+    // GRAM-NOFT: grammarians do not get File Transfer
+    if (user.role === 'grammarian') { document.querySelectorAll('a[href*="Reviewer_file_transfer"]').forEach(function (l) { l.style.display = 'none'; }); }
 }
 
 // ── Tabs ─────────────────────────────────────────────────────────────────
