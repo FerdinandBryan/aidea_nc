@@ -296,11 +296,24 @@ function renderAdminNote(raw) {
     }
     return '<div class="rn-wrap">' + stripStatusItem(html) + '</div>';
 }
+function svcName() {
+    var b = document.getElementById('roleBadge');
+    var s = b ? b.textContent.trim() : '';
+    return s || 'Reviewer';
+}
+function noteWithDetails(t) {
+    var n = String((t && t.note) || '');
+    if (n.indexOf('REQUEST DETAILS') >= 0) return n;
+    var who = (t && (t.student_name || (t.student && t.student.name))) || '-';
+    var lines = ['Student: ' + who, 'Service: ' + svcName(), 'Date: ' + formatDate(t && (t.assigned_at || t.created_at)), 'Research title: -', 'Researcher/s: -', 'Program: -', 'Adviser: -', 'Type of research: -', 'Facebook contact: -'];
+    return (n ? n + '\n\n' : '') + 'REQUEST DETAILS\n' + lines.join('\n');
+}
 function splitReviewTitle(t) {
     const title = String((t && t.title) || '');
     if (t && t.file_label) return { title: title, label: t.file_label };
     const m = title.match(/^(.+?)\s[-\u2013\u2014]\s(.+?)\s[-\u2013\u2014]\s(.+)$/);
     if (m) return { title: m[1] + ' - ' + m[2], label: m[3] };
+    var sn = t && (t.student_name || (t.student && t.student.name)); if (/^upload\b/i.test(title) && sn) return { title: svcName() + ' \u2013 ' + sn, label: title };
     return { title: title, label: '' };
 }
 function linkifyLabel(label) {
@@ -381,7 +394,7 @@ async function loadPending() {
                         <span class="badge badge-warning">Pending review</span>
                     </div>
 
-                    ${renderAdminNote(t.note)}
+                    ${renderAdminNote(noteWithDetails(t))}
 
                     ${renderFileRows(t)}
 
