@@ -6,7 +6,8 @@
     pdf: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
     worker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
     zip: 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
-    docx: 'https://cdnjs.cloudflare.com/ajax/libs/docx-preview/0.3.2/docx-preview.min.js'
+    docx: 'https://cdnjs.cloudflare.com/ajax/libs/docx-preview/0.3.2/docx-preview.min.js',
+    xlsx: 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
   };
   var loading = {};
   var notesKey = 'svNotes';
@@ -637,6 +638,34 @@
     });
   }
 
+  function renderXlsx(buf, scroll, stat, title) {
+    return loadScript(LIBS.xlsx).then(function () {
+      var wb = window.XLSX.read(buf, { type: 'array' });
+      scroll.innerHTML = '';
+      var bar = document.createElement('div');
+      bar.className = 'sv-msg';
+      bar.textContent = 'Spreadsheet view (read only). Download the original to edit it in Excel. ';
+      var a = document.createElement('a');
+      a.className = 'sv-btn';
+      a.textContent = 'Download original';
+      a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      a.download = ((title || 'sheet').replace(/[^\w\- ]+/g, '').trim() || 'sheet') + '.xlsx';
+      bar.appendChild(a);
+      scroll.appendChild(bar);
+      wb.SheetNames.forEach(function (name) {
+        var h = document.createElement('div');
+        h.style.cssText = 'font-weight:600;font-size:14px;padding:12px 16px 4px';
+        h.textContent = name;
+        var wrap = document.createElement('div');
+        wrap.style.cssText = 'overflow:auto;padding:0 16px 16px';
+        wrap.innerHTML = '<style>.sv-xl td{border:1px solid #cbd5e1;padding:4px 8px;font:13px Arial,sans-serif;color:#111827;white-space:nowrap}.sv-xl{border-collapse:collapse;background:#fff}</style>' + window.XLSX.utils.sheet_to_html(wb.Sheets[name]).replace('<table', '<table class="sv-xl"');
+        scroll.appendChild(h);
+        scroll.appendChild(wrap);
+      });
+      stat.textContent = wb.SheetNames.length + (wb.SheetNames.length === 1 ? ' sheet' : ' sheets');
+    });
+  }
+
   function openViewer(url, title, src) {
     injectCss();
     notesKey = src ? ('svNotes:' + src.id + ':' + src.n) : ('svNotes:' + url);
@@ -746,7 +775,7 @@
     }).then(function (buf) {
       var b = new Uint8Array(buf.slice(0, 4));
       if (b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46) return renderPdf(buf, scroll, stat);
-      if (b[0] === 0x50 && b[1] === 0x4B) return renderDocx(buf, scroll, stat, ov);
+      if (b[0] === 0x50 && b[1] === 0x4B) return loadScript(LIBS.zip).then(function () { return window.JSZip.loadAsync(buf); }).then(function (z) { if (z.file('xl/workbook.xml')) return renderXlsx(buf, scroll, stat, title); return renderDocx(buf, scroll, stat, ov); });
       throw new Error('Unsupported file type');
     }).catch(fail);
   }
