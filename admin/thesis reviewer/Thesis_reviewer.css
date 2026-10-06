@@ -402,3 +402,19 @@
         width: 100%;
     }
 }
+/* ACTBTN-FIX: View, Download and Send Evaluation look identical */
+.action-btn {
+    box-sizing: border-box;
+    font-family: inherit;
+    line-height: 1;
+    letter-spacing: inherit;
+    white-space: nowrap;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.action-btn svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+}
