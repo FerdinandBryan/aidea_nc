@@ -760,7 +760,7 @@
       scroll.innerHTML = '';
       var m = document.createElement('div');
       m.className = 'sv-msg';
-      m.textContent = "Couldn't load this paper here. Close it and try again.";
+      m.textContent = (err && err.message === 'Unsupported file type') ? "This file type cannot be previewed (older .doc or .xls). Close this and download the file to open it in Word or Excel." : "Couldn't load this paper here (" + ((err && err.message) || 'unknown error') + "). Close it and try again.";
       scroll.appendChild(m);
       if (window.console) console.error('Split viewer:', err);
     }
