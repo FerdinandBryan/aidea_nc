@@ -432,7 +432,7 @@
 
   function renderDocx(buf, scroll, stat, ov) {
     return loadScript(LIBS.zip).then(function () {
-      return loadScript(LIBS.docx);
+      return loadScript(LIBS.docx).catch(function () { return loadScript('https://cdn.jsdelivr.net/npm/docx-preview@0.3.2/dist/docx-preview.min.js'); }).catch(function () { return loadScript('https://unpkg.com/docx-preview@0.3.2/dist/docx-preview.min.js'); });
     }).then(function () {
       var host = document.createElement('div');
       host.style.cssText = 'position:absolute;left:-99999px;top:0;visibility:hidden';
