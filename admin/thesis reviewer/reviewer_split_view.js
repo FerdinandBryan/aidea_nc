@@ -437,7 +437,7 @@
       var host = document.createElement('div');
       host.style.cssText = 'position:absolute;left:-99999px;top:0;visibility:hidden';
       ov.appendChild(host);
-      return window.docx.renderAsync(buf, host, null, { className: 'docx', inWrapper: false, breakPages: true }).then(function () {
+      return window.docx.renderAsync(buf, host, null, { className: 'docx', inWrapper: false, breakPages: true, ignoreLastRenderedPageBreak: false }).then(function () {
         var secs = host.querySelectorAll('section.docx');
         if (!secs.length) throw new Error('No pages found in this document.');
         var colW = cellWidth(scroll);
