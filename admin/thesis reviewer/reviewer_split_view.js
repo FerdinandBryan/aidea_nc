@@ -452,7 +452,7 @@
         Array.prototype.forEach.call(secs, function (sec, idx) {
           var w = sec.offsetWidth, h = sec.offsetHeight, k = colW / w;
           var row = makeRow(scroll, idx + 1, w / h);
-          row.left.style.height = (h * k) + 'px';
+          row.left.style.height = (h * k) + 'px'; row.left.style.width = colW + 'px'; /* SV-CUTFIX */
           row.left.style.overflow = 'hidden';
           row.right.style.aspectRatio = '';
           row.right.style.height = (h * k) + 'px';
