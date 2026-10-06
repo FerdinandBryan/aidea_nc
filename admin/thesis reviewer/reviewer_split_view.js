@@ -52,7 +52,11 @@
       '.sv-doconly .sv-blank,.sv-doconly .sv-tb,.sv-doconly .sv-save,.sv-doconly .sv-cols>div:nth-child(2){display:none!important}' +
       '.sv-doconly .sv-cols{display:block!important;text-align:center}' +
       '.sv-doconly .sv-row{display:block!important}' +
-      '.sv-doconly .sv-pg{margin-left:auto;margin-right:auto}';
+      '.sv-doconly .sv-pg{margin-left:auto;margin-right:auto}' +
+      '.sv-doconly .sv-scroll{display:flex!important;flex-direction:column;align-items:center}' +
+      '.sv-doconly .sv-row{display:flex!important;justify-content:center;width:100%}' +
+      '.sv-doconly .sv-pg{flex:0 0 auto;margin:0 auto!important}' +
+      '.sv-doconly .sv-pg canvas{display:block;margin:0 auto}';
     document.head.appendChild(st);
   }
 
