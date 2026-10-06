@@ -48,12 +48,16 @@
       '.sv-blank{border:1px solid #cbd5e1;display:block;padding:7%;overflow:auto;text-align:left;white-space:pre-wrap;word-wrap:break-word;color:#111827;font:14px/1.7 Georgia,serif;cursor:text}' +
       '.sv-blank:empty::before{content:attr(data-ph);color:#9ca3af}' +
       '.sv-blank:focus{outline:2px solid #3b82f6;outline-offset:-1px}' +
-      '.sv-msg{padding:24px;text-align:center;color:#4b5563;font-size:14px}';
+      '.sv-msg{padding:24px;text-align:center;color:#4b5563;font-size:14px}' +
+      '.sv-doconly .sv-blank,.sv-doconly .sv-tb,.sv-doconly .sv-save,.sv-doconly .sv-cols>div:nth-child(2){display:none!important}' +
+      '.sv-doconly .sv-cols{display:block!important;text-align:center}' +
+      '.sv-doconly .sv-row{display:block!important}' +
+      '.sv-doconly .sv-pg{margin-left:auto;margin-right:auto}';
     document.head.appendChild(st);
   }
 
   function cellWidth(scroll) {
-    return Math.max(120, (scroll.clientWidth - 32 - 16) / 2);
+    var ovx = scroll.closest ? scroll.closest('#svOv') : null; if (ovx && ovx.classList.contains('sv-doconly')) return Math.min(900, Math.max(120, scroll.clientWidth - 32)); return Math.max(120, (scroll.clientWidth - 32 - 16) / 2);
   }
 
   function makeRow(scroll, num, ratio) {
@@ -666,11 +670,11 @@
     });
   }
 
-  function openViewer(url, title, src) {
+  function openViewer(url, title, src, docOnly) {
     injectCss();
     notesKey = src ? ('svNotes:' + src.id + ':' + src.n) : ('svNotes:' + url);
     var ov = document.createElement('div');
-    ov.id = 'svOv';
+    ov.id = 'svOv'; if (docOnly) ov.classList.add('sv-doconly');
     ov.innerHTML =
       '<div class="sv-win" role="dialog" aria-modal="true" aria-label="Paper viewer">' +
       '<div class="sv-head"><div class="sv-title"></div><span class="sv-stat">Loading</span>' +
@@ -798,6 +802,6 @@
       if (hrefs.indexOf(x.href) < 0) hrefs.push(x.href);
     });
     var n = Math.max(0, hrefs.indexOf(a.href));
-    openViewer(a.href, t ? t.textContent.trim() : '', id ? { id: id, n: n } : null);
+    openViewer(a.href, t ? t.textContent.trim() : '', id ? { id: id, n: n } : null, /^original/i.test(label));
   }, true);
 })();
