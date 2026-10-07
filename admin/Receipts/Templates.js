@@ -81,13 +81,31 @@
         fetch(BASE + '/certificate-templates/' + t.id + '/original', { headers: hd() }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); }).then(function (buf) {
             return tplNeed(function () { return window.JSZip; }, ['https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'])
                 .then(function () { return tplNeed(function () { return window.docx; }, ['https://cdnjs.cloudflare.com/ajax/libs/docx-preview/0.3.2/docx-preview.min.js', 'https://cdn.jsdelivr.net/npm/docx-preview@0.3.2/dist/docx-preview.min.js']); })
-                .then(function () { return window.docx.renderAsync(buf, host, null, { className: 'docx', inWrapper: false, breakPages: true, ignoreLastRenderedPageBreak: false }); });
+                .then(function () { return tplFixAlt(buf).then(function (fb) { return window.docx.renderAsync(fb, host, null, { className: 'docx', inWrapper: false, breakPages: true, ignoreLastRenderedPageBreak: false }); }); });
         }).then(function () {
             msg.remove();
             Array.prototype.forEach.call(host.querySelectorAll('section.docx'), function (s) { s.setAttribute('contenteditable', 'true'); s.setAttribute('spellcheck', 'true'); s.style.margin = '0 auto 16px'; s.style.outline = 'none'; });
         }).catch(function (e) {
             msg.textContent = (e && /HTTP 404/.test(e.message)) ? 'This template has no original Word file. Re-upload it as a .docx.' : 'Could not open this template (' + ((e && e.message) || 'error') + ').';
         });
+    }
+    function tplFixAlt(buf) {
+        return window.JSZip.loadAsync(buf).then(function (zip) {
+            var names = Object.keys(zip.files).filter(function (n) { return /^word\/(document|header\d*|footer\d*)\.xml$/.test(n); });
+            return Promise.all(names.map(function (n) {
+                return zip.file(n).async('string').then(function (x) {
+                    var y = x.replace(/<mc:AlternateContent[\s\S]*?<\/mc:AlternateContent>/g, function (blk) {
+                        var ch = /<mc:Choice[\s\S]*?<\/mc:Choice>/.exec(blk), fb = /<mc:Fallback[\s\S]*?<\/mc:Fallback>/.exec(blk);
+                        if (!ch || !fb) return blk;
+                        var m = /<a:blip [^>]*?r:embed="([^"]+)"/.exec(ch[0]);
+                        if (!m) return blk;
+                        var nf = fb[0].replace(/(<a:blip [^>]*?r:embed=")[^"]+(")/, function (all, p1, p2) { return p1 + m[1] + p2; });
+                        return blk.replace(fb[0], function () { return nf; });
+                    });
+                    if (y !== x) zip.file(n, y);
+                });
+            })).then(function () { return zip.generateAsync({ type: 'arraybuffer' }); });
+        }).catch(function () { return buf; });
     }
     function card(t) {
         var d = document.createElement('div');
