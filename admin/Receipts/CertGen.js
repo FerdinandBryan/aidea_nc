@@ -685,7 +685,7 @@
             var ln = document.createElement('div');
             ln.className = 'svhdrline';
             ln.setAttribute('contenteditable', 'false');
-            ln.style.cssText = 'position:absolute;left:' + svLnLeft + 'px;width:' + svLnWidth + 'px;height:2px;background:#4a7ebb;pointer-events:none;top:' + Math.round(s2.bottom - hr.top + 3) + 'px';
+            ln.style.cssText = 'position:absolute;left:' + svLnLeft + 'px;width:' + svLnWidth + 'px;height:2px;background:#4a7ebb;pointer-events:none;top:' + Math.round(s2.bottom - hr.top + 24) + 'px';
             h.appendChild(ln);
             var svRightLogo = imgs.reduce(function (a, b) { return b.getBoundingClientRect().left > a.getBoundingClientRect().left ? b : a; });
             if (svRightLogo !== seal) {
