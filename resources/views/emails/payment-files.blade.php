@@ -76,7 +76,7 @@
   @endif
 
   <tr><td style="padding:22px 32px 30px;">
-    <p style="margin:0;font-size:13px;line-height:1.7;color:#5f6d8c;">You will also see this in your AIDEA notifications.</p>
+    <p style="margin:0;font-size:13px;line-height:1.7;color:#5f6d8c;">You will also see this in your AIDEA Requests.</p>
   </td></tr>
 
   <tr><td style="background:#f8f9fd;border-top:1px solid #e2e7f1;padding:16px 32px;text-align:center;">
