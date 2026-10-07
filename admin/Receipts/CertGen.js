@@ -485,7 +485,7 @@
             var w = window.open('', '_blank'); if (!w) { alert('Allow pop-ups to print.'); return; }
             var st = ''; Array.prototype.forEach.call(host.querySelectorAll('style'), function (s) { st += s.outerHTML; });
             var pg = ''; Array.prototype.forEach.call(host.querySelectorAll('section.docx'), function (s) { var c = s.cloneNode(true); c.removeAttribute('contenteditable'); pg += c.outerHTML; });
-            w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Certificate</title>' + st + '<style>@page{margin:0}body{margin:0}section.docx{margin:0 auto!important;box-shadow:none!important}</style></head><body>' + pg + '</body></html>');
+            w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Certificate</title>' + st + '<style>@page{margin:0}body{margin:0}section.docx{margin:0 auto!important;box-shadow:none!important}header p{white-space:nowrap!important}</style></head><body>' + pg + '</body></html>');
             w.document.close(); w.onload = function () { w.focus(); w.print(); };
         });
         ov.querySelector('[data-a="docx"]').addEventListener('click', function () {

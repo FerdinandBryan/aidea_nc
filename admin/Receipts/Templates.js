@@ -58,7 +58,7 @@
         ov.querySelector('[data-a="close"]').addEventListener('click', function () { document.removeEventListener('selectionchange', onSel); ov.remove(); });
         ov.querySelector('[data-a="print"]').addEventListener('click', function () {
             var w = window.open('', '_blank'); if (!w) { alert('Allow pop-ups to print.'); return; }
-            w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + fname + '</title>' + stylesHtml() + '<style>@page{margin:0}body{margin:0}section.docx{margin:0 auto!important;box-shadow:none!important}</style></head><body>' + pagesHtml() + '</body></html>');
+            w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + fname + '</title>' + stylesHtml() + '<style>@page{margin:0}body{margin:0}section.docx{margin:0 auto!important;box-shadow:none!important}header p{white-space:nowrap!important}</style></head><body>' + pagesHtml() + '</body></html>');
             w.document.close(); w.onload = function () { w.focus(); w.print(); };
         });
         ov.querySelector('[data-a="doc"]').addEventListener('click', function () {
