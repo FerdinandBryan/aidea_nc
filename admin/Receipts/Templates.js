@@ -83,7 +83,7 @@
                 .then(function () { return tplNeed(function () { return window.docx; }, ['https://cdnjs.cloudflare.com/ajax/libs/docx-preview/0.3.2/docx-preview.min.js', 'https://cdn.jsdelivr.net/npm/docx-preview@0.3.2/dist/docx-preview.min.js']); })
                 .then(function () { return tplFixAlt(buf).then(function (fb) { return window.docx.renderAsync(fb, host, null, { className: 'docx', inWrapper: false, breakPages: true, ignoreLastRenderedPageBreak: false }); }); });
         }).then(function () {
-            msg.remove(); tplAlignHdr(host); tplTightHdr(host);
+            msg.remove(); tplAlignHdr(host); tplTightHdr(host); tplHdrFinish(host);
             Array.prototype.forEach.call(host.querySelectorAll('section.docx'), function (s) { s.setAttribute('contenteditable', 'true'); s.setAttribute('spellcheck', 'true'); s.style.margin = '0 auto 16px'; s.style.outline = 'none'; });
         }).catch(function (e) {
             msg.textContent = (e && /HTTP 404/.test(e.message)) ? 'This template has no original Word file. Re-upload it as a .docx.' : 'Could not open this template (' + ((e && e.message) || 'error') + ').';
@@ -177,6 +177,27 @@
             if (lines.length < 3) return;
             var gap = lines[1].t - lines[0].t, pitch = lines[2].t - lines[1].t;
             if (pitch > 4 && gap > pitch + 3 && gap < 120) lines[0].p.style.marginBottom = (pitch - gap) + 'px';
+        });
+    }
+    function tplHdrFinish(host) {
+        Array.prototype.forEach.call(host.querySelectorAll('header'), function (h) {
+            Array.prototype.forEach.call(h.querySelectorAll('.svhdrline'), function (o) { o.remove(); });
+            var imgs = Array.prototype.slice.call(h.querySelectorAll('img')).filter(function (im) { var r = im.getBoundingClientRect(); return r.height > 40 && r.width > 40; });
+            if (!imgs.length) return;
+            imgs.forEach(function (im) { im.style.transform = ''; });
+            var seal = imgs.reduce(function (a, b) { return b.getBoundingClientRect().left < a.getBoundingClientRect().left ? b : a; });
+            var ps = Array.prototype.filter.call(h.querySelectorAll('p'), function (p) { return p.textContent.trim(); }).slice(0, 4);
+            if (!ps.length) return;
+            var sr = seal.getBoundingClientRect(), t0 = ps[0].getBoundingClientRect(), t1 = ps[ps.length - 1].getBoundingClientRect();
+            var d = (t0.top + t1.bottom) / 2 - (sr.top + sr.bottom) / 2;
+            if (Math.abs(d) > 2 && Math.abs(d) < 80) seal.style.transform = 'translateY(' + d + 'px)';
+            if (getComputedStyle(h).position === 'static') h.style.position = 'relative';
+            var hr = h.getBoundingClientRect(), s2 = seal.getBoundingClientRect();
+            var ln = document.createElement('div');
+            ln.className = 'svhdrline';
+            ln.setAttribute('contenteditable', 'false');
+            ln.style.cssText = 'position:absolute;left:-12px;width:648px;height:2px;background:#4a7ebb;pointer-events:none;top:' + Math.round(s2.bottom - hr.top + 15) + 'px';
+            h.appendChild(ln);
         });
     }
     function card(t) {
