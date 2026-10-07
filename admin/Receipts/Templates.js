@@ -75,7 +75,7 @@
                 .then(function () {
                     var sec = host.querySelector('section.docx');
                     if (!sec) throw new Error('No pages found');
-                    return window.html2canvas(sec, { scale: 1600 / sec.offsetWidth, backgroundColor: '#ffffff', useCORS: true });
+                    return window.html2canvas(sec, { scale: 1600 / sec.offsetWidth, backgroundColor: '#ffffff', useCORS: true, ignoreElements: function (el) { return el.tagName === 'IMG' && /^https?:/i.test(el.getAttribute('src') || '') && !host.contains(el); } });
                 })
                 .then(function (c) {
                     document.body.removeChild(host);
