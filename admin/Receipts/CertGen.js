@@ -506,7 +506,7 @@
             .then(function () { return svNeed(function () { return window.docx; }, ['https://cdnjs.cloudflare.com/ajax/libs/docx-preview/0.3.2/docx-preview.min.js', 'https://cdn.jsdelivr.net/npm/docx-preview@0.3.2/dist/docx-preview.min.js']); })
             .then(function () { return svFixAlt(buf).then(function (fb) { return window.docx.renderAsync(fb, host, null, { className: 'docx', inWrapper: false, breakPages: true, ignoreLastRenderedPageBreak: false }); }); })
             .then(function () {
-                msg.remove();
+                msg.remove(); svAlignHdr(host);
                 var rx = /\{\{\s*(title|name|date|protocol)\s*\}\}/gi, nodes = [], w = document.createTreeWalker(host, NodeFilter.SHOW_TEXT), n;
                 while ((n = w.nextNode())) { if (/\{\{/.test(n.nodeValue)) nodes.push(n); }
                 nodes.forEach(function (tn) {
@@ -582,6 +582,31 @@
                 });
             })).then(function () { return zip.generateAsync({ type: 'arraybuffer' }); });
         }).catch(function () { return buf; });
+    }
+    function svAlignHdr(host) {
+        function textLeft(p) {
+            var w = document.createTreeWalker(p, NodeFilter.SHOW_TEXT), n;
+            while ((n = w.nextNode())) {
+                if (!n.nodeValue.trim()) continue;
+                var r = document.createRange(); r.selectNodeContents(n);
+                var rc = r.getClientRects();
+                if (rc.length) return rc[0].left;
+            }
+            return null;
+        }
+        var heads = host.querySelectorAll('header');
+        if (!heads.length) { var s0 = host.querySelector('section.docx'); heads = s0 ? [s0] : []; }
+        Array.prototype.forEach.call(heads, function (h) {
+            var ps = h.querySelectorAll('p'), first = null, ref = null, i;
+            for (i = 0; i < ps.length; i++) {
+                if (textLeft(ps[i]) === null) continue;
+                if (!first) { first = ps[i]; continue; }
+                ref = ps[i]; break;
+            }
+            if (!first || !ref) return;
+            var d = textLeft(ref) - textLeft(first);
+            if (d > 4 && d < 300) first.style.marginLeft = (parseFloat(first.style.marginLeft) || 0) + d + 'px';
+        });
     }
     function svPdfToImage(f) {
         return svNeed(function () { return window.pdfjsLib; }, ['https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'])
