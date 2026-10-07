@@ -31,6 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // -- Dashboard --
     Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
     Route::get('/dashboard/thesis-by-year', [DashboardController::class, 'thesisByYear']);
+    Route::get('/dashboard/thesis-by-year-month', [DashboardController::class, 'thesisByYearMonth']);
 
     // -- Submissions --
     Route::get('/submissions', [SubmissionController::class, 'index']);

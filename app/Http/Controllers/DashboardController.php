@@ -81,4 +81,25 @@ class DashboardController extends Controller
             ->get();
 
         return response()->json(['data' => $rows]);
+    }
+
+    public function thesisByYearMonth()
+    {
+        $rows = \App\Models\ThesisSubmission::query()->get(['academic_year', 'created_at']);
+
+        $grid = [];
+        foreach ($rows as $r) {
+            if (!$r->created_at) continue;
+            $y = $r->academic_year;
+            $m = (int) $r->created_at->format('n');
+            $grid[$y][$m] = ($grid[$y][$m] ?? 0) + 1;
+        }
+        ksort($grid);
+
+        $data = [];
+        foreach ($grid as $y => $months) {
+            $data[] = ['academic_year' => $y, 'months' => $months];
+        }
+
+        return response()->json(['data' => $data]);
     }}

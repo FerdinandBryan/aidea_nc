@@ -539,14 +539,23 @@ document.addEventListener('DOMContentLoaded', () => {
     initDonutChart();
 });
 
-// ── Thesis submitted per academic year (horizontal bar) ───────────────────
+// ── Thesis submitted per academic year x month (grid) ─────────────────────
 (function () {
-  async function initThesisYearChart() {
-    if (typeof Chart === 'undefined') return;
+  const ORDER  = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5];
+  const LABELS = { 1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec' };
+
+  async function initThesisGrid() {
     const canvas = document.getElementById('thesisYearChart');
     if (!canvas) return;
+    const box = canvas.closest('.chart-box');
+    if (!box) return;
 
-    const v = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+    box.style.height = 'auto';
+    box.style.overflowX = 'auto';
+    box.innerHTML = '<div id="thesisGridMsg" style="padding:12px;opacity:.7">Loading…</div>';
+
+    const sub = document.getElementById('revenueYear');
+    if (sub) sub.textContent = 'Number of thesis submitted per month';
 
     let rows = [];
     try {
@@ -554,41 +563,81 @@ document.addEventListener('DOMContentLoaded', () => {
                    (typeof API !== 'undefined' && API) || '/api';
       const token = localStorage.getItem('token') || localStorage.getItem('admin_token') ||
                     localStorage.getItem('auth_token') || localStorage.getItem('access_token') || '';
-      const res = await fetch(String(base).replace(/\/$/, '') + '/dashboard/thesis-by-year', {
+      const res = await fetch(String(base).replace(/\/$/, '') + '/dashboard/thesis-by-year-month', {
         headers: { 'Accept': 'application/json', ...(token ? { 'Authorization': 'Bearer ' + token } : {}) }
       });
       const json = await res.json();
       rows = json.data || [];
-    } catch (e) { console.error('Thesis-by-year load failed', e); }
+    } catch (e) {
+      console.error('Thesis grid load failed', e);
+      box.innerHTML = '<div style="padding:12px;opacity:.7">Could not load data.</div>';
+      return;
+    }
 
-    new Chart(canvas.getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels: rows.map(r => r.academic_year),
-        datasets: [{
-          label: 'Thesis submitted',
-          data: rows.map(r => Number(r.total)),
-          backgroundColor: v('--chart-line') || '#4f46e5',
-          borderRadius: 6,
-          barThickness: 24
-        }]
-      },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { beginAtZero: true, grid: { color: v('--chart-grid') },
-               ticks: { color: v('--chart-text'), precision: 0, stepSize: 1 },
-               title: { display: true, text: 'Number of thesis submitted', color: v('--chart-text') } },
-          y: { grid: { display: false }, ticks: { color: v('--chart-text') },
-               title: { display: true, text: 'Academic year', color: v('--chart-text') } }
-        }
-      }
+    if (!rows.length) {
+      box.innerHTML = '<div style="padding:12px;opacity:.7">No thesis submitted yet.</div>';
+      return;
+    }
+
+    let max = 1;
+    rows.forEach(r => ORDER.forEach(mo => { max = Math.max(max, Number((r.months || {})[mo] || 0)); }));
+
+    const table = document.createElement('table');
+    table.style.cssText = 'width:100%;border-collapse:separate;border-spacing:3px;font-size:12px;text-align:center;color:var(--chart-text)';
+
+    const thead = document.createElement('thead');
+    const hr = document.createElement('tr');
+    const corner = document.createElement('th');
+    corner.textContent = 'Academic year';
+    corner.style.cssText = 'text-align:left;padding:6px 8px;font-weight:600;white-space:nowrap';
+    hr.appendChild(corner);
+    ORDER.forEach(mo => {
+      const th = document.createElement('th');
+      th.textContent = LABELS[mo];
+      th.style.cssText = 'padding:6px 4px;font-weight:600';
+      hr.appendChild(th);
     });
+    const thTotal = document.createElement('th');
+    thTotal.textContent = 'Total';
+    thTotal.style.cssText = 'padding:6px 8px;font-weight:700';
+    hr.appendChild(thTotal);
+    thead.appendChild(hr);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      const th = document.createElement('th');
+      th.textContent = r.academic_year;
+      th.style.cssText = 'text-align:left;padding:8px;font-weight:600;white-space:nowrap';
+      tr.appendChild(th);
+
+      let total = 0;
+      ORDER.forEach(mo => {
+        const n = Number((r.months || {})[mo] || 0);
+        total += n;
+        const td = document.createElement('td');
+        td.textContent = n ? n : '';
+        td.title = r.academic_year + ' · ' + LABELS[mo] + ': ' + n;
+        const pct = n ? Math.round(18 + (n / max) * 72) : 0;
+        td.style.cssText = 'padding:8px 4px;min-width:34px;border-radius:6px;font-weight:600;' +
+          'background:' + (n ? 'color-mix(in srgb, var(--chart-line) ' + pct + '%, transparent)'
+                             : 'color-mix(in srgb, var(--chart-grid) 35%, transparent)');
+        tr.appendChild(td);
+      });
+
+      const tdTotal = document.createElement('td');
+      tdTotal.textContent = total;
+      tdTotal.style.cssText = 'padding:8px;font-weight:700';
+      tr.appendChild(tdTotal);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+
+    box.innerHTML = '';
+    box.appendChild(table);
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initThesisYearChart);
-  else initThesisYearChart();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initThesisGrid);
+  else initThesisGrid();
 })();
