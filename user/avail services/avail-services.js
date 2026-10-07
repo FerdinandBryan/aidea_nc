@@ -734,7 +734,7 @@ async function submitPayment() {
 
     if (!isFreeService() && !proofFile) return showToast('Please upload your GCash payment screenshot.', 'error');
     if (!isFreeService() && !ref) return showToast('Please enter the GCash reference number.', 'error');
-    if (!isFreeService() && ref.length < 6) return showToast('Reference number looks too short.', 'error');
+    if (!isFreeService() && !/^\d{13}$/.test(ref)) return showToast('Reference number must be exactly 13 digits.', 'error');
 
     if (currentService?.requires_research_info && !researchInfoData) {
         return showToast('Please complete the Research Info step first.', 'error');

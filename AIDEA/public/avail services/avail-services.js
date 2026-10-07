@@ -154,7 +154,7 @@ async function submitPayment() {
 
     if (!proofFile) return showToast('Please upload your GCash payment screenshot.', 'error');
     if (!ref) return showToast('Please enter the GCash reference number.', 'error');
-    if (ref.length < 6) return showToast('Reference number looks too short.', 'error');
+    if (!/^\d{13}$/.test(ref)) return showToast('Reference number must be exactly 13 digits.', 'error');
 
     const submitBtn = document.querySelector('#gmBodyStep2 .gm-btn-next');
     submitBtn.disabled = true;

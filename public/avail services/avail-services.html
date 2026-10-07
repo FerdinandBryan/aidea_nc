@@ -661,7 +661,7 @@
                 <input type="file" id="gmProofInput" accept="image/*" style="display:none;" />
 
                 <div class="gm-ref-row">
-                    <input type="text" id="gmRefInput" placeholder="GCash Reference Number (13-digit)" maxlength="20" />
+                    <input type="text" id="gmRefInput" placeholder="GCash Reference Number (13-digit)" maxlength="13" inputmode="numeric" pattern="[0-9]{13}" oninput="this.value=this.value.replace(/\D/g,'''')" />
                 </div>
 
                 <div class="gm-btn-row">

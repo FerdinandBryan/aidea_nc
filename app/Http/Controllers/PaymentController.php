@@ -24,7 +24,7 @@ class PaymentController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'gcash_ref' => 'required_unless:method,Free|nullable|string|min:6',
+            'gcash_ref' => 'required_unless:method,Free|nullable|digits:13',
             'service' => 'required|string',
             'service_id' => 'nullable|integer',
             'student_id' => 'nullable|string',
