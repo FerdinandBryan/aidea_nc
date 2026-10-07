@@ -559,15 +559,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let rows = [];
     try {
-      const base = (typeof API_BASE !== 'undefined' && API_BASE) ||
-                   (typeof API !== 'undefined' && API) || '/api';
-      const token = localStorage.getItem('token') || localStorage.getItem('admin_token') ||
-                    localStorage.getItem('auth_token') || localStorage.getItem('access_token') || '';
-      const res = await fetch(String(base).replace(/\/$/, '') + '/dashboard/thesis-by-year-month', {
-        headers: { 'Accept': 'application/json', ...(token ? { 'Authorization': 'Bearer ' + token } : {}) }
-      });
-      const json = await res.json();
-      rows = json.data || [];
+      const json = await load('/dashboard/thesis-by-year-month');
+      rows = Array.isArray(json) ? json : (json.data || []);
     } catch (e) {
       console.error('Thesis grid load failed', e);
       box.innerHTML = '<div style="padding:12px;opacity:.7">Could not load data.</div>';
