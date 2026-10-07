@@ -674,6 +674,57 @@
     });
   }
 
+  function svSaveAs(a) {
+    var card = a.closest('.review-card');
+    var id = card ? card.getAttribute('data-id') : null;
+    var all = card ? Array.prototype.filter.call(card.querySelectorAll('a[download]'), function (x) { return /download/i.test(x.textContent || ''); }) : [a];
+    var n = Math.max(0, all.indexOf(a));
+    var nm = '';
+    try { nm = decodeURIComponent(a.href.split('?')[0].split('/').pop() || ''); } catch (e) { }
+    if (!/\.[A-Za-z0-9]{2,5}$/.test(nm)) {
+      var tt = card && card.querySelector('.review-card-title');
+      nm = (((tt && tt.textContent) || 'paper').replace(/[^\w\- ]+/g, '').trim() || 'paper') + '.docx';
+    }
+    var base = (typeof ADMIN_API !== 'undefined') ? ADMIN_API : 'https://aideanc-production.up.railway.app/api';
+    var token = '';
+    try { token = localStorage.getItem('auth_token') || ''; } catch (e) { }
+    function getBlob() {
+      var viaApi = id ? fetch(base + '/reviewer/assignments/' + id + '/file/' + n, { headers: { 'Authorization': 'Bearer ' + token } }) : Promise.reject(new Error('no id'));
+      return viaApi.then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+        .catch(function () { return fetch(a.href).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); }); });
+    }
+    if (window.showSaveFilePicker) {
+      window.showSaveFilePicker({ suggestedName: nm }).then(function (h) {
+        return getBlob().then(function (blob) {
+          return h.createWritable().then(function (w) { return w.write(blob).then(function () { return w.close(); }); });
+        });
+      }).catch(function (err) {
+        if (err && err.name === 'AbortError') return;
+        alert('Could not save the file. Please try again.');
+        if (window.console) console.error('Save as:', err);
+      });
+    } else {
+      var name = window.prompt('File name:', nm);
+      if (!name) return;
+      getBlob().then(function (blob) {
+        var l = document.createElement('a');
+        l.href = URL.createObjectURL(blob);
+        l.download = name;
+        document.body.appendChild(l);
+        l.click();
+        setTimeout(function () { URL.revokeObjectURL(l.href); document.body.removeChild(l); }, 1000);
+      }).catch(function () { alert('Could not download the file. Please try again.'); });
+    }
+  }
+
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest ? e.target.closest('a[download]') : null;
+    if (!a || !a.closest('.review-card') || !/download/i.test(a.textContent || '')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    svSaveAs(a);
+  }, true);
+
   function openViewer(url, title, src, docOnly) {
     injectCss();
     notesKey = src ? ('svNotes:' + src.id + ':' + src.n) : ('svNotes:' + url);
