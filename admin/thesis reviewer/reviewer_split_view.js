@@ -459,7 +459,7 @@
           sec.style.transformOrigin = 'top left';
           sec.style.transform = 'scale(' + k + ')'; sec._svk = k;
           sec.style.margin = '0';
-          row.left.appendChild(sec); svHfDocx(sec, row.left, row.right, k);
+          row.left.appendChild(sec); svHfDocx(sec, row.left, row.right, k); if (!ov.classList.contains('sv-doconly')) { sec.setAttribute('contenteditable', 'true'); sec.setAttribute('spellcheck', 'true'); sec.style.outline = 'none'; sec.addEventListener('input', function () { sec._svEdited = true; }); } /* SV-DIRECT */
         });
         stat.textContent = secs.length + (secs.length === 1 ? ' page' : ' pages');
       });
@@ -627,6 +627,12 @@
       var pages = [];
       Array.prototype.forEach.call(scroll.querySelectorAll('.sv-blank'), function (b) {
         if (svBodyText(b).replace(/\s+/g, '')) pages.push('<div class="pg">' + svBodyHtml(b) + '</div>');
+      });
+      Array.prototype.slice.call(scroll.querySelectorAll('.sv-pg section.docx')).reverse().forEach(function (s) {
+        if (!s._svEdited) return;
+        var c = s.cloneNode(true);
+        c.removeAttribute('contenteditable');
+        pages.unshift('<div class="pg">' + c.innerHTML + '</div>');
       });
       if (!pages.length) return null;
       var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>div.pg{page-break-after:always}</style></head><body>' + pages.join('') + '</body></html>';
