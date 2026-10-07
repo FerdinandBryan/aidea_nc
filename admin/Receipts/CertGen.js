@@ -632,7 +632,7 @@
             if (pitch > 4 && gap > pitch + 3 && gap < 120) lines[0].p.style.marginBottom = (pitch - gap) + 'px';
         });
     }
-    function svPrintLive(ov) {
+    function svPrintLive(ov) { try { svAlignHdr(ov.querySelector('#gHost')); } catch (e) { }
         var st = document.createElement('style');
         st.textContent = '@media print{' +
             '@page{margin:0}' +
