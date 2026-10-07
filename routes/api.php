@@ -229,6 +229,7 @@ require __DIR__ . '/profile.php';
             'name'  => 'required|string|max:120',
             'image' => 'required|file|mimes:png,jpg,jpeg,webp|max:10240',
             'fields' => 'nullable|string|max:20000',
+            'original' => 'nullable|file|max:20480',
         ]);
         $file = $request->file('image');
         $mime = $file->getMimeType();
@@ -238,6 +239,14 @@ require __DIR__ . '/profile.php';
             'name' => $data['name'], 'path' => $path, 'mime' => $mime, 'created_at' => now(), 'updated_at' => now(),
         ]);
         if (!empty($data['fields']) && \Illuminate\Support\Facades\Schema::hasColumn('certificate_templates', 'fields')) { \Illuminate\Support\Facades\DB::table('certificate_templates')->where('id', $id)->update(['fields' => $data['fields']]); }
+        if ($request->hasFile('original') && \Illuminate\Support\Facades\Schema::hasColumn('certificate_templates', 'original_path')) {
+            $of = $request->file('original');
+            $oext = strtolower($of->getClientOriginalExtension());
+            if ($oext === 'docx') {
+                $opath = $of->storeAs('certificate-templates', uniqid('orig_') . '.docx', 'public');
+                \Illuminate\Support\Facades\DB::table('certificate_templates')->where('id', $id)->update(['original_path' => $opath, 'original_name' => substr($of->getClientOriginalName(), 0, 250)]);
+            }
+        }
         return response()->json(['ok' => true, 'id' => $id], 201);
     });
     \Illuminate\Support\Facades\Route::get('/{id}/image', function ($id) {
@@ -254,10 +263,18 @@ require __DIR__ . '/profile.php';
     \Illuminate\Support\Facades\DB::table('certificate_templates')->where('id', $id)->update(['fields' => $data['fields'], 'updated_at' => now()]);
     return response()->json(['ok' => true]);
 })->whereNumber('id');
+    \Illuminate\Support\Facades\Route::get('/{id}/original', function ($id) {
+        $row = \Illuminate\Support\Facades\DB::table('certificate_templates')->where('id', $id)->first();
+        abort_unless($row && !empty($row->original_path), 404);
+        $disk = \Illuminate\Support\Facades\Storage::disk('public');
+        abort_unless($disk->exists($row->original_path), 404);
+        return response($disk->get($row->original_path), 200, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']);
+    })->whereNumber('id');
     \Illuminate\Support\Facades\Route::delete('/{id}', function ($id) {
         $row = \Illuminate\Support\Facades\DB::table('certificate_templates')->where('id', $id)->first();
         abort_unless($row, 404);
         \Illuminate\Support\Facades\Storage::disk('public')->delete($row->path);
+        if (!empty($row->original_path)) { \Illuminate\Support\Facades\Storage::disk('public')->delete($row->original_path); }
         \Illuminate\Support\Facades\DB::table('certificate_templates')->where('id', $id)->delete();
         return response()->json(['ok' => true]);
     })->whereNumber('id');

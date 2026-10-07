@@ -34,7 +34,7 @@
         if (!nm) { alert('Enter a name for the template.'); return; }
         if (!f) { alert('Choose a PDF or DOCX file first.'); return; }
         if (f.size > 10 * 1024 * 1024) { alert('The image is over 10 MB. Use a smaller one.'); return; }
-        var fd = new FormData(); fd.append('name', nm); fd.append('image', f);
+        var fd = new FormData(); fd.append('name', nm); fd.append('image', f); if (window.svOrig && window.svOrig.png === f) fd.append('original', window.svOrig.file);
         var label = addBtn.textContent;
         addBtn.disabled = true; addBtn.textContent = 'Uploading...';
         fetch(BASE + '/certificate-templates', { method: 'POST', headers: hd(), body: fd }).then(ok).then(function () {
@@ -98,7 +98,7 @@
             if (!(b[0] === 0x50 && b[1] === 0x4B)) throw new Error('bad');
             return tplDocxToPng(f);
         }).then(function (blob) {
-            var png = new File([blob], f.name.replace(/\.docx$/i, '') + '.png', { type: 'image/png' });
+            var png = new File([blob], f.name.replace(/\.docx$/i, '') + '.png', { type: 'image/png' }); window.svOrig = { png: png, file: f };
             var dt = new DataTransfer(); dt.items.add(png); fileIn.files = dt.files;
             srcOk = true; done();
         }).catch(function (e) {
