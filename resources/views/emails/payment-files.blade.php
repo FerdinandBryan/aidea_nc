@@ -10,8 +10,6 @@
 <title>{{ $title }}</title>
 </head>
 <body style="margin:0;padding:0;background:#f3f5fa;font-family:Arial,Helvetica,sans-serif;">
-<div style="text-align:center;padding:20px 0 10px;"><img src="https://aideanc-production.up.railway.app/images/email-logo.png" alt="AIDEA" width="80" height="80" style="display:block;margin:0 auto;border:0;outline:none;"></div>
-
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">{{ $title }}@if($service) for {{ $service }}@endif</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f5fa;padding:28px 12px;">
 <tr><td align="center">
@@ -19,7 +17,7 @@
 
   <tr><td style="background:#0a1a3f;padding:24px 32px;">
     <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-      <td width="36" height="36" align="center" style="background:#FFC72C;color:#0a1a3f;font-weight:bold;font-size:18px;border-radius:9px;">A</td>
+      <td width="36" height="36" align="center" style="background:#ffffff;border-radius:9px;"><img src="https://aideanc-production.up.railway.app/images/email-logo.png" alt="AIDEA" width="30" height="30" style="display:block;margin:0 auto;border:0;outline:none;"></td>
       <td style="padding-left:12px;">
         <div style="color:#ffffff;font-size:17px;font-weight:bold;letter-spacing:1px;">AIDEA</div>
         <div style="color:#9fb0d6;font-size:11px;margin-top:2px;">Norzagaray College Research Platform</div>
