@@ -7,7 +7,6 @@
 <table cellpadding="6" cellspacing="0" border="1" style="border-collapse:collapse;">
     <tr><td><strong>Service</strong></td><td>{{ $payment->service }}</td></tr>
     <tr><td><strong>Student</strong></td><td>{{ $payment->student }}</td></tr>
-    <tr><td><strong>Student ID</strong></td><td>{{ $payment->student_id ?? '-' }}</td></tr>
     <tr><td><strong>Amount</strong></td><td>&#8369;{{ number_format($payment->amount, 2) }}</td></tr>
     <tr><td><strong>GCash Reference</strong></td><td>{{ $payment->gcash_ref }}</td></tr>
     <tr><td><strong>Internal Ref</strong></td><td>{{ $payment->ref }}</td></tr>
