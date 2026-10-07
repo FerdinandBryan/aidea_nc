@@ -515,9 +515,30 @@
                     }
                     tn.parentNode.replaceChild(frag, tn);
                 });
-                Array.prototype.forEach.call(host.querySelectorAll('section.docx'), function (s) { s.setAttribute('contenteditable', 'true'); s.setAttribute('spellcheck', 'true'); s.style.margin = '0 auto 16px'; s.style.outline = 'none'; });
+                Array.prototype.forEach.call(host.querySelectorAll('section.docx'), function (s) { s.setAttribute('contenteditable', 'true'); s.setAttribute('spellcheck', 'true'); s.style.margin = '0 auto 16px'; s.style.outline = 'none'; }); svPageTabs(ov, host);
                 apply();
             }).catch(function (e) { msg.textContent = 'Could not open this template (' + ((e && e.message) || 'error') + ').'; });
+    }
+    function svPageTabs(ov, host) {
+        var secs = host.querySelectorAll('section.docx');
+        var bar = ov.querySelector('#gTb');
+        if (!bar || !secs.length) return;
+        var wrap = document.createElement('span');
+        wrap.style.cssText = 'margin-left:auto;display:flex;gap:4px;align-items:center;font-size:13px;color:#475569';
+        if (secs.length < 2) {
+            wrap.textContent = '1 page';
+        } else {
+            wrap.appendChild(document.createTextNode('Pages:'));
+            Array.prototype.forEach.call(secs, function (s, i) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = 'Page ' + (i + 1);
+                b.style.cssText = 'height:28px;padding:0 10px;border:1px solid #9ca3af;border-radius:6px;background:#fff;color:#111827;cursor:pointer;font:inherit';
+                b.addEventListener('click', function () { s.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+                wrap.appendChild(b);
+            });
+        }
+        bar.appendChild(wrap);
     }
     function svPdfToImage(f) {
         return svNeed(function () { return window.pdfjsLib; }, ['https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'])
