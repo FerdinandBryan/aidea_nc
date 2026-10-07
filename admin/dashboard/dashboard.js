@@ -535,32 +535,16 @@ document.addEventListener('DOMContentLoaded', () => {
     loadStats();
     loadRecentTransactions();
     loadRecentSubmissions();
-    initRevenueChart();
+    // initRevenueChart(); // replaced by thesis chart
     initDonutChart();
 });
+
 // ── Thesis submitted per academic year (horizontal bar) ───────────────────
 (function () {
   async function initThesisYearChart() {
     if (typeof Chart === 'undefined') return;
-    const anchor = document.querySelector('.charts-row');
-    const sample = document.querySelector('#revenueChart');
-    if (!anchor || !sample || document.getElementById('thesisYearChart')) return;
-
-    const box  = sample.closest('.chart-box');
-    const card = box && box.parentElement;
-
-    const section = document.createElement('section');
-    section.className = anchor.className;
-    section.style.gridTemplateColumns = '1fr';
-
-    const wrap = document.createElement('div');
-    if (card) wrap.className = card.className;
-    wrap.innerHTML =
-      '<h3 style="margin:0 0 12px;font-size:15px">Thesis submitted per academic year</h3>' +
-      '<div style="position:relative;height:280px"><canvas id="thesisYearChart" role="img" ' +
-      'aria-label="Thesis submitted per academic year bar chart"></canvas></div>';
-    section.appendChild(wrap);
-    anchor.insertAdjacentElement('afterend', section);
+    const canvas = document.getElementById('thesisYearChart');
+    if (!canvas) return;
 
     const v = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
@@ -577,7 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
       rows = json.data || [];
     } catch (e) { console.error('Thesis-by-year load failed', e); }
 
-    new Chart(document.getElementById('thesisYearChart').getContext('2d'), {
+    new Chart(canvas.getContext('2d'), {
       type: 'bar',
       data: {
         labels: rows.map(r => r.academic_year),
