@@ -147,10 +147,10 @@
 
       <section id="tplPanel" style="margin:0 0 18px;padding:16px;border:1px solid rgba(128,128,128,.3);border-radius:12px">
         <h3 style="margin:0 0 4px;font-size:16px">Certificate templates</h3>
-        <p style="margin:0 0 12px;font-size:13px;opacity:.75">Upload a certificate image for reference. Saved templates appear in Generate certificate.</p>
+        <p style="margin:0 0 12px;font-size:13px;opacity:.75">Upload a certificate template as a PDF or DOCX file. Saved templates appear in Generate certificate.</p>
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
           <input type="text" id="tplName" placeholder="Template name" maxlength="120" style="padding:9px 12px;border:1px solid rgba(128,128,128,.4);border-radius:8px;background:transparent;color:inherit;font:inherit;min-width:200px">
-          <input type="file" id="tplFile" accept="image/png,image/jpeg,image/webp" style="font:inherit;max-width:260px">
+          <input type="file" id="tplFile" accept=".pdf,.docx" style="font:inherit;max-width:260px">
           <button type="button" id="tplAdd" style="padding:9px 16px;border:0;border-radius:8px;background:#2f6bff;color:#fff;font:inherit;font-weight:600;cursor:pointer">Upload template</button>
         </div>
         <div id="tplList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px"></div>

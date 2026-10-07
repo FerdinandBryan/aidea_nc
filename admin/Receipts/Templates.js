@@ -32,7 +32,7 @@
     addBtn.addEventListener('click', function () {
         var f = fileIn.files && fileIn.files[0], nm = (nameIn.value || '').trim();
         if (!nm) { alert('Enter a name for the template.'); return; }
-        if (!f) { alert('Choose an image first (PNG, JPG or WebP).'); return; }
+        if (!f) { alert('Choose a PDF or DOCX file first.'); return; }
         if (f.size > 10 * 1024 * 1024) { alert('The image is over 10 MB. Use a smaller one.'); return; }
         var fd = new FormData(); fd.append('name', nm); fd.append('image', f);
         var label = addBtn.textContent;
@@ -45,6 +45,73 @@
     });
 
     load();
+    /* TPL-PDFDOCX: only PDF and DOCX are accepted; both are saved as a PNG of page 1 */
+    var srcOk = false;
+    function tplScript(urls) {
+        return new Promise(function (ok, fail) {
+            var i = 0;
+            (function next() {
+                if (i >= urls.length) { fail(new Error('Could not load a library')); return; }
+                var s = document.createElement('script');
+                s.src = urls[i++];
+                s.onload = function () { ok(); };
+                s.onerror = function () { next(); };
+                document.head.appendChild(s);
+            })();
+        });
+    }
+    function tplNeed(test, urls) { return test() ? Promise.resolve() : tplScript(urls); }
+    function tplDocxToPng(f) {
+        var host = document.createElement('div');
+        host.style.cssText = 'position:absolute;left:-99999px;top:0;background:#fff';
+        return f.arrayBuffer().then(function (buf) {
+            return tplNeed(function () { return window.JSZip; }, ['https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'])
+                .then(function () { return tplNeed(function () { return window.docx; }, ['https://cdnjs.cloudflare.com/ajax/libs/docx-preview/0.3.2/docx-preview.min.js', 'https://cdn.jsdelivr.net/npm/docx-preview@0.3.2/dist/docx-preview.min.js']); })
+                .then(function () { return tplNeed(function () { return window.html2canvas; }, ['https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js']); })
+                .then(function () {
+                    document.body.appendChild(host);
+                    return window.docx.renderAsync(buf, host, null, { className: 'docx', inWrapper: false, breakPages: true });
+                })
+                .then(function () {
+                    var sec = host.querySelector('section.docx');
+                    if (!sec) throw new Error('No pages found');
+                    return window.html2canvas(sec, { scale: 1600 / sec.offsetWidth, backgroundColor: '#ffffff', useCORS: true });
+                })
+                .then(function (c) {
+                    document.body.removeChild(host);
+                    return new Promise(function (ok, fail) { c.toBlob(function (b) { if (b) ok(b); else fail(new Error('No image')); }, 'image/png'); });
+                });
+        }).catch(function (e) { if (host.parentNode) host.parentNode.removeChild(host); throw e; });
+    }
+    fileIn.addEventListener('change', function () {
+        var f = fileIn.files && fileIn.files[0];
+        srcOk = false;
+        if (!f) return;
+        var isPdf = /\.pdf$/i.test(f.name), isDocx = /\.docx$/i.test(f.name);
+        if (isPdf) { srcOk = true; return; }
+        if (!isDocx) { fileIn.value = ''; alert('Only PDF or DOCX files are allowed. Images are not accepted.'); return; }
+        var label = addBtn.textContent;
+        addBtn.disabled = true; addBtn.textContent = 'Converting Word file...';
+        function done() { addBtn.disabled = false; addBtn.textContent = label; }
+        f.slice(0, 4).arrayBuffer().then(function (h) {
+            var b = new Uint8Array(h);
+            if (!(b[0] === 0x50 && b[1] === 0x4B)) throw new Error('bad');
+            return tplDocxToPng(f);
+        }).then(function (blob) {
+            var png = new File([blob], f.name.replace(/\.docx$/i, '') + '.png', { type: 'image/png' });
+            var dt = new DataTransfer(); dt.items.add(png); fileIn.files = dt.files;
+            srcOk = true; done();
+        }).catch(function (e) {
+            console.warn(e); fileIn.value = ''; done();
+            alert('Could not read that Word file. Make sure it is a real .docx, or upload it as a PDF.');
+        });
+    });
+    addBtn.addEventListener('click', function (e) {
+        if (fileIn.files && fileIn.files[0] && !srcOk) {
+            e.stopImmediatePropagation(); e.preventDefault();
+            alert('Only PDF or DOCX files are allowed.');
+        }
+    }, true);
     /* PDF support: convert page 1 of a chosen PDF to a PNG in the browser, then upload it as an image */
     function loadPdfJs(cb, bad) {
         if (window.pdfjsLib) { cb(); return; }
