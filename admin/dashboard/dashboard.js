@@ -538,3 +538,73 @@ document.addEventListener('DOMContentLoaded', () => {
     initRevenueChart();
     initDonutChart();
 });
+// ── Thesis submitted per academic year (horizontal bar) ───────────────────
+(function () {
+  async function initThesisYearChart() {
+    if (typeof Chart === 'undefined') return;
+    const anchor = document.querySelector('.charts-row');
+    const sample = document.querySelector('#revenueChart');
+    if (!anchor || !sample || document.getElementById('thesisYearChart')) return;
+
+    const box  = sample.closest('.chart-box');
+    const card = box && box.parentElement;
+
+    const section = document.createElement('section');
+    section.className = anchor.className;
+    section.style.gridTemplateColumns = '1fr';
+
+    const wrap = document.createElement('div');
+    if (card) wrap.className = card.className;
+    wrap.innerHTML =
+      '<h3 style="margin:0 0 12px;font-size:15px">Thesis submitted per academic year</h3>' +
+      '<div style="position:relative;height:280px"><canvas id="thesisYearChart" role="img" ' +
+      'aria-label="Thesis submitted per academic year bar chart"></canvas></div>';
+    section.appendChild(wrap);
+    anchor.insertAdjacentElement('afterend', section);
+
+    const v = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+    let rows = [];
+    try {
+      const base = (typeof API_BASE !== 'undefined' && API_BASE) ||
+                   (typeof API !== 'undefined' && API) || '/api';
+      const token = localStorage.getItem('token') || localStorage.getItem('admin_token') ||
+                    localStorage.getItem('auth_token') || localStorage.getItem('access_token') || '';
+      const res = await fetch(String(base).replace(/\/$/, '') + '/dashboard/thesis-by-year', {
+        headers: { 'Accept': 'application/json', ...(token ? { 'Authorization': 'Bearer ' + token } : {}) }
+      });
+      const json = await res.json();
+      rows = json.data || [];
+    } catch (e) { console.error('Thesis-by-year load failed', e); }
+
+    new Chart(document.getElementById('thesisYearChart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: rows.map(r => r.academic_year),
+        datasets: [{
+          label: 'Thesis submitted',
+          data: rows.map(r => Number(r.total)),
+          backgroundColor: v('--chart-line') || '#4f46e5',
+          borderRadius: 6,
+          barThickness: 24
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { beginAtZero: true, grid: { color: v('--chart-grid') },
+               ticks: { color: v('--chart-text'), precision: 0, stepSize: 1 },
+               title: { display: true, text: 'Number of thesis submitted', color: v('--chart-text') } },
+          y: { grid: { display: false }, ticks: { color: v('--chart-text') },
+               title: { display: true, text: 'Academic year', color: v('--chart-text') } }
+        }
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initThesisYearChart);
+  else initThesisYearChart();
+})();

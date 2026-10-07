@@ -71,4 +71,14 @@ class DashboardController extends Controller
             'avg_feedback' => $avgFeedback ? round($avgFeedback, 1) : null,
         ]);
     }
-}
+
+    public function thesisByYear()
+    {
+        $rows = \App\Models\ThesisSubmission::query()
+            ->select('academic_year', \DB::raw('COUNT(*) as total'))
+            ->groupBy('academic_year')
+            ->orderBy('academic_year')
+            ->get();
+
+        return response()->json(['data' => $rows]);
+    }}
