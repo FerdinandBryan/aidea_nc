@@ -519,6 +519,26 @@
                 apply();
             }).catch(function (e) { msg.textContent = 'Could not open this template (' + ((e && e.message) || 'error') + ').'; });
     }
+    function svPdfToImage(f) {
+        return svNeed(function () { return window.pdfjsLib; }, ['https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'])
+            .then(function () {
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                return f.arrayBuffer();
+            })
+            .then(function (buf) { return window.pdfjsLib.getDocument({ data: buf }).promise; })
+            .then(function (pdf) { return pdf.getPage(1); })
+            .then(function (page) {
+                var v0 = page.getViewport({ scale: 1 }), v = page.getViewport({ scale: 1600 / v0.width });
+                var c = document.createElement('canvas'); c.width = Math.round(v.width); c.height = Math.round(v.height);
+                var cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height);
+                return page.render({ canvasContext: cx, viewport: v }).promise.then(function () { return c; });
+            })
+            .then(function (c) {
+                return new Promise(function (ok, fail) {
+                    c.toBlob(function (b) { if (b) ok(new File([b], f.name.replace(/\.pdf$/i, '') + '.png', { type: 'image/png' })); else fail(new Error('No image')); }, 'image/png');
+                });
+            });
+    }
     function openChooser() {
         var m = modal(
             '<div style="width:min(580px,100%);background:#fff;color:#111827;border-radius:14px;padding:22px">' +
@@ -528,10 +548,10 @@
             '<p style="margin:0 0 16px;font-size:13px;color:#475569">Which template do you want to use?</p>' +
             '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px">' +
             choice('sys', 'System template', 'Use the built-in AIDEA certificate design.') +
-            choice('new', 'New template', 'Attach your certificate image. The system copies its colors and logo, then rebuilds it in the system layout.') +
+            choice('new', 'New template', 'Attach a Word (.docx) file to edit all its text, or a PDF or image.') +
             '</div>' +
-            '<input type="file" id="cgFile" accept="image/png,image/jpeg,image/webp" hidden>' +
-            '<p style="margin:14px 0 0;font-size:12px;color:#64748b">A new template must be an image (PNG, JPG or WebP). For a PDF, export it as an image first.</p>' +
+            '<input type="file" id="cgFile" accept=".docx,.pdf,image/png,image/jpeg,image/webp" hidden>' +
+            '<p style="margin:14px 0 0;font-size:12px;color:#64748b">Choose a Word (.docx) file to edit it like in Word. A PDF is opened as a picture, so save it as .docx to edit the text.</p>' +
             '</div>');
         var file = m.o.querySelector('#cgFile');
         var tplBase = (typeof API_BASE !== 'undefined' ? API_BASE : 'https://aideanc-production.up.railway.app/api');
@@ -572,6 +592,23 @@
             } else file.click();
         });
         file.addEventListener('change', function () {
+            var f0 = file.files && file.files[0];
+            if (f0 && /\.docx$/i.test(f0.name)) {
+                file.value = '';
+                f0.arrayBuffer().then(function (buf) {
+                    var b = new Uint8Array(buf.slice(0, 2));
+                    if (!(b[0] === 0x50 && b[1] === 0x4B)) { alert('That is not a real .docx file.'); return; }
+                    m.close(); svDocxGen(buf, f0.name.replace(/\.docx$/i, ''));
+                });
+                return;
+            }
+            if (f0 && /\.pdf$/i.test(f0.name)) {
+                file.value = '';
+                svPdfToImage(f0).then(function (png) {
+                    loadImage(png, function (im) { m.close(); openGenerator(Object.assign({ mode: 'template', img: im, pal: analyze(im) }, cgExtra)); });
+                }).catch(function () { alert('Could not read that PDF. Save it as a .docx to edit the text.'); });
+                return;
+            }
             loadImage(file.files[0], function (im) { m.close(); openGenerator(Object.assign({ mode: 'template', img: im, pal: analyze(im) }, cgExtra)); });
         });
     }
