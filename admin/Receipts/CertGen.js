@@ -412,6 +412,113 @@
     function protoCommit(yr, svc) { try { localStorage.setItem(protoKey(yr, svc), String(protoCount(yr, svc) + 1)); } catch (e) {} }
 
     var cgExtra = {};
+    function svLoad(urls) {
+        return new Promise(function (ok, fail) {
+            var i = 0;
+            (function next() {
+                if (i >= urls.length) { fail(new Error('Could not load a library')); return; }
+                var s = document.createElement('script'); s.src = urls[i++];
+                s.onload = ok; s.onerror = next; document.head.appendChild(s);
+            })();
+        });
+    }
+    function svNeed(test, urls) { return test() ? Promise.resolve() : svLoad(urls); }
+    function svDocxGen(buf, name) {
+        var ov = document.createElement('div');
+        ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.65);display:flex;flex-direction:column;font:14px Arial,sans-serif;color:#111827';
+        var bs = 'height:30px;padding:0 10px;border:1px solid #9ca3af;border-radius:6px;background:#fff;color:#111827;cursor:pointer;font:inherit';
+        var tb = 'height:28px;min-width:28px;border:0;border-radius:6px;background:transparent;color:#1f2937;cursor:pointer;font:inherit';
+        var fi = 'height:30px;padding:0 8px;border:1px solid #cbd5e1;border-radius:6px;font:inherit;color:#111827;background:#fff;min-width:0';
+        function cb(c, l, ti) { return '<button type="button" data-c="' + c + '" title="' + ti + '" style="' + tb + '">' + l + '</button>'; }
+        ov.innerHTML =
+            '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 16px;background:#fff;border-bottom:1px solid #d1d5db">' +
+            '<input id="gTitle" placeholder="Title" style="' + fi + ';flex:2;min-width:160px"><input id="gProto" placeholder="Protocol No." style="' + fi + ';width:130px"><input id="gDate" type="date" style="' + fi + '"><input id="gName" placeholder="Name" style="' + fi + ';width:170px">' +
+            '<button type="button" data-a="print" style="' + bs + '">Print / PDF</button><button type="button" data-a="png" style="' + bs + '">Download PNG</button><button type="button" data-a="close" style="' + bs + '">Close</button></div>' +
+            '<div id="gTb" style="display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:6px 16px;background:#edf2fa;border-bottom:1px solid #d1d5db">' +
+            cb('undo', '&#8630;', 'Undo') + cb('redo', '&#8631;', 'Redo') +
+            '<select data-f="font" style="' + tb + '"><option value="">Font</option><option>Arial</option><option>Times New Roman</option><option>Calibri</option><option>Cambria</option><option>Georgia</option></select>' +
+            '<select data-f="size" style="' + tb + '"><option value="">Size</option><option>10</option><option>11</option><option>12</option><option>14</option><option>16</option><option>18</option><option>24</option><option>32</option></select>' +
+            cb('bold', '<b>B</b>', 'Bold') + cb('italic', '<i>I</i>', 'Italic') + cb('underline', '<u>U</u>', 'Underline') +
+            '<input type="color" data-k="foreColor" value="#000000" style="width:28px;height:28px;border:0;background:transparent"><input type="color" data-k="hiliteColor" value="#ffff00" style="width:28px;height:28px;border:0;background:transparent">' +
+            cb('justifyLeft', '&#8676;', 'Left') + cb('justifyCenter', '&#8596;', 'Center') + cb('justifyRight', '&#8677;', 'Right') + cb('justifyFull', '&#9776;', 'Justify') +
+            cb('insertUnorderedList', '&#8226;&#8801;', 'Bullets') + cb('insertOrderedList', '1.&#8801;', 'Numbers') + '</div>' +
+            '<div style="flex:1;overflow:auto;background:#e5e7eb;padding:16px"><div id="gMsg" style="text-align:center;color:#4b5563;padding:24px">Opening ' + String(name || 'template').replace(/[<>&]/g, '') + '...</div><div id="gHost"></div></div>';
+        document.body.appendChild(ov);
+        ov.querySelector('#gDate').value = new Date().toISOString().slice(0, 10);
+        var host = ov.querySelector('#gHost'), msg = ov.querySelector('#gMsg'), saved = null, phs = [];
+        function inHost(n) { while (n) { if (n === host) return true; n = n.parentNode; } return false; }
+        function onSel() { if (!ov.isConnected) { document.removeEventListener('selectionchange', onSel); return; } var s = window.getSelection(); if (s && s.rangeCount && inHost(s.anchorNode)) saved = s.getRangeAt(0).cloneRange(); }
+        document.addEventListener('selectionchange', onSel);
+        function restore() { if (!saved) return false; var s = window.getSelection(); s.removeAllRanges(); s.addRange(saved); return true; }
+        function run(c, v) { if (!restore()) return; try { document.execCommand('styleWithCSS', false, true); } catch (e) { } document.execCommand(c, false, v); }
+        function setSize(px) {
+            if (!restore() || saved.collapsed) return;
+            try { document.execCommand('styleWithCSS', false, false); } catch (e) { }
+            document.execCommand('fontSize', false, '7');
+            Array.prototype.forEach.call(host.querySelectorAll('font[size="7"]'), function (f) { var sp = document.createElement('span'); sp.style.fontSize = px + 'px'; while (f.firstChild) sp.appendChild(f.firstChild); f.parentNode.replaceChild(sp, f); });
+        }
+        var bar = ov.querySelector('#gTb');
+        bar.addEventListener('mousedown', function (e) { var n = e.target.tagName; if (n === 'SELECT' || n === 'INPUT' || n === 'OPTION') return; e.preventDefault(); });
+        bar.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('button[data-c]'); if (b) run(b.getAttribute('data-c')); });
+        bar.addEventListener('change', function (e) { var x = e.target, f = x.getAttribute('data-f'); if (f === 'font' && x.value) run('fontName', x.value); else if (f === 'size' && x.value) setSize(parseInt(x.value, 10)); if (f) x.selectedIndex = 0; });
+        bar.addEventListener('input', function (e) { var k = e.target.getAttribute && e.target.getAttribute('data-k'); if (k) run(k, e.target.value); });
+        function val(id) { return (ov.querySelector(id).value || '').trim(); }
+        function fillCells(label, v) {
+            Array.prototype.forEach.call(host.querySelectorAll('td'), function (td) {
+                if (td.textContent.replace(/[\s:]+/g, ' ').trim().toLowerCase() !== label) return;
+                var nx = td.nextElementSibling; if (!nx) return;
+                if (!nx._svFill && nx.textContent.trim()) return;
+                nx._svFill = true; nx.textContent = v;
+            });
+        }
+        function apply() {
+            var d = val('#gDate'), dt = d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+            var vals = { title: val('#gTitle'), protocol: val('#gProto'), name: val('#gName'), date: dt };
+            phs.forEach(function (s) { s.textContent = vals[s.getAttribute('data-ph')] || s._tok; });
+            if (vals.protocol) fillCells('protocol no', vals.protocol);
+            if (vals.title) fillCells('title', vals.title);
+        }
+        ov.querySelectorAll('#gTitle,#gProto,#gDate,#gName').forEach(function (i) { i.addEventListener('input', apply); });
+        function close() { document.removeEventListener('selectionchange', onSel); ov.remove(); }
+        ov.querySelector('[data-a="close"]').addEventListener('click', close);
+        ov.querySelector('[data-a="print"]').addEventListener('click', function () {
+            var w = window.open('', '_blank'); if (!w) { alert('Allow pop-ups to print.'); return; }
+            var st = ''; Array.prototype.forEach.call(host.querySelectorAll('style'), function (s) { st += s.outerHTML; });
+            var pg = ''; Array.prototype.forEach.call(host.querySelectorAll('section.docx'), function (s) { var c = s.cloneNode(true); c.removeAttribute('contenteditable'); pg += c.outerHTML; });
+            w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Certificate</title>' + st + '<style>@page{margin:0}body{margin:0}section.docx{margin:0 auto!important;box-shadow:none!important}</style></head><body>' + pg + '</body></html>');
+            w.document.close(); w.onload = function () { w.focus(); w.print(); };
+        });
+        ov.querySelector('[data-a="png"]').addEventListener('click', function () {
+            svNeed(function () { return window.html2canvas; }, ['https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js']).then(function () {
+                var secs = host.querySelectorAll('section.docx'), i = 0;
+                (function next() {
+                    if (i >= secs.length) return;
+                    var s = secs[i++];
+                    window.html2canvas(s, { scale: 1600 / s.offsetWidth, backgroundColor: '#ffffff', useCORS: true }).then(function (c) {
+                        var a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = 'certificate-page' + i + '.png'; document.body.appendChild(a); a.click(); a.remove(); next();
+                    });
+                })();
+            }).catch(function () { alert('Could not create the PNG.'); });
+        });
+        svNeed(function () { return window.JSZip; }, ['https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'])
+            .then(function () { return svNeed(function () { return window.docx; }, ['https://cdnjs.cloudflare.com/ajax/libs/docx-preview/0.3.2/docx-preview.min.js', 'https://cdn.jsdelivr.net/npm/docx-preview@0.3.2/dist/docx-preview.min.js']); })
+            .then(function () { return window.docx.renderAsync(buf, host, null, { className: 'docx', inWrapper: false, breakPages: true, ignoreLastRenderedPageBreak: false }); })
+            .then(function () {
+                msg.remove();
+                var rx = /\{\{\s*(title|name|date|protocol)\s*\}\}/gi, nodes = [], w = document.createTreeWalker(host, NodeFilter.SHOW_TEXT), n;
+                while ((n = w.nextNode())) { if (/\{\{/.test(n.nodeValue)) nodes.push(n); }
+                nodes.forEach(function (tn) {
+                    var parts = tn.nodeValue.split(rx), frag = document.createDocumentFragment();
+                    for (var i = 0; i < parts.length; i++) {
+                        if (i % 2 === 0) { if (parts[i]) frag.appendChild(document.createTextNode(parts[i])); }
+                        else { var sp = document.createElement('span'); sp.setAttribute('data-ph', parts[i].toLowerCase()); sp._tok = '{{' + parts[i].toLowerCase() + '}}'; sp.textContent = sp._tok; phs.push(sp); frag.appendChild(sp); }
+                    }
+                    tn.parentNode.replaceChild(frag, tn);
+                });
+                Array.prototype.forEach.call(host.querySelectorAll('section.docx'), function (s) { s.setAttribute('contenteditable', 'true'); s.setAttribute('spellcheck', 'true'); s.style.margin = '0 auto 16px'; s.style.outline = 'none'; });
+                apply();
+            }).catch(function (e) { msg.textContent = 'Could not open this template (' + ((e && e.message) || 'error') + ').'; });
+    }
     function openChooser() {
         var m = modal(
             '<div style="width:min(580px,100%);background:#fff;color:#111827;border-radius:14px;padding:22px">' +
@@ -439,6 +546,17 @@
                 });
             }).catch(function (e) { console.warn('Saved templates not loaded:', e); });
         })();
+        m.o.addEventListener('click', function (e) {
+            var c = e.target.closest ? e.target.closest('[data-choice]') : null;
+            if (!c || c._svSkip) return;
+            var v = String(c.getAttribute('data-choice'));
+            if (v.indexOf('tpl:') !== 0) return;
+            e.stopImmediatePropagation(); e.preventDefault();
+            var id = parseInt(v.slice(4), 10), st0 = c.querySelector('strong');
+            fetch(tplBase + '/certificate-templates/' + id + '/original', { headers: tplHd }).then(function (r) { if (!r.ok) throw new Error('none'); return r.arrayBuffer(); })
+                .then(function (buf) { m.close(); svDocxGen(buf, st0 ? st0.textContent : ''); })
+                .catch(function () { c._svSkip = true; c.click(); c._svSkip = false; });
+        }, true);
         m.o.addEventListener('click', function (e) {
             var c = e.target.closest('[data-choice]');
             if (!c) return;
