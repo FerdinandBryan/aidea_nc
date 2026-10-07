@@ -314,10 +314,37 @@
         }
         return out;
     }
+    function svTplPanel(st, q) {
+        var old = q('#cgTplEdit'); if (old) old.remove();
+        var keys = ['school', 'sub'].filter(function (k) { return st.tpl && st.tpl[k] && st.tpl[k].text; });
+        var anchor = q('#cgOcrStatus');
+        if (!keys.length || !anchor || !anchor.parentNode) return;
+        var w = document.createElement('div');
+        w.id = 'cgTplEdit';
+        w.style.cssText = 'margin:8px 0;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#111827';
+        var h = document.createElement('div');
+        h.style.cssText = 'font-weight:600;margin-bottom:6px';
+        h.textContent = 'Template text (edit to replace the original)';
+        w.appendChild(h);
+        var names = { school: 'Top line', sub: 'Second line' };
+        keys.forEach(function (k) {
+            var lab = document.createElement('label');
+            lab.style.cssText = 'display:block;margin-bottom:6px;font-weight:600;color:#475569';
+            lab.appendChild(document.createTextNode(names[k]));
+            var inp = document.createElement('input');
+            inp.type = 'text';
+            inp.value = st.tpl[k].text;
+            inp.style.cssText = 'display:block;width:100%;margin-top:4px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font:inherit;color:#111827;background:#fff';
+            inp.addEventListener('input', function () { st.tpl[k].text = inp.value; });
+            lab.appendChild(inp);
+            w.appendChild(lab);
+        });
+        anchor.parentNode.insertAdjacentElement('afterend', w);
+    }
     function runOcr(st, q, redraw) {
         var img = st.img, status = q('#cgOcrStatus'), box = q('#cgOcr');
         function say(m) { if (status) status.textContent = m; }
-        function done(m) { say(m); if (box) box.disabled = false; redraw(); }
+        function done(m) { say(m); if (box) box.disabled = false; svTplPanel(st, q); redraw(); }
         if (box) box.disabled = true;
         say('(reading template, first time may take a while...)');
         loadTess(function () {
