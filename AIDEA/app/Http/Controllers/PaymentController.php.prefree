@@ -24,7 +24,7 @@ class PaymentController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'gcash_ref' => 'required_unless:method,Free|nullable|string|min:6',
+            'gcash_ref' => 'required|string|min:6',
             'service' => 'required|string',
             'service_id' => 'nullable|integer',
             'student_id' => 'nullable|string',
@@ -32,7 +32,7 @@ class PaymentController extends Controller
             'date_iso' => 'nullable|date',
             'amount' => 'required|numeric|min:0',
             'method' => 'nullable|string',
-            'proof_image' => 'required_unless:method,Free|nullable|string',
+            'proof_image' => 'required|string',
             'research_items' => 'nullable|array',
         ]);
 

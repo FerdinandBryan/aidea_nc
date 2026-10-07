@@ -1,0 +1,262 @@
+2:    formatting.css  ?  AIDEA Admin ? Format Templates
+3:    Shares the Dashboard / Price Audit Log design tokens: blue + yellow
+4:    palette, light & dark themes, responsive sidebar drawer, profile
+5:    sign-out modal.
+6: ???~ */
+7: 
+8: /* ?? Design tokens (identical across AIDEA Admin pages) ???~ */
+9: :root {
+10:     --font: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+11: 
+12:     --blue: #1d4ed8;
+13:     --blue-soft: #e8efff;
+14:     --yellow: #f5b301;
+15:     --yellow-soft: #fff5d6;
+16: 
+17:     --bg: #f3f5fa;
+18:     --surface: #fff~;
+19:     --surface-2: #f8f9fd;
+20:     --border: #e2e7f1;
+21:     --text: #0e1a3a;
+22:     --muted: #5f6d8c;
+23:     --hover: #f1f4fb;
+24: 
+25:     --primary: var(--blue);
+26:     --primary-contrast: #fff~;
+27:     --accent: var(--yellow);
+28: 
+29:     --ok-bg: #e3f6ec;
+30:     --ok-fg: #14764a;
+31:     --warn-bg: #fff2cc;
+32:     --warn-fg: #8a5d00;
+33:     --bad-bg: #fde8e8;
+34:     --bad-fg: #b42323;
+35:     --info-bg: #e5eeff;
+36:     --info-fg: #1d4ed8;
+37: 
+38:     --sidebar-bg: #0a1a3f;
+39:     --sidebar-text: rgba(255, 255, 255, .66);
+40:     --sidebar-heading: rgba(255, 255, 255, .38);
+41: 
+42:     --shadow: 0 1px 2px rgba(14, 26, 58, .04), 0 8px 24px -12px rgba(14, 26, 58, .10);
+43:     --radius: 14px;
+44:     --radius-sm: 9px;
+45:     --sidebar-w: 256px;
+46:     --topbar-h: 64px;
+47: }
+48: 
+49: :root[data-theme="dark"] {
+50:     --blue-soft: rgba(96, 145, 255, .14);
+51:     --yellow-soft: rgba(255, 199, 44, .13);
+52: 
+53:     --bg: #070d1c;
+54:     --surface: #0f1830;
+55:     --surface-2: #131e3a;
+56:     --border: #1e2a4a;
+57:     --text: #e7edfb;
+58:     --muted: #93a2c6;
+59:     --hover: #16223f;
+60: 
+61:     --primary: #5b93ff;
+62:     --primary-contrast: #06122e;
+63:     --accent: #ffc72c;
+64: 
+65:     --ok-bg: rgba(52, 211, 153, .14);
+66:     --ok-fg: #5fe0aa;
+67:     --warn-bg: rgba(255, 199, 44, .15);
+68:     --warn-fg: #ffd668;
+69:     --bad-bg: rgba(248, 113, 113, .15);
+70:     --bad-fg: #ff9a9a;
+71:     --info-bg: rgba(96, 145, 255, .15);
+72:     --info-fg: #8fb4ff;
+73: 
+74:     --sidebar-bg: #050a17;
+75:     --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 30px -14px rgba(0, 0, 0, .6);
+76:     color-scheme: dark;
+77: }
+78: 
+79: /* ?? Reset / base ???~ */
+80: *,
+81: *::before,
+82: *::after {
+83:     box-sizing: border-box;
+84:     margin: 0;
+85:     padding: 0;
+86: }
+87: 
+88: html {
+89:     -webkit-text-size-adjust: 100%;
+90:     text-size-adjust: 100%;
+-----
+870: 
+871: /* ???~
+872:    MODALS (create/edit, view, delete)
+873: ???~ */
+874: .modal-overlay {
+875:     position: fixed;
+876:     inset: 0;
+877:     background: rgba(3, 8, 24, .55);
+878:     z-index: 1000;
+879:     display: none;
+880:     align-items: center;
+881:     justify-content: center;
+882:     padding: 20px;
+883:     -webkit-backdrop-filter: blur(4px);
+884:     backdrop-filter: blur(4px);
+885:     overflow-y: auto;
+886: }
+887: 
+888: .modal-overlay.open {
+889:     display: flex;
+890: }
+891: 
+892: .modal-box {
+893:     background: var(--surface);
+894:     color: var(--text);
+895:     border: 1px solid var(--border);
+896:     border-radius: 16px;
+897:     width: 100%;
+898:     max-width: 540px;
+899:     max-height: 90vh;
+900:     overflow-y: auto;
+901:     box-shadow: 0 24px 60px -12px rgba(0, 0, 0, .35);
+902:     animation: slideUp .22s ease;
+903: }
+904: 
+905: .modal-box.wide {
+906:     max-width: 760px;
+907: }
+908: 
+909: @keyframes slideUp {
+910:     from {
+911:    ~transform: translateY(14px);
+912:    ~opacity: 0;
+913:     }
+914: 
+915:     to {
+916:    ~transform: none;
+917:    ~opacity: 1;
+918:     }
+919: }
+920: 
+921: .modal-header {
+922:     padding: 18px 22px 16px;
+923:     border-bottom: 1px solid var(--border);
+924:     display: flex;
+925:     align-items: center;
+926:     justify-content: space-between;
+927:     position: sticky;
+928:     top: 0;
+929:     background: var(--surface);
+930:     z-index: 2;
+931: }
+932: 
+933: .modal-header h3 {
+934:     font-size: 16px;
+935:     font-weight: 700;
+936: }
+937: 
+938: .modal-close {
+939:     width: 28px;
+940:     height: 28px;
+941:     border-radius: 7px;
+942:     background: var(--surface-2);
+943:     border: 1px solid var(--border);
+944:     color: var(--muted);
+945:     font-size: 14px;
+946:     cursor: pointer;
+947:     display: flex;
+948:     align-items: center;
+949:     justify-content: center;
+950:     transition: all .15s;
+951: }
+952: 
+953: .modal-close:hover {
+954:     color: var(--text);
+955:     background: var(--hover);
+956: }
+957: 
+958: .modal-body {
+959:     padding: 20px 22px;
+960: }
+961: 
+962: .modal-footer {
+963:     padding: 14px 22px;
+964:     border-top: 1px solid var(--border);
+965:     display: flex;
+966:     justify-content: flex-end;
+967:     gap: 10px;
+968: }
+969: 
+970: .btn-modal-close {
+971:     padding: 9px 18px;
+972:     border-radius: var(--radius-sm);
+973:     background: var(--surface-2);
+974:     border: 1px solid var(--border);
+975:     color: var(--muted);
+976:     font-size: 13px;
+977:     cursor: pointer;
+978:     transition: all .18s;
+979: }
+980: 
+981: .btn-modal-close:hover {
+982:     color: var(--text);
+983:     background: var(--hover);
+984: }
+985: 
+986: .btn-modal-submit {
+987:     padding: 9px 20px;
+988:     border-radius: var(--radius-sm);
+989:     background: var(--primary);
+990:     border: none;
+991:     color: var(--primary-contrast);
+992:     font-size: 13px;
+993:     font-weight: 600;
+994:     cursor: pointer;
+995:     transition: filter .18s;
+996: }
+997: 
+998: .btn-modal-submit:hover {
+999:     filter: brightness(1.08);
+1000: }
+1001: 
+1002: .btn-danger {
+1003:     padding: 9px 20px;
+1004:     border-radius: var(--radius-sm);
+1005:     background: var(--bad-bg);
+1006:     border: 1px solid var(--bad-fg);
+1007:     color: var(--bad-fg);
+1008:     font-size: 13px;
+1009:     font-weight: 600;
+1010:     cursor: pointer;
+-----
+892: .modal-box {
+905: .modal-box.wide {
+1025: .form-group {
+1029: .form-label {
+1078: /* ?? DROPZONE ?? */
+1079: .dropzone {
+1089: .dropzone:hover,
+1090: .dropzone.dragover {
+1127: /* ?? RULES BUILDER ?? */
+1128: .rules-header {
+1135: .rules-hint {
+1141: .btn-add-rule {
+1153: .btn-add-rule:hover {
+1157: .rules-container {
+1163: .rule-row {
+1172:     animation: fadeInRule .18s ease;
+1175: @keyframes fadeInRule {
+1187: .rule-row input,
+1188: .rule-row select {
+1199: .rule-row input:focus,
+1200: .rule-row select:focus {
+1204: .btn-remove-rule {
+1220: .btn-remove-rule:hover {
+1224: .rules-empty {
+1326: .view-rules-list {
+1332: .view-rule-row {
+1343: .view-rule-dot {
+1352: .view-rule-name {
+1357: .view-rule-type {
+1542:     .rule-row {

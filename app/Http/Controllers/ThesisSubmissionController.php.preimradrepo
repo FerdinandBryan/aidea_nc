@@ -8,36 +8,51 @@ use Illuminate\Support\Facades\Storage;
 
 class ThesisSubmissionController extends Controller
 {
-    /* ── STUDENT: submit a thesis ── */
+    /* â”€â”€ STUDENT: submit a thesis â”€â”€ */
     public function store(Request $request)
     {
         $validated = $request->validate([
             'title' => 'required|string|max:500',
             'course' => 'required|string',
-            'academic_year' => 'required|string|max:20',
-            'abstract' => 'required|string|min:50',
+            'academic_year' => 'required|in:2026-2027,2027-2028,2028-2029,2029-2030',
+            'abstract' => 'nullable|string|required_without:abstract_file',
             'adviser_name' => 'required|string|max:255',
-            'submission_type' => 'required|in:initial,revision,final',
+            'submission_type' => 'required|in:thesis,research',
             'authors' => 'nullable|string|max:500',
             'file' => 'required|file|mimes:pdf,docx|max:20480',
+            'abstract_file' => 'nullable|file|mimes:pdf,docx|max:20480',
+            'imrad_file' => 'required_if:submission_type,research|nullable|file|mimes:pdf,docx|max:20480',
         ]);
 
         $file = $request->file('file');
+        $abstractText = trim((string) ($validated['abstract'] ?? ''));
+        if ($abstractText !== '') {
+            $wordCount = count(preg_split('/\s+/u', $abstractText, -1, PREG_SPLIT_NO_EMPTY));
+            if ($wordCount < 150 || $wordCount > 200) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'abstract' => ["Abstract must be 150 to 200 words (you entered {$wordCount})."],
+                ]);
+            }
+        }
         $path = $file->store('thesis_files', 'public');
+        $abstractFilePath = $request->hasFile('abstract_file') ? $request->file('abstract_file')->store('thesis_files', 'public') : null;
+        $imradFilePath = $request->hasFile('imrad_file') ? $request->file('imrad_file')->store('thesis_files', 'public') : null;
 
         $submission = ThesisSubmission::create([
             'user_id' => auth()->id(),
             'title' => $validated['title'],
             'course' => $validated['course'],
             'academic_year' => $validated['academic_year'],
-            'abstract' => $validated['abstract'],
+            'abstract' => $abstractText !== '' ? $abstractText : 'Abstract submitted as an attached file.',
+            'abstract_file_path' => $abstractFilePath,
+            'imrad_file_path' => $imradFilePath,
             'adviser_name' => $validated['adviser_name'],
             'submission_type' => $validated['submission_type'],
             'authors' => $validated['authors'] ?? null,
             'file_path' => $path,
             'original_filename' => $file->getClientOriginalName(),
-            'file_size' => $file->getSize(),        // ← add this
-            'file_type' => $file->getMimeType(),    // ← add this
+            'file_size' => $file->getSize(),        // â† add this
+            'file_type' => $file->getMimeType(),    // â† add this
             'status' => 'pending',
         ]);
 
@@ -48,8 +63,8 @@ class ThesisSubmissionController extends Controller
         ], 201);
     }
 
-    /* ── ADMIN: view ALL submissions ── */
-    /* ── ADMIN: view ALL submissions ── */
+    /* â”€â”€ ADMIN: view ALL submissions â”€â”€ */
+    /* â”€â”€ ADMIN: view ALL submissions â”€â”€ */
     public function adminList()
     {
         $theses = ThesisSubmission::with('user')->latest()->get();
@@ -59,9 +74,10 @@ class ThesisSubmissionController extends Controller
                 return [
                     'id' => $t->id,
                     'user_id' => $t->user_id,
+                    'student_name' => $t->authors,
                     'user' => $t->user ? [
                         'id' => $t->user->id,
-                        'name' => $t->user->full_name,   // ← was ->name, now ->full_name
+                        'name' => (trim((string) $t->user->full_name) !== '' ? $t->user->full_name : (trim(($t->user->fname ?? '') . ' ' . ($t->user->lname ?? '')) ?: ($t->user->name ?? $t->user->email ?? null))),
                     ] : null,
                     'title' => $t->title,
                     'course' => $t->course,
@@ -71,6 +87,7 @@ class ThesisSubmissionController extends Controller
                     'submission_type' => $t->submission_type,
                     'authors' => $t->authors,
                     'status' => $t->status,
+                    'visible_in_repo' => (bool) $t->visible_in_repo,
                     'remarks' => $t->remarks,
                     'created_at' => $t->created_at,
                     'file_path' => $t->file_path,
@@ -85,29 +102,47 @@ class ThesisSubmissionController extends Controller
         ]);
     }
 
-    /* ── PUBLIC: approved theses for landing page ── */
+    /* â”€â”€ PUBLIC: approved theses for landing page â”€â”€ */
     public function publicApproved()
     {
         $theses = ThesisSubmission::with('user')
             ->where('status', 'approved')
+            ->where('visible_in_repo', true)
             ->latest()
             ->get();
 
         return response()->json([
             'data' => $theses->map(function ($t) {
                 return [
+                    'id' => $t->id,
                     'title' => $t->title,
                     'author' => $t->user->full_name ?? $t->authors ?? 'N/A',
+                    'authors' => $t->authors,
+                    'adviser' => $t->adviser_name,
                     'course' => $t->course,
                     'academic_year' => $t->academic_year,
                     'abstract' => $t->abstract,
                     'status' => $t->status,
+                    'created_at' => optional($t->created_at)->toDateString(),
+                    'has_file' => !empty($t->file_path),
                 ];
             })
         ]);
     }
 
-    /* ── STUDENT: view own submissions ── */
+    /* -- ADMIN: toggle repository visibility (independent of approval status) -- */
+    public function toggleRepoVisibility($id)
+    {
+        $thesis = ThesisSubmission::findOrFail($id);
+        $thesis->update(['visible_in_repo' => !$thesis->visible_in_repo]);
+
+        return response()->json([
+            'message' => 'Repository visibility updated.',
+            'data' => $thesis->fresh(),
+        ]);
+    }
+
+    /* â”€â”€ STUDENT: view own submissions â”€â”€ */
     public function index()
     {
         $theses = ThesisSubmission::with('user')
@@ -118,7 +153,7 @@ class ThesisSubmissionController extends Controller
         return response()->json(['data' => $theses]);
     }
 
-    /* ── ADMIN: approve / reject ── */
+    /* â”€â”€ ADMIN: approve / reject â”€â”€ */
     public function review(Request $request, $id)
     {
         $request->validate([
@@ -139,7 +174,7 @@ class ThesisSubmissionController extends Controller
         ]);
     }
 
-    /* ── SERVE FILE (view/download) ── */
+    /* â”€â”€ SERVE FILE (view/download) â”€â”€ */
     public function serveFile($id)
     {
         $thesis = \App\Models\ThesisSubmission::findOrFail($id);

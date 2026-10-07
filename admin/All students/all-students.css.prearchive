@@ -1,0 +1,350 @@
+/* ==========================================================================
+   AIDEA Admin — All Students
+   Page-specific styles only. Tokens (light/dark), sidebar, topbar, panels,
+   tables, badges and the modal shell come from ../dashboard/dashboard.css,
+   which is loaded first in the HTML.
+   ========================================================================== */
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+.toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+/* Shared control look: search and form fields */
+.search-input,
+.form-group input {
+    height: 40px;
+    padding: 0 14px;
+    font: inherit;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+}
+
+.search-input:focus,
+.form-group input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--blue-soft);
+}
+
+.search-input::placeholder,
+.form-group input::placeholder {
+    color: var(--muted);
+}
+
+.search-input {
+    flex: 1 1 160px;
+    min-width: 0;
+}
+
+.btn-primary {
+    height: 40px;
+    padding: 0 18px;
+    background: var(--primary);
+    color: var(--primary-contrast);
+    border: 0;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: filter .15s;
+}
+
+.btn-primary:hover {
+    filter: brightness(1.08);
+}
+
+/* ── Table extras ────────────────────────────────────────────────────────── */
+td.empty.error {
+    color: var(--bad-fg);
+}
+
+.avatar-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.avatar {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--blue-soft);
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* ── Pagination ──────────────────────────────────────────────────────────── */
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.pagination[hidden] {
+    display: none;
+}
+
+.page-info {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.page-btns {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.page-btn {
+    min-width: 34px;
+    height: 34px;
+    padding: 0 10px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color .15s, border-color .15s, color .15s;
+}
+
+.page-btn:hover:not(:disabled):not(.active) {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.page-btn.active {
+    background: var(--primary);
+    color: var(--primary-contrast);
+    border-color: var(--primary);
+}
+
+.page-btn:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+}
+
+.page-gap {
+    padding: 0 2px;
+    color: var(--muted);
+}
+
+/* ── Add / edit student modal ────────────────────────────────────────────── */
+.modal-form {
+    width: min(480px, 100%);
+    max-height: calc(100dvh - 40px);
+    overflow-y: auto;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    grid-column: span 12;
+}
+
+/* display:flex above would override [hidden], so restore it */
+.form-group[hidden],
+.pass-hints[hidden] {
+    display: none;
+}
+
+/* First name · Last name · Middle initial: three equal boxes on one row */
+.form-group.span-4 {
+    grid-column: span 4;
+}
+
+.form-group label {
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.form-group input {
+    width: 100%;
+}
+
+.field-error {
+    color: var(--bad-fg);
+    font-size: 12px;
+}
+
+.field-error:empty {
+    display: none;
+}
+
+.form-error {
+    margin-top: 14px;
+    padding: 10px 12px;
+    background: var(--bad-bg);
+    color: var(--bad-fg);
+    border-radius: 10px;
+    font-size: 13px;
+}
+
+.modal-btn-primary {
+    background: var(--primary);
+    color: var(--primary-contrast);
+    border: 1px solid transparent;
+}
+
+.modal-btn-primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+}
+
+.modal-btn:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+/* ── Password fields ─────────────────────────────────────────────────────── */
+.input-wrap {
+    position: relative;
+    display: flex;
+}
+
+.input-wrap input {
+    padding-right: 44px;
+}
+
+.toggle-pass {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 42px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    background: none;
+    border: 0;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.toggle-pass:hover {
+    color: var(--primary);
+}
+
+.toggle-pass .eye-closed,
+.toggle-pass.showing .eye-open {
+    display: none;
+}
+
+.toggle-pass.showing .eye-closed {
+    display: block;
+}
+
+.password-strength {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.password-strength[hidden] {
+    display: none;
+}
+
+.strength-bar {
+    flex: 1;
+    height: 6px;
+    border-radius: 99px;
+    background: var(--border);
+    overflow: hidden;
+}
+
+.strength-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 99px;
+    transition: width .2s, background-color .2s;
+}
+
+.strength-label {
+    min-width: 76px;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: right;
+}
+
+.pass-hints {
+    grid-column: span 12;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+}
+
+.pass-hint {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.pass-hint.met {
+    color: #16a34a;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 720px) {
+
+    /* table → stacked cards (base behaviour lives in dashboard.css) */
+    tbody td[data-label="No."] {
+        display: none;
+    }
+
+    /* name row leads the card: avatar + name, no label */
+    tbody td[data-label="Name"] {
+        justify-content: flex-start;
+        text-align: left;
+    }
+
+    tbody td[data-label="Name"]::before {
+        display: none;
+    }
+
+    .pagination {
+        justify-content: center;
+        text-align: center;
+    }
+}
+
+/* Narrow modal: the three boxes stack, each full width (still the same size) */
+@media (max-width: 480px) {
+    .form-group.span-4 {
+        grid-column: span 12;
+    }
+
+    .pass-hints {
+        grid-template-columns: 1fr;
+    }
+}

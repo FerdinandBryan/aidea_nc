@@ -1,0 +1,372 @@
+353:     if (['left', 'start'].includes(v)) return 'left';
+354:     if (['right', 'end'].includes(v)) return 'right';
+355:     if (v === 'center' || v === 'centre') return 'center';
+356:     return v;
+357: }
+358: 
+359: /* ---~ DOCX: exact formatting from document.xml ---~ */
+360: async function _extractDocxFormatting(file) {
+361:     return new Promise((resolve, reject) => {
+362:    ~_validatorDeps.ensureJSZip(async () => {
+363:    ~if (!window.JSZip) { reject(new Error('JSZip unavailable')); return; }
+364:    ~try {
+365:    ~const arrayBuffer = await _resolveArrayBuffer(file);
+366:    ~const zip = await JSZip.loadAsync(arrayBuffer);
+367:    ~const xmlFile = zip.file('word/document.xml');
+368:    ~if (!xmlFile) { reject(new Error('Not a valid DOCX')); return; }
+369:    ~const xmlStr = await xmlFile.async('string');
+370:    ~const parser = new DOMParser();
+371:    ~const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
+372: 
+373:    ~let margins = null;
+374:    ~const sectPrs = xmlDoc.getElementsByTagNameNS(_WORD_NS, 'sectPr');
+375:    ~if (sectPrs.length) {
+376:    ~const sectPr = sectPrs[sectPrs.length - 1];
+377:    ~const pgMarEls = sectPr.getElementsByTagNameNS(_WORD_NS, 'pgMar');
+378:    ~if (pgMarEls.length) {
+379:    ~const pgMar = pgMarEls[0];
+380:    ~const get = attr => {
+381:    ~const v = pgMar.getAttributeNS(_WORD_NS, attr);
+382:    ~return v ? parseFloat(v) / _TWIPS_PER_INCH : null;
+383:    ~};
+384:    ~margins = { top: get('top'), bottom: get('bottom'), left: get('left'), right: get('right') };
+385:    ~}
+386:    ~}
+387: 
+388:    ~const paragraphs = [];
+389:    ~const pEls = xmlDoc.getElementsByTagNameNS(_WORD_NS, 'p');
+390:    ~for (let i = 0; i < pEls.length; i++) {
+391:    ~const p = pEls[i];
+392:    ~const tNodes = p.getElementsByTagNameNS(_WORD_NS, 't');
+393:    ~const text = Array.from(tNodes).map(n => n.textContent).join('').trim();
+394:    ~if (!text) continue;
+395: 
+396:    ~const pPrList = p.getElementsByTagNameNS(_WORD_NS, 'pPr');
+397:    ~const pPr = pPrList.length ? pPrList[0] : null;
+398: 
+399:    ~let lineSpacing = null, lineRule = null;
+400:    ~let firstLineIndent = null;
+401:    ~let alignment = null;
+402: 
+403:    ~if (pPr) {
+404:    ~const spacingEls = pPr.getElementsByTagNameNS(_WORD_NS, 'spacing');
+405:    ~if (spacingEls.length) {
+406:    ~const sp = spacingEls[0];
+407:    ~const lineVal = sp.getAttributeNS(_WORD_NS, 'line');
+408:    ~lineRule = sp.getAttributeNS(_WORD_NS, 'lineRule') || 'auto';
+409:    ~if (lineVal) {
+410:    ~lineSpacing = lineRule === 'auto'
+411:    ~? +(parseFloat(lineVal) / 240).toFixed(2)
+412:    ~: +(parseFloat(lineVal) / 20).toFixed(1); // atLeast/exact -> points
+413:    ~}
+414:    ~}
+415:    ~const indEls = pPr.getElementsByTagNameNS(_WORD_NS, 'ind');
+416:    ~if (indEls.length) {
+417:    ~const ind = indEls[0];
+418:    ~const firstLine = ind.getAttributeNS(_WORD_NS, 'firstLine');
+419:    ~const hanging = ind.getAttributeNS(_WORD_NS, 'hanging');
+420:    ~if (firstLine) firstLineIndent = +(parseFloat(firstLine) / _TWIPS_PER_INCH).toFixed(2);
+421:    ~else if (hanging) firstLineIndent = +(-parseFloat(hanging) / _TWIPS_PER_INCH).toFixed(2);
+422:    ~}
+423:    ~const jcEls = pPr.getElementsByTagNameNS(_WORD_NS, 'jc');
+424:    ~if (jcEls.length) {
+425:    ~alignment = _alignNormalize(jcEls[0].getAttributeNS(_WORD_NS, 'val'));
+426:    ~}
+427:    ~}
+428: 
+429:    ~paragraphs.push({
+430:    ~index: i,
+431:    ~snippet: text.slice(0, 70) + (text.length > 70 ? '?' : ''),
+432:    ~lineSpacing, lineRule,
+433:    ~firstLineIndent, alignment,
+434:    ~});
+435:    ~}
+436: 
+437:    ~resolve({ source: 'docx', estimated: false, margins, paragraphs });
+438:    ~} catch (e) {
+439:    ~reject(e);
+440:    ~}
+441:    ~});
+442:     });
+443: }
+444: 
+445: /* ---~ PDF: heuristic formatting from text-item positions ---~ */
+446: async function _extractPdfFormatting(file) {
+447:     return new Promise((resolve, reject) => {
+448:    ~_validatorDeps.ensurePdfJs(async () => {
+449:    ~if (!window.pdfjsLib) { reject(new Error('pdf.js unavailable')); return; }
+450:    ~try {
+451:    ~const arrayBuffer = await _resolveArrayBuffer(file);
+452:    ~const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+453:    ~const maxPages = Math.min(pdf.numPages, 8);
+454:    ~const paragraphs = [];
+455:    ~const marginSamples = { left: [], right: [], top: [], bottom: [] };
+456: 
+457:    ~for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+458:    ~const page = await pdf.getPage(pageNum);
+459:    ~const viewport = page.getViewport({ scale: 1 });
+460:    ~const pageWidthIn = viewport.width / _POINTS_PER_INCH;
+461:    ~const pageHeightIn = viewport.height / _POINTS_PER_INCH;
+462:    ~const content = await page.getTextContent();
+463: 
+464:    ~const items = content.items
+465:    ~.filter(it => it.str && it.str.trim())
+466:    ~.map(it => ({
+467:    ~str: it.str,
+468:    ~x: it.transform[4],
+469:    ~y: it.transform[5],
+470:    ~fontSize: Math.hypot(it.transform[2], it.transform[3]) || it.height || 10,
+471:    ~}));
+472:    ~if (!items.length) continue;
+473: 
+474:    ~items.sort((a, b) => b.y - a.y || a.x - b.x);
+475:    ~const lines = [];
+476:    ~let current = null;
+477:    ~const Y_TOL = 2;
+478:    ~items.forEach(it => {
+479:    ~if (current && Math.abs(current.y - it.y) <= Y_TOL) {
+480:    ~current.items.push(it);
+481:    ~} else {
+482:    ~current = { y: it.y, items: [it] };
+483:    ~lines.push(current);
+484:    ~}
+485:    ~});
+486: 
+487:    ~const xs = items.map(it => it.x);
+488:    ~const ys = items.map(it => it.y);
+489:    ~marginSamples.left.push(Math.min(...xs) / _POINTS_PER_INCH);
+490:    ~marginSamples.right.push(pageWidthIn - Math.max(...xs) / _POINTS_PER_INCH);
+491:    ~marginSamples.top.push(pageHeightIn - Math.max(...ys) / _POINTS_PER_INCH);
+492:    ~marginSamples.bottom.push(Math.min(...ys) / _POINTS_PER_INCH);
+493: 
+494:    ~for (let li = 1; li < lines.length; li++) {
+495:    ~const prev = lines[li - 1], cur = lines[li];
+496:    ~const fontSize = cur.items[0].fontSize || 10;
+497:    ~const deltaY = Math.abs(prev.y - cur.y);
+498:    ~const lineSpacing = fontSize ? +(deltaY / fontSize).toFixed(2) : null;
+499:    ~const lineStartX = cur.items[0].x;
+500:    ~const text = cur.items.map(it => it.str).join('').trim();
+501:    ~if (!text) continue;
+502:    ~paragraphs.push({
+503:    ~index: paragraphs.length,
+504:    ~page: pageNum,
+505:    ~y: cur.y,
+506:    ~height: fontSize,
+507:    ~snippet: text.slice(0, 70) + (text.length > 70 ? '?' : ''),
+508:    ~text,
+509:    ~lineSpacing,
+510:    ~lineStartX,
+511:    ~});
+512:    ~}
+513:    ~}
+514: 
+515:    ~const avg = arr => arr.length ? +(arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(2) : null;
+516:    ~const margins = {
+517:    ~left: avg(marginSamples.left), right: avg(marginSamples.right),
+518:    ~top: avg(marginSamples.top), bottom: avg(marginSamples.bottom),
+519:    ~};
+520: 
+521:    ~const typicalLeftX = margins.left != null ? margins.left * _POINTS_PER_INCH : null;
+522:    ~paragraphs.forEach(p => {
+523:    ~if (typicalLeftX != null && p.lineStartX != null) {
+524:    ~const deltaIn = (p.lineStartX - typicalLeftX) / _POINTS_PER_INCH;
+525:    ~p.firstLineIndent = deltaIn > 0.15 ? +deltaIn.toFixed(2) : 0;
+526:    ~}
+527:    ~});
+528: 
+529:    ~resolve({ source: 'pdf', estimated: true, margins, paragraphs });
+530:    ~} catch (e) {
+531:    ~reject(e);
+532:    ~}
+533:    ~});
+534:     });
+535: }
+536: 
+537: async function _extractFormattingProfile(file) {
+538:     const name = (typeof file.name === 'string' ? file.name : '') || '';
+539:     const ext = name.split('.').pop().toLowerCase();
+540:     if (ext === 'docx') return _extractDocxFormatting(file);
+541:     if (ext === 'pdf') return _extractPdfFormatting(file);
+542:     return null; // .doc or unsupported ? no structural check possible
+543: }
+544: 
+545: function _evaluateFormattingRule(rule, profile) {
+546:     if (!profile) return null;
+547: 
+548:     const type = (rule.type || '').toLowerCase();
+549:     const tolerance = typeof rule.tolerance === 'number' ? rule.tolerance : _RULE_TOLERANCE_DEFAULTS[type];
+550: 
+551:     if (type === 'spacing') {
+552:    ~const target = parseFloat(rule.value);
+553:    ~if (Number.isNaN(target)) return null;
+554:    ~const checked = profile.paragraphs.filter(p => p.lineSpacing != null);
+555:    ~if (!checked.length) return { status: 'manual', violations: [], checkedCount: 0 };
+556:    ~const violations = checked
+557:    ~.filter(p => Math.abs(p.lineSpacing - target) > tolerance)
+558:    ~.map(p => ({ ...p, actual: p.lineSpacing }));
+559:    ~return { status: violations.length ? 'fail' : 'pass', violations, checkedCount: checked.length, target, unit: 'x line height' };
+560:     }
+561: 
+562:     if (type === 'indentation') {
+563:    ~const target = parseFloat(rule.value);
+564:    ~if (Number.isNaN(target)) return null;
+565:    ~const checked = profile.paragraphs.filter(p => p.firstLineIndent != null);
+566:    ~if (!checked.length) return { status: 'manual', violations: [], checkedCount: 0 };
+567:    ~const violations = checked
+568:    ~.filter(p => Math.abs(p.firstLineIndent - target) > tolerance)
+569:    ~.map(p => ({ ...p, actual: p.firstLineIndent }));
+570:    ~return { status: violations.length ? 'fail' : 'pass', violations, checkedCount: checked.length, target, unit: 'in' };
+571:     }
+572: 
+573:     if (type === 'alignment') {
+574:    ~const target = _alignNormalize(rule.value);
+575:    ~if (!target) return null;
+576:    ~const checked = profile.paragraphs.filter(p => p.alignment);
+577:    ~if (!checked.length) return { status: 'manual', violations: [], checkedCount: 0 };
+578:    ~const violations = checked
+579:    ~.filter(p => p.alignment !== target)
+580:    ~.map(p => ({ ...p, actual: p.alignment }));
+581:    ~return { status: violations.length ? 'fail' : 'pass', violations, checkedCount: checked.length, target };
+582:     }
+583: 
+584:     if (type === 'margin') {
+585:    ~if (!profile.margins) return { status: 'manual', violations: [], checkedCount: 0 };
+586:    ~const targets = (rule.value && typeof rule.value === 'object')
+587:    ~? rule.value
+588:    ~: { top: rule.value, bottom: rule.value, left: rule.value, right: rule.value };
+589:    ~const violations = [];
+590:    ~['top', 'bottom', 'left', 'right'].forEach(side => {
+591:    ~const t = parseFloat(targets[side]);
+592:    ~const actual = profile.margins[side];
+593:    ~if (Number.isNaN(t) || actual == null) return;
+594:    ~if (Math.abs(actual - t) > tolerance) {
+595:    ~violations.push({ side, target: t, actual: +actual.toFixed(2) });
+596:    ~}
+597:    ~});
+598:    ~return { status: violations.length ? 'fail' : 'pass', violations, checkedCount: 4, isMargin: true };
+599:     }
+600: 
+601:     return null;
+602: }
+603: 
+604: function _dvComputeFlatViolations(rules, formattingProfile) {
+605:     const flat = [];
+606:     if (!formattingProfile) return flat;
+607:     rules.forEach(r => {
+608:    ~const ev = _evaluateFormattingRule(r, formattingProfile);
+609:    ~if (ev && ev.status === 'fail' && !ev.isMargin) {
+610:    ~ev.violations.forEach(v => {
+611:    ~flat.push({
+612:    ~ruleName: r.name, type: r.type, target: ev.target, unit: ev.unit,
+613:    ~actual: v.actual, index: v.index, page: v.page, snippet: v.snippet,
+614:    ~y: v.y, height: v.height,
+615:    ~});
+616:    ~});
+617:    ~}
+618:     });
+619:     return flat;
+620: }
+621: 
+622: /* ???~
+623:    REDLINE / AUTO-FIX FILE GENERATION
+624: ???~ */
+625: 
+626: function _dvBaseName(name) {
+627:     return (name || 'document').replace(/\.[^/.]+$/, '');
+628: }
+629: 
+630: function _dvTriggerDownload(blob, filename) {
+631:     const url = URL.createObjectURL(blob);
+632:     const a = document.createElement('a');
+633:     a.href = url;
+634:     a.download = filename;
+635:     document.body.appendChild(a);
+636:     a.click();
+637:     a.remove();
+638:     setTimeout(() => URL.revokeObjectURL(url), 4000);
+639: }
+640: 
+641: function _dvWrapText(text, font, size, maxWidth) {
+642:     const words = text.split(' ');
+643:     const lines = [];
+644:     let line = '';
+645:     words.forEach(word => {
+646:    ~const test = line ? line + ' ' + word : word;
+647:    ~if (font.widthOfTextAtSize(test, size) > maxWidth && line) {
+648:    ~lines.push(line);
+649:    ~line = word;
+650:    ~} else {
+651:    ~line = test;
+652:    ~}
+653:     });
+654:     if (line) lines.push(line);
+655:     return lines;
+656: }
+657: 
+658: /* ---~ DOCX: redlined copy (highlight + inline red note) ---~ */
+659: function _dvBuildNoteParagraph(xmlDoc, text) {
+660:     const p = xmlDoc.createElementNS(_WORD_NS, 'w:p');
+661:     const r = xmlDoc.createElementNS(_WORD_NS, 'w:r');
+662:     const rPr = xmlDoc.createElementNS(_WORD_NS, 'w:rPr');
+663:     const color = xmlDoc.createElementNS(_WORD_NS, 'w:color');
+664:     color.setAttributeNS(_WORD_NS, 'w:val', 'FF0000');
+665:     const bold = xmlDoc.createElementNS(_WORD_NS, 'w:b');
+666:     const italic = xmlDoc.createElementNS(_WORD_NS, 'w:i');
+667:     rPr.appendChild(color); rPr.appendChild(bold); rPr.appendChild(italic);
+668:     r.appendChild(rPr);
+669:     const t = xmlDoc.createElementNS(_WORD_NS, 'w:t');
+670:     t.setAttribute('xml:space', 'preserve');
+671:     t.textContent = text;
+672:     r.appendChild(t);
+673:     p.appendChild(r);
+674:     return p;
+675: }
+676: 
+677: function _dvApplyHighlight(xmlDoc, pEl) {
+678:     let pPrList = pEl.getElementsByTagNameNS(_WORD_NS, 'pPr');
+679:     let pPr;
+680:     if (pPrList.length) {
+681:    ~pPr = pPrList[0];
+682:     } else {
+683:    ~pPr = xmlDoc.createElementNS(_WORD_NS, 'w:pPr');
+684:    ~pEl.insertBefore(pPr, pEl.firstChild);
+685:     }
+686:     Array.from(pPr.getElementsByTagNameNS(_WORD_NS, 'shd')).forEach(s => pPr.removeChild(s));
+687:     const shd = xmlDoc.createElementNS(_WORD_NS, 'w:shd');
+688:     shd.setAttributeNS(_WORD_NS, 'w:val', 'clear');
+689:     shd.setAttributeNS(_WORD_NS, 'w:color', 'auto');
+690:     shd.setAttributeNS(_WORD_NS, 'w:fill', 'FFF3B0');
+691:     pPr.appendChild(shd);
+692: }
+693: 
+694: async function _dvGenerateRedlinedDocx(file, violationsByParagraph) {
+695:     return new Promise((resolve, reject) => {
+696:    ~_validatorDeps.ensureJSZip(async () => {
+697:    ~if (!window.JSZip) { reject(new Error('JSZip unavailable')); return; }
+698:    ~try {
+699:    ~const arrayBuffer = await _resolveArrayBuffer(file);
+700:    ~const zip = await JSZip.loadAsync(arrayBuffer);
+-----
+292:    `estimated: true` and surfaced as "estimated ? verify manually".
+555:    ~if (!checked.length) return { status: 'manual', violations: [], checkedCount: 0 };
+566:    ~if (!checked.length) return { status: 'manual', violations: [], checkedCount: 0 };
+577:    ~if (!checked.length) return { status: 'manual', violations: [], checkedCount: 0 };
+585:    ~if (!profile.margins) return { status: 'manual', violations: [], checkedCount: 0 };
+612:    ~ruleName: r.name, type: r.type, target: ev.target, unit: ev.unit,
+744:    ~const structuralRules = rules.filter(r => ['spacing', 'indentation', 'alignment'].includes((r.type || '').toLowerCase()));
+784:    ~const marginRule = rules.find(r => (r.type || '').toLowerCase() === 'margin');
+909:    ~const spacingRule = rules.find(r => (r.type || '').toLowerCase() === 'spacing');
+910:    ~const indentRule = rules.find(r => (r.type || '').toLowerCase() === 'indentation');
+911:    ~const alignRule = rules.find(r => (r.type || '').toLowerCase() === 'alignment');
+912:    ~const marginRule = rules.find(r => (r.type || '').toLowerCase() === 'margin');
+1038:    ~const capstoneKeywords = ['source code', 'system design', 'user manual', 'entity relationship', 'use case', 'database design', 'proposed system'];
+1082:    ~error: '.doc (legacy Word) cannot be validated client-side. Manual review recommended.',
+1287:    ~<div class="dv-rule-row dv-rule-manual">
+1290:    ~<div class="dv-rule-status">Not automatically checkable ? please verify manually.</div>
+1294:     if (evalResult.status === 'manual') {
+1296:    ~<div class="dv-rule-row dv-rule-manual">
+1299:    ~<div class="dv-rule-status">Could not be measured automatically from this file ? please verify manually.</div>
+1305:     const estimateNote = formattingProfile.estimated ? ` <span class="dv-rule-estimate">(estimated from PDF layout ? verify manually)</span>` : '';
+1349:    ~<div class="dv-type-sub">Cannot auto-validate ? manual review needed</div>
+1414:    ~<div class="fp-notice warning" style="margin-top:14px;">?? Formatting could not be analyzed for this file type ? spacing/margin/indentation/alignment need manual revi...
+1769:    ~.dv-rule-manual { border-color: #f59e0b44; background: rgba(245,158,11,0.08); }

@@ -1,0 +1,239 @@
+800:    ~if (Number.isNaN(t)) return;
+801:    ~pgMar.setAttributeNS(_WORD_NS, 'w:' + side, String(Math.round(t * _TWIPS_PER_INCH)));
+802:    ~});
+803:    ~}
+804:    ~}
+805: 
+806:    ~const serializer = new XMLSerializer();
+807:    ~const newXmlStr = serializer.serializeToString(xmlDoc);
+808:    ~zip.file('word/document.xml', newXmlStr);
+809:    ~const blob = await zip.generateAsync({ type: 'blob' });
+810:    ~resolve(blob);
+811:    ~} catch (e) { reject(e); }
+812:    ~});
+813:     });
+814: }
+815: 
+816: /* ---~ PDF: redlined copy (highlight overlay + numbered legend page) ---~ */
+817: async function _dvGenerateRedlinedPdf(file, violations) {
+818:     return new Promise((resolve, reject) => {
+819:    ~_validatorDeps.ensurePdfLib(async () => {
+820:    ~if (!window.PDFLib) { reject(new Error('pdf-lib unavailable')); return; }
+821:    ~try {
+822:    ~const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+823:    ~const arrayBuffer = await _resolveArrayBuffer(file);
+824:    ~const pdfDoc = await PDFDocument.load(arrayBuffer);
+825:    ~const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+826:    ~const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+827:    ~const pages = pdfDoc.getPages();
+828: 
+829:    ~let counter = 0;
+830:    ~const legend = [];
+831:    ~violations.forEach(v => {
+832:    ~if (!v.page || v.y == null) return;
+833:    ~const page = pages[v.page - 1];
+834:    ~if (!page) return;
+835:    ~counter++;
+836:    ~const h = (v.height || 10) * 1.3;
+837:    ~page.drawRectangle({
+838:    ~x: 40, y: v.y - h * 0.25, width: page.getWidth() - 80, height: h,
+839:    ~color: rgb(1, 0.93, 0.55), opacity: 0.45,
+840:    ~});
+841:    ~page.drawText(String(counter), {
+842:    ~x: 12, y: v.y, size: 9, font: boldFont, color: rgb(0.85, 0.1, 0.1),
+843:    ~});
+844:    ~legend.push(`${counter}. p.${v.page} ? ${v.ruleName}: expected ${v.target}${v.unit ? ' ' + v.unit : ''}, found ${v.actual}. "${v.snippet}"`);
+845:    ~});
+846: 
+847:    ~if (legend.length) {
+848:    ~let summaryPage = pdfDoc.addPage();
+849:    ~const { width, height } = summaryPage.getSize();
+850:    ~let y = height - 50;
+851:    ~summaryPage.drawText('Formatting Issues ? Summary', { x: 50, y, size: 14, font: boldFont, color: rgb(0.1, 0.1, 0.1) });
+852:    ~y -= 26;
+853:    ~legend.forEach(line => {
+854:    ~const wrapped = _dvWrapText(line, regularFont, 10, width - 100);
+855:    ~wrapped.forEach(w => {
+856:    ~if (y < 40) {
+857:    ~summaryPage = pdfDoc.addPage();
+858:    ~y = height - 50;
+859:    ~}
+860:    ~summaryPage.drawText(w, { x: 50, y, size: 10, font: regularFont, color: rgb(0.5, 0, 0) });
+861:    ~y -= 14;
+862:    ~});
+863:    ~y -= 4;
+864:    ~});
+865:    ~}
+866: 
+867:    ~const bytes = await pdfDoc.save();
+868:    ~resolve(new Blob([bytes], { type: 'application/pdf' }));
+869:    ~} catch (e) { reject(e); }
+870:    ~});
+871:     });
+872: }
+873: 
+874: /* ---~ PDF: auto-fixed copy (re-typeset from extracted text ? see disclaimer) ---~ */
+875: function _dvDrawLine(page, font, words, x0, y, size, usableWidth, indent, align, isLastLine, color) {
+876:     const lineText = words.join(' ');
+877:     const naturalWidth = font.widthOfTextAtSize(lineText, size);
+878:     const avail = usableWidth - indent;
+879: 
+880:     if (align === 'center') {
+881:    ~const offset = Math.max(0, (avail - naturalWidth) / 2);
+882:    ~page.drawText(lineText, { x: x0 + indent + offset, y, size, font, color });
+883:     } else if (align === 'right') {
+884:    ~const offset = Math.max(0, avail - naturalWidth);
+885:    ~page.drawText(lineText, { x: x0 + indent + offset, y, size, font, color });
+886:     } else if (align === 'justified' && !isLastLine && words.length > 1) {
+887:    ~const spaceWidth = font.widthOfTextAtSize(' ', size);
+888:    ~const wordsWidth = words.reduce((sum, w) => sum + font.widthOfTextAtSize(w, size), 0);
+889:    ~const gaps = words.length - 1;
+890:    ~const extra = Math.max(0, avail - wordsWidth - spaceWidth * gaps);
+891:    ~const gapWidth = spaceWidth + extra / gaps;
+892:    ~let x = x0 + indent;
+893:    ~words.forEach(w => {
+894:    ~page.drawText(w, { x, y, size, font, color });
+895:    ~x += font.widthOfTextAtSize(w, size) + gapWidth;
+896:    ~});
+897:     } else {
+898:    ~page.drawText(lineText, { x: x0 + indent, y, size, font, color });
+899:     }
+900: }
+901: 
+902: async function _dvGenerateFixedPdf(file, rules, formattingProfile) {
+903:     return new Promise((resolve, reject) => {
+904:    ~_validatorDeps.ensurePdfLib(async () => {
+905:    ~if (!window.PDFLib) { reject(new Error('pdf-lib unavailable')); return; }
+906:    ~try {
+907:    ~const { PDFDocument, StandardFonts, rgb } = window.PDFLib;
+908: 
+909:    ~const spacingRule = rules.find(r => (r.type || '').toLowerCase() === 'spacing');
+910:    ~const indentRule = rules.find(r => (r.type || '').toLowerCase() === 'indentation');
+911:    ~const alignRule = rules.find(r => (r.type || '').toLowerCase() === 'alignment');
+912:    ~const marginRule = rules.find(r => (r.type || '').toLowerCase() === 'margin');
+913: 
+914:    ~const lineSpacingMult = spacingRule ? parseFloat(spacingRule.value) || 1.5 : 1.5;
+915:    ~const firstLineIndentIn = indentRule ? parseFloat(indentRule.value) || 0.5 : 0.5;
+916:    ~const alignment = alignRule ? (_alignNormalize(alignRule.value) || 'left') : 'left';
+917:    ~const marginTargets = marginRule
+918:    ~? ((marginRule.value && typeof marginRule.value === 'object') ? marginRule.value : { top: marginRule.value, bottom: marginRule.value, left: marginRule.value, right: m...
+919:    ~: { top: 1, bottom: 1, left: 1, right: 1 };
+920: 
+921:    ~const fontSizePt = 12;
+922:    ~const pageWidthPt = 8.5 * _POINTS_PER_INCH;
+923:    ~const pageHeightPt = 11 * _POINTS_PER_INCH;
+924:    ~const marginLeftPt = (parseFloat(marginTargets.left) || 1) * _POINTS_PER_INCH;
+925:    ~const marginRightPt = (parseFloat(marginTargets.right) || 1) * _POINTS_PER_INCH;
+926:    ~const marginTopPt = (parseFloat(marginTargets.top) || 1) * _POINTS_PER_INCH;
+927:    ~const marginBottomPt = (parseFloat(marginTargets.bottom) || 1) * _POINTS_PER_INCH;
+928:    ~const usableWidth = pageWidthPt - marginLeftPt - marginRightPt;
+929:    ~const lineHeightPt = fontSizePt * lineSpacingMult;
+930: 
+931:    ~const pdfDoc = await PDFDocument.create();
+932:    ~const font = await pdfDoc.embedFont(StandardFonts.TimesRoman);
+933:    ~const black = rgb(0, 0, 0);
+934:    ~const gray = rgb(0.5, 0.5, 0.5);
+935: 
+936:    ~let page = pdfDoc.addPage([pageWidthPt, pageHeightPt]);
+937:    ~let y = pageHeightPt - marginTopPt;
+938: 
+939:    ~const disclaimerLines = _dvWrapText(
+940:    ~'Auto-generated, re-typeset copy for formatting reference only. Original layout, images, tables, and fonts are not preserved ? use this to check spacing, margins, ind...
+941:    ~font, 8, usableWidth
+942:    ~);
+943:    ~disclaimerLines.forEach(l => {
+944:    ~page.drawText(l, { x: marginLeftPt, y, size: 8, font, color: gray });
+945:    ~y -= 10;
+946:    ~});
+947:    ~y -= 10;
+948: 
+949:    ~const sourceLines = (formattingProfile.paragraphs || []).map(p => p.text || p.snippet);
+950: 
+951:    ~sourceLines.forEach(paraText => {
+952:    ~const words = (paraText || '').split(/\s+/).filter(Boolean);
+953:    ~if (!words.length) return;
+954: 
+955:    ~const rawLines = [];
+956:    ~let cur = [];
+957:    ~let firstLineFlag = true;
+958:    ~words.forEach(word => {
+959:    ~const indent = firstLineFlag ? firstLineIndentIn * _POINTS_PER_INCH : 0;
+960:    ~const testWords = [...cur, word];
+961:    ~const testWidth = font.widthOfTextAtSize(testWords.join(' '), fontSizePt);
+962:    ~if (testWidth > usableWidth - indent && cur.length) {
+963:    ~rawLines.push({ words: cur, indent, isFirst: firstLineFlag });
+964:    ~firstLineFlag = false;
+965:    ~cur = [word];
+966:    ~} else {
+967:    ~cur = testWords;
+968:    ~}
+969:    ~});
+970:    ~if (cur.length) rawLines.push({ words: cur, indent: firstLineFlag ? firstLineIndentIn * _POINTS_PER_INCH : 0, isFirst: firstLineFlag });
+971: 
+972:    ~rawLines.forEach((ln, li) => {
+973:    ~if (y < marginBottomPt + lineHeightPt) {
+974:    ~page = pdfDoc.addPage([pageWidthPt, pageHeightPt]);
+975:    ~y = pageHeightPt - marginTopPt;
+976:    ~}
+977:    ~const isLastLine = li === rawLines.length - 1;
+978:    ~_dvDrawLine(page, font, ln.words, marginLeftPt, y, fontSizePt, usableWidth, ln.indent, alignment, isLastLine, black);
+979:    ~y -= lineHeightPt;
+980:    ~});
+981:    ~y -= lineHeightPt * 0.4;
+982:    ~});
+983: 
+984:    ~const bytes = await pdfDoc.save();
+985:    ~resolve(new Blob([bytes], { type: 'application/pdf' }));
+986:    ~} catch (e) { reject(e); }
+987:    ~});
+988:     });
+989: }
+990: 
+991: /* ???~
+992:    SCORING ENGINE
+993: ???~ */
+994: 
+995: function _scoreDocument(text, pages) {
+996:     const lower = text.toLowerCase();
+997:     const wordCount = text.split(/\s+/).filter(Boolean).length;
+998: 
+999:     let thesisScore = 0;
+1000:     let invalidScore = 0;
+1001:     const thesisHits = [];
+1002:     const invalidHits = [];
+1003: 
+1004:     _THESIS_SIGNALS.structural.forEach(phrase => {
+1005:    ~if (lower.includes(phrase)) { thesisScore += 3; thesisHits.push({ phrase, weight: 3 }); }
+1006:     });
+1007:     _THESIS_SIGNALS.academic.forEach(phrase => {
+1008:    ~if (lower.includes(phrase)) { thesisScore += 2; thesisHits.push({ phrase, weight: 2 }); }
+1009:     });
+1010:     _THESIS_SIGNALS.weak.forEach(phrase => {
+16: //   ~1) a REDLINED copy ? problem paragraphs highlighted + a red inline note
+17: //   ~2) an AUTO-FIXED copy ? spacing/margins/indentation/alignment corrected
+20: //   ~auto-fixing re-typesets the extracted text with the target formatting, since
+28: //   ~downloads (redlined copy + auto-fixed copy) via the shared generators.
+658: /* ---~ DOCX: redlined copy (highlight + inline red note) ---~ */
+694: async function _dvGenerateRedlinedDocx(file, violationsByParagraph) {
+728: /* ---~ DOCX: auto-fixed copy (rewrites pPr/sectPr to target values) ---~ */
+729: async function _dvGenerateFixedDocxOriginal(file, rules, formattingProfile) {
+816: /* ---~ PDF: redlined copy (highlight overlay + numbered legend page) ---~ */
+817: async function _dvGenerateRedlinedPdf(file, violations) {
+874: /* ---~ PDF: auto-fixed copy (re-typeset from extracted text ? see disclaimer) ---~ */
+902: async function _dvGenerateFixedPdf(file, rules, formattingProfile) {
+940:    ~'Auto-generated, re-typeset copy for formatting reference only. Original layout, images, tables, and fonts are not preserved ? use this to check spacing, margins, ind...
+1409:    ~<button class="btn-modal-close" id="dvRedlineBtn" onclick="window._dvDownloadRedline()">?? Download Redlined Copy (shows errors)</button>
+1410:    ~<button class="btn-modal-close" id="dvFixedBtn" onclick="window._dvDownloadFixed()">?? Download Auto-Fixed Copy (aligned to template)</button>
+1497:    ~blob = await _dvGenerateRedlinedDocx(_dvLastFile, byParagraph);
+1500:    ~blob = await _dvGenerateRedlinedPdf(_dvLastFile, _dvLastFlatViolations);
+1504:    ~_dvTriggerDownload(blob, _dvBaseName(_dvLastFile.name) + '_redlined.' + ext);
+1507:    ~alert('Could not generate the redlined copy: ' + e.message);
+1509:    ~if (btn) { btn.disabled = false; btn.textContent = '?? Download Redlined Copy (shows errors)'; }
+1521:    ~blob = await _dvGenerateFixedDocx(_dvLastFile, _dvLastRules, _dvLastFormattingProfile);
+1523:    ~blob = await _dvGenerateFixedPdf(_dvLastFile, _dvLastRules, _dvLastFormattingProfile);
+1530:    ~alert('Could not generate the auto-fixed copy: ' + e.message);
+1532:    ~if (btn) { btn.disabled = false; btn.textContent = '?? Download Auto-Fixed Copy (aligned to template)'; }
+1575:    redlined copy + auto-fixed copy.
+1987: /* CHECKLIST_FIX_FONT: auto-fixed DOCX also gets Times New Roman 12 when the checklist is used */
+1988: async function _dvGenerateFixedDocx(file, rules, formattingProfile) {
+1989:     var blob = await _dvGenerateFixedDocxOriginal(file, rules, formattingProfile);
