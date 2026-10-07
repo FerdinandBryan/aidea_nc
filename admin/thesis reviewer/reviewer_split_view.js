@@ -556,7 +556,7 @@
 
     var saved = null;
     function blankOf(n) {
-      while (n) { if (n.nodeType === 1 && n.classList && n.classList.contains('sv-blank')) return n; n = n.parentNode; }
+      while (n) { if (n.nodeType === 1 && n.classList && n.classList.contains('sv-blank')) return n; /* SV-TBPAPER */ if (n.nodeType === 1 && n.tagName === 'SECTION' && n.getAttribute('contenteditable') === 'true') return n; n = n.parentNode; }
       return null;
     }
     function onSel() {
