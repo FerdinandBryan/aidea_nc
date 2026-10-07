@@ -678,10 +678,14 @@
             imgs.forEach(function (im) { var ir = im.getBoundingClientRect(), dd = hdrMid - (ir.top + ir.bottom) / 2; if (Math.abs(dd) > 2 && Math.abs(dd) < 80) im.style.transform = 'translateY(' + dd + 'px)'; });
             if (getComputedStyle(h).position === 'static') h.style.position = 'relative';
             var hr = h.getBoundingClientRect(), s2 = seal.getBoundingClientRect();
+            var svRt = imgs.reduce(function (a, b) { return b.getBoundingClientRect().right > a.getBoundingClientRect().right ? b : a; }).getBoundingClientRect();
+            var svPadL = 0, svPadR = 0;
+            var svLnLeft = Math.round(s2.left - hr.left - svPadL), svLnWidth = Math.round(svRt.right - s2.left + svPadL + svPadR);
+            if (!(svLnWidth > 200 && svLnWidth < 1000)) { svLnLeft = -12; svLnWidth = 648; }
             var ln = document.createElement('div');
             ln.className = 'svhdrline';
             ln.setAttribute('contenteditable', 'false');
-            ln.style.cssText = 'position:absolute;left:-12px;width:648px;height:2px;background:#4a7ebb;pointer-events:none;top:' + Math.round(s2.bottom - hr.top + 3) + 'px';
+            ln.style.cssText = 'position:absolute;left:' + svLnLeft + 'px;width:' + svLnWidth + 'px;height:2px;background:#4a7ebb;pointer-events:none;top:' + Math.round(s2.bottom - hr.top + 3) + 'px';
             h.appendChild(ln);
             var svRightLogo = imgs.reduce(function (a, b) { return b.getBoundingClientRect().left > a.getBoundingClientRect().left ? b : a; });
             if (svRightLogo !== seal) {
