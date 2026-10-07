@@ -539,6 +539,42 @@
                 });
             });
     }
+    function svDocxToPng(buf) {
+        return svNeed(function () { return window.JSZip; }, ['https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'])
+            .then(function () { return svNeed(function () { return window.docx; }, ['https://cdnjs.cloudflare.com/ajax/libs/docx-preview/0.3.2/docx-preview.min.js', 'https://cdn.jsdelivr.net/npm/docx-preview@0.3.2/dist/docx-preview.min.js']); })
+            .then(function () { return svNeed(function () { return window.html2canvas; }, ['https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js']); })
+            .then(function () {
+                var host = document.createElement('div');
+                host.style.cssText = 'position:fixed;left:0;top:0;z-index:-1;background:#fff';
+                document.body.appendChild(host);
+                return window.docx.renderAsync(buf, host, null, { inWrapper: false, breakPages: true }).then(function () {
+                    var pg = host.querySelector('section.docx') || host;
+                    return window.html2canvas(pg, {
+                        scale: 1.5, useCORS: true, backgroundColor: '#fff',
+                        ignoreElements: function (el) { return el.tagName === 'IMG' && /^https?:/i.test(el.getAttribute('src') || '') && !host.contains(el); }
+                    });
+                }).then(function (c) {
+                    host.remove();
+                    return new Promise(function (ok, fail) {
+                        c.toBlob(function (b) { if (b) ok(new File([b], 'template.png', { type: 'image/png' })); else fail(new Error('No image')); }, 'image/png');
+                    });
+                }).catch(function (e) { host.remove(); throw e; });
+            });
+    }
+    function svSaveTpl(orig, f, png) {
+        var nm = prompt('Save as a reusable template? Enter a name (Cancel = do not save):', f.name.replace(/\.(docx|pdf)$/i, ''));
+        if (!nm || !nm.trim()) return;
+        (png ? Promise.resolve(png) : svDocxToPng(orig)).then(function (img) {
+            var fd = new FormData();
+            fd.append('name', nm.trim()); fd.append('image', img);
+            if (!png) fd.append('original', f);
+            var h = Object.assign({}, tplHd); delete h['Content-Type']; delete h['content-type'];
+            return fetch(tplBase + '/certificate-templates', { method: 'POST', headers: h, body: fd });
+        }).then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            alert('Saved. It now appears in the template list.');
+        }).catch(function (e) { alert('Not saved: ' + ((e && e.message) || 'error')); });
+    }
     function openChooser() {
         var m = modal(
             '<div style="width:min(580px,100%);background:#fff;color:#111827;border-radius:14px;padding:22px">' +
@@ -598,13 +634,13 @@
                 f0.arrayBuffer().then(function (buf) {
                     var b = new Uint8Array(buf.slice(0, 2));
                     if (!(b[0] === 0x50 && b[1] === 0x4B)) { alert('That is not a real .docx file.'); return; }
-                    m.close(); svDocxGen(buf, f0.name.replace(/\.docx$/i, ''));
+                    m.close(); svSaveTpl(buf, f0, null); svDocxGen(buf, f0.name.replace(/\.docx$/i, ''));
                 });
                 return;
             }
             if (f0 && /\.pdf$/i.test(f0.name)) {
                 file.value = '';
-                svPdfToImage(f0).then(function (png) {
+                svPdfToImage(f0).then(function (png) { svSaveTpl(null, f0, png);
                     loadImage(png, function (im) { m.close(); openGenerator(Object.assign({ mode: 'template', img: im, pal: analyze(im) }, cgExtra)); });
                 }).catch(function () { alert('Could not read that PDF. Save it as a .docx to edit the text.'); });
                 return;
