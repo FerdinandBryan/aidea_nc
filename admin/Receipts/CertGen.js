@@ -482,7 +482,7 @@
         function close() { document.removeEventListener('selectionchange', onSel); ov.remove(); }
         ov.querySelector('[data-a="close"]').addEventListener('click', close);
         ov.querySelector('[data-a="print"]').addEventListener('click', function () {
-            var w = window.open('', '_blank'); if (!w) { alert('Allow pop-ups to print.'); return; }
+            svPrintLive(ov); return; var w = window.open('', '_blank'); if (!w) { alert('Allow pop-ups to print.'); return; }
             var st = ''; Array.prototype.forEach.call(host.querySelectorAll('style'), function (s) { st += s.outerHTML; });
             var pg = ''; Array.prototype.forEach.call(host.querySelectorAll('section.docx'), function (s) { var c = s.cloneNode(true); c.removeAttribute('contenteditable'); pg += c.outerHTML; });
             w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Certificate</title>' + st + '<style>@page{margin:0}body{margin:0}section.docx{margin:0 auto!important;box-shadow:none!important}header p{white-space:nowrap!important}</style></head><body>' + pg + '</body></html>');
@@ -631,6 +631,24 @@
             var gap = lines[1].t - lines[0].t, pitch = lines[2].t - lines[1].t;
             if (pitch > 4 && gap > pitch + 3 && gap < 120) lines[0].p.style.marginBottom = (pitch - gap) + 'px';
         });
+    }
+    function svPrintLive(ov) {
+        var st = document.createElement('style');
+        st.textContent = '@media print{' +
+            '@page{margin:0}' +
+            'html,body{height:auto!important;overflow:visible!important;background:#fff!important}' +
+            'body>*{display:none!important}' +
+            'body>.svprinting{display:block!important;position:static!important;transform:none!important;width:auto!important;box-shadow:none!important;overflow:visible!important;background:#fff!important;border-radius:0!important}' +
+            '.svprinting>div:nth-child(1),.svprinting>div:nth-child(2),.svprinting #gMsg{display:none!important}' +
+            '.svprinting>div:nth-child(3){display:block!important;overflow:visible!important;padding:0!important;background:#fff!important}' +
+            '.svprinting section.docx{margin:0 auto!important;box-shadow:none!important;page-break-after:always}' +
+            '.svprinting section.docx:last-of-type{page-break-after:auto}' +
+            '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+        document.head.appendChild(st);
+        ov.classList.add('svprinting');
+        function done() { ov.classList.remove('svprinting'); st.remove(); window.removeEventListener('afterprint', done); }
+        window.addEventListener('afterprint', done);
+        setTimeout(function () { window.print(); }, 60);
     }
     function svPdfToImage(f) {
         return svNeed(function () { return window.pdfjsLib; }, ['https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'])
