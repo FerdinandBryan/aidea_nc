@@ -31,6 +31,9 @@
   }
   function updateImradLabel() {
     el('upImradReq').textContent = el('upType').value === 'research' ? ' *' : ' (optional)';
+    var isRes = el('upType').value === 'research';
+    el('upTitleLbl').textContent = isRes ? 'Research title *' : 'Thesis title *';
+    el('upFileLbl').textContent = (isRes ? 'Research' : 'Thesis') + ' paper file * (PDF, max 20 MB)';
   }
 
   function openModal() { errEl.textContent = ''; updateCount(); updateImradLabel(); modal.hidden = false; el('upTitle').focus(); }
