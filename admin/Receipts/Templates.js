@@ -115,7 +115,8 @@
         if (!nm) { alert('Enter a name for the template.'); return; }
         if (!f) { alert('Choose a PDF or DOCX file first.'); return; }
         if (f.size > 10 * 1024 * 1024) { alert('The image is over 10 MB. Use a smaller one.'); return; }
-        var fd = new FormData(); fd.append('name', nm); fd.append('image', f); if (window.svOrig && window.svOrig.png === f) fd.append('original', window.svOrig.file);
+        var fd = new FormData(); var isW = /\.docx$/i.test(f.name); var blank = isW ? (function () { var c = document.createElement('canvas'); c.width = 8; c.height = 6; var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 8, 6); var s = atob(c.toDataURL('image/png').split(',')[1]), u = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return new File([u], 'template.png', { type: 'image/png' }); })() : null;
+        fd.append('name', nm); fd.append('image', isW ? blank : f); if (isW) fd.append('original', f); else if (window.svOrig && window.svOrig.png === f) fd.append('original', window.svOrig.file);
         var label = addBtn.textContent;
         addBtn.disabled = true; addBtn.textContent = 'Uploading...';
         fetch(BASE + '/certificate-templates', { method: 'POST', headers: hd(), body: fd }).then(ok).then(function () {
@@ -171,6 +172,12 @@
         var isPdf = /\.pdf$/i.test(f.name), isDocx = /\.docx$/i.test(f.name);
         if (isPdf) { srcOk = true; return; }
         if (!isDocx) { fileIn.value = ''; alert('Only PDF or DOCX files are allowed. Images are not accepted.'); return; }
+        f.slice(0, 4).arrayBuffer().then(function (h) {
+            var b = new Uint8Array(h);
+            if (!(b[0] === 0x50 && b[1] === 0x4B)) { fileIn.value = ''; srcOk = false; alert('That is not a real .docx file.'); return; }
+            srcOk = true;
+        });
+        return;
         var label = addBtn.textContent;
         addBtn.disabled = true; addBtn.textContent = 'Converting Word file...';
         function done() { addBtn.disabled = false; addBtn.textContent = label; }
