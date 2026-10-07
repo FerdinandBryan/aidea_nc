@@ -425,7 +425,7 @@
     function svNeed(test, urls) { return test() ? Promise.resolve() : svLoad(urls); }
     function svDocxGen(buf, name) {
         var ov = document.createElement('div');
-        ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.65);display:flex;flex-direction:column;font:14px Arial,sans-serif;color:#111827';
+        ov.style.cssText = 'position:fixed;top:4vh;bottom:4vh;left:50%;transform:translateX(-50%);width:min(1240px,94vw);z-index:99999;background:rgba(0,0,0,.65);border-radius:12px;overflow:hidden;box-shadow:0 0 0 100vmax rgba(0,0,0,.55);display:flex;flex-direction:column;font:14px Arial,sans-serif;color:#111827';
         var bs = 'height:30px;padding:0 10px;border:1px solid #9ca3af;border-radius:6px;background:#fff;color:#111827;cursor:pointer;font:inherit';
         var tb = 'height:28px;min-width:28px;border:0;border-radius:6px;background:transparent;color:#1f2937;cursor:pointer;font:inherit';
         var fi = 'height:30px;padding:0 8px;border:1px solid #cbd5e1;border-radius:6px;font:inherit;color:#111827;background:#fff;min-width:0';
