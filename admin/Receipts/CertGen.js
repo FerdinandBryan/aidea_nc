@@ -433,7 +433,7 @@
         ov.innerHTML =
             '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 16px;background:#fff;border-bottom:1px solid #d1d5db">' +
             '<input id="gTitle" placeholder="Title" style="' + fi + ';flex:2;min-width:160px"><input id="gProto" placeholder="Protocol No." style="' + fi + ';width:130px"><input id="gDate" type="date" style="' + fi + '"><input id="gName" placeholder="Name" style="' + fi + ';width:170px">' +
-            '<button type="button" data-a="print" style="' + bs + '">Print / PDF</button><button type="button" data-a="png" style="' + bs + '">Download PNG</button><button type="button" data-a="close" style="' + bs + '">Close</button></div>' +
+            '<button type="button" data-a="print" style="' + bs + '">Print / PDF</button><button type="button" data-a="docx" style="' + bs + '">Download Word (.docx)</button><button type="button" data-a="close" style="' + bs + '">Close</button></div>' +
             '<div id="gTb" style="display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:6px 16px;background:#edf2fa;border-bottom:1px solid #d1d5db">' +
             cb('undo', '&#8630;', 'Undo') + cb('redo', '&#8631;', 'Redo') +
             '<select data-f="font" style="' + tb + '"><option value="">Font</option><option>Arial</option><option>Times New Roman</option><option>Calibri</option><option>Cambria</option><option>Georgia</option></select>' +
@@ -488,7 +488,9 @@
             w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Certificate</title>' + st + '<style>@page{margin:0}body{margin:0}section.docx{margin:0 auto!important;box-shadow:none!important}</style></head><body>' + pg + '</body></html>');
             w.document.close(); w.onload = function () { w.focus(); w.print(); };
         });
-        ov.querySelector('[data-a="png"]').addEventListener('click', function () {
+        ov.querySelector('[data-a="docx"]').addEventListener('click', function () {
+            svDownloadDocx(buf, name, { title: val('#gTitle'), protocol: val('#gProto'), name: val('#gName'), date: (function () { var d = val('#gDate'); return d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : ''; })() });
+            return;
             svNeed(function () { return window.html2canvas; }, ['https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js']).then(function () {
                 var secs = host.querySelectorAll('section.docx'), i = 0;
                 (function next() {
@@ -582,10 +584,49 @@
                 }).catch(function (e) { host.remove(); throw e; });
             });
     }
+    function svFillXml(x, v) {
+        var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+        return x.replace(/<w:p[ >][\s\S]*?<\/w:p>/g, function (p) {
+            var re = /<w:t(?: [^>]*)?>([^<]*)<\/w:t>/g, txt = '', m;
+            while ((m = re.exec(p))) txt += m[1];
+            if (!/\{\{/.test(txt)) return p;
+            var out = txt.replace(/\{\{\s*(title|name|date|protocol)\s*\}\}/gi, function (all, k) { var r = v[k.toLowerCase()]; return r ? esc(r) : all; });
+            if (out === txt) return p;
+            var i = 0;
+            return p.replace(re, function () { return i++ === 0 ? '<w:t xml:space="preserve">' + out + '</w:t>' : '<w:t></w:t>'; });
+        });
+    }
+    function svDownloadDocx(buf, name, vals) {
+        svNeed(function () { return window.JSZip; }, ['https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'])
+            .then(function () { return window.JSZip.loadAsync(buf); })
+            .then(function (zip) {
+                var names = Object.keys(zip.files).filter(function (n) { return /^word\/(document|header\d*|footer\d*)\.xml$/.test(n); });
+                return Promise.all(names.map(function (n) {
+                    return zip.file(n).async('string').then(function (x) { zip.file(n, svFillXml(x, vals)); });
+                })).then(function () {
+                    return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', compression: 'DEFLATE' });
+                });
+            })
+            .then(function (blob) {
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = String(name || 'certificate').replace(/[\\\/:*?"<>|]/g, '') + '.docx';
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+            })
+            .catch(function () { alert('Could not create the Word file.'); });
+    }
+    function svBlankPng() {
+        var c = document.createElement('canvas'); c.width = 8; c.height = 6;
+        var cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, 8, 6);
+        return new Promise(function (ok, fail) {
+            c.toBlob(function (b) { if (b) ok(new File([b], 'template.png', { type: 'image/png' })); else fail(new Error('No image')); }, 'image/png');
+        });
+    }
     function svSaveTpl(orig, f, png) {
         var nm = prompt('Save as a reusable template? Enter a name (Cancel = do not save):', f.name.replace(/\.(docx|pdf)$/i, ''));
         if (!nm || !nm.trim()) return;
-        (png ? Promise.resolve(png) : svDocxToPng(orig)).then(function (img) {
+        (png ? Promise.resolve(png) : svBlankPng()).then(function (img) {
             var fd = new FormData();
             fd.append('name', nm.trim()); fd.append('image', img);
             if (!png) fd.append('original', f);
