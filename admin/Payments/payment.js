@@ -9,6 +9,7 @@
     const LOGIN_URL = '../../user/login/login.html';
 
     let allPayments = [];
+let paymentsLoaded = false;
     let filtered = [];
     let searchTerm = '';
     let statusFilter = '';
@@ -465,7 +466,7 @@
         if (!tbody) return;
 
         if (!allPayments.length) {
-            tbody.innerHTML = '<tr><td colspan="7" class="empty">No payments yet.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="empty">' + (paymentsLoaded ? 'No payments yet.' : 'Loading...') + '</td></tr>';
             return;
         }
         if (!filtered.length) {
@@ -1198,12 +1199,12 @@ function openViewModal(i) {
     }
     async function reload() {
         try {
-            allPayments = await apiFetch('/payments');
+            allPayments = await apiFetch('/payments'); paymentsLoaded = true;
         try { certTypeMap = await apiFetch('/certificates') || {}; } catch (e) { certTypeMap = {}; }
         } catch (err) {
             console.error('Failed to load payments:', err);
             showToast('Failed to load payments.', 'error');
-            allPayments = [];
+            allPayments = []; paymentsLoaded = true;
         }
         updateStats();
         render();
