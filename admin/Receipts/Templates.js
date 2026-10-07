@@ -89,6 +89,29 @@
             msg.textContent = (e && /HTTP 404/.test(e.message)) ? 'This template has no original Word file. Re-upload it as a .docx.' : 'Could not open this template (' + ((e && e.message) || 'error') + ').';
         });
     }
+    function tplFixHdr(x) {
+        var am = /<wp:anchor\b[\s\S]*?<\/wp:anchor>/g, m, edge = 0, pos = -1;
+        while ((m = am.exec(x))) {
+            var d = m[0];
+            if (!/<wp:wrapSquare/.test(d) || !/<wp:positionH relativeFrom="column"/.test(d)) continue;
+            var ph = /<wp:positionH[^>]*>\s*<wp:posOffset>(-?\d+)/.exec(d), pv = /<wp:positionV[^>]*>\s*<wp:posOffset>(-?\d+)/.exec(d), cx = /<wp:extent cx="(\d+)"/.exec(d), dr = /distR="(\d+)"/.exec(d);
+            if (!ph || !pv || !cx || parseInt(pv[1], 10) >= 0) continue;
+            edge = Math.round((parseInt(ph[1], 10) + parseInt(cx[1], 10) + (dr ? parseInt(dr[1], 10) : 114300)) / 635);
+            pos = m.index; break;
+        }
+        if (edge <= 0) return x;
+        var pr = /<w:p[ >][\s\S]*?<\/w:p>/g, p, prev = null, found = false;
+        while ((p = pr.exec(x))) {
+            if (p.index <= pos && pos < p.index + p[0].length) { found = true; break; }
+            prev = { i: p.index, s: p[0] };
+        }
+        if (!found || !prev || !/<w:t[ >]/.test(prev.s)) return x;
+        var ns;
+        if (/<w:ind [^>]*w:left="/.test(prev.s)) ns = prev.s.replace(/(<w:ind [^>]*w:left=")\d+(")/, function (a, b, c) { return b + edge + c; });
+        else if (/<w:pPr>/.test(prev.s)) ns = prev.s.replace('<w:pPr>', '<w:pPr><w:ind w:left="' + edge + '"/>');
+        else ns = prev.s.replace(/^(<w:p(?: [^>]*)?>)/, function (a) { return a + '<w:pPr><w:ind w:left="' + edge + '"/></w:pPr>'; });
+        return x.slice(0, prev.i) + ns + x.slice(prev.i + prev.s.length);
+    }
     function tplFixAlt(buf) {
         return window.JSZip.loadAsync(buf).then(function (zip) {
             var names = Object.keys(zip.files).filter(function (n) { return /^word\/(document|header\d*|footer\d*)\.xml$/.test(n); });
@@ -102,7 +125,7 @@
                         var nf = fb[0].replace(/(<a:blip [^>]*?r:embed=")[^"]+(")/, function (all, p1, p2) { return p1 + m[1] + p2; });
                         return blk.replace(fb[0], function () { return nf; });
                     });
-                    if (y !== x) zip.file(n, y);
+                    if (/^word\/header/.test(n)) y = tplFixHdr(y); if (y !== x) zip.file(n, y);
                 });
             })).then(function () { return zip.generateAsync({ type: 'arraybuffer' }); });
         }).catch(function () { return buf; });
