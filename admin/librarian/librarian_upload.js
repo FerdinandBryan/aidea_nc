@@ -1,12 +1,13 @@
 (function () {
   var API = 'https://aideanc-production.up.railway.app/api';
+  var MIN_WORDS = 150, MAX_WORDS = 200, MAX_BYTES = 20 * 1024 * 1024;
   var modal = document.getElementById('uploadModal');
   var openBtn = document.getElementById('addDocBtn');
   var submit = document.getElementById('upSubmit');
   var errEl = document.getElementById('upErr');
   if (!modal || !openBtn || !submit) return;
 
-  var ids = ['upTitle', 'upAuthors', 'upYear', 'upCourse', 'upAdviser', 'upAbstract', 'upFile'];
+  var ids = ['upTitle', 'upCourse', 'upYear', 'upAdviser', 'upAuthors', 'upAbstract', 'upFile', 'upImrad'];
   function el(id) { return document.getElementById(id); }
   function token() { try { return localStorage.getItem('auth_token') || ''; } catch (e) { return ''; } }
 
@@ -21,11 +22,30 @@
     setTimeout(function () { d.remove(); }, 3500);
   }
 
-  function openModal() { errEl.textContent = ''; modal.hidden = false; el('upTitle').focus(); }
+  function wordCount(t) { t = (t || '').trim(); return t ? t.split(/\s+/).length : 0; }
+  function updateCount() {
+    var n = wordCount(el('upAbstract').value);
+    var c = el('upCount');
+    c.textContent = n + ' words - required: ' + MIN_WORDS + ' to ' + MAX_WORDS + ' words';
+    c.style.color = n === 0 ? '' : (n >= MIN_WORDS && n <= MAX_WORDS ? '#16a34a' : '#dc2626');
+  }
+  function updateImradLabel() {
+    el('upImradReq').textContent = el('upType').value === 'research' ? ' *' : ' (optional)';
+  }
+
+  function openModal() { errEl.textContent = ''; updateCount(); updateImradLabel(); modal.hidden = false; el('upTitle').focus(); }
   function closeModal() { modal.hidden = true; }
-  function reset() { ids.forEach(function (i) { el(i).value = ''; }); errEl.textContent = ''; }
+  function reset() {
+    ids.forEach(function (i) { el(i).value = ''; });
+    el('upType').value = 'thesis';
+    errEl.textContent = '';
+    updateCount();
+    updateImradLabel();
+  }
 
   openBtn.addEventListener('click', openModal);
+  el('upAbstract').addEventListener('input', updateCount);
+  el('upType').addEventListener('change', updateImradLabel);
   modal.addEventListener('click', function (e) {
     if (e.target === modal || e.target.closest('[data-upload-close]')) closeModal();
   });
@@ -34,23 +54,37 @@
   submit.addEventListener('click', async function () {
     errEl.textContent = '';
     var title = el('upTitle').value.trim();
+    var course = el('upCourse').value;
+    var year = el('upYear').value;
+    var adviser = el('upAdviser').value.trim();
+    var type = el('upType').value;
     var authors = el('upAuthors').value.trim();
-    var year = el('upYear').value.trim();
+    var abstractText = el('upAbstract').value.trim();
     var file = el('upFile').files[0];
+    var imrad = el('upImrad').files[0];
+    var words = wordCount(abstractText);
 
-    if (!title || !authors || !year) { errEl.textContent = 'Title, author(s) and academic year are required.'; return; }
-    if (!file) { errEl.textContent = 'Please choose a PDF file.'; return; }
-    if (!/\.pdf$/i.test(file.name)) { errEl.textContent = 'Only PDF files are allowed.'; return; }
-    if (file.size > 20 * 1024 * 1024) { errEl.textContent = 'File is larger than 20 MB.'; return; }
+    if (!title || !course || !year || !adviser) { errEl.textContent = 'Title, course, academic year and adviser are required.'; return; }
+    if (words < MIN_WORDS || words > MAX_WORDS) { errEl.textContent = 'Abstract must be ' + MIN_WORDS + ' to ' + MAX_WORDS + ' words (you entered ' + words + ').'; return; }
+    if (!file) { errEl.textContent = 'Please choose the thesis paper PDF.'; return; }
+    if (!/\.pdf$/i.test(file.name)) { errEl.textContent = 'The thesis paper must be a PDF.'; return; }
+    if (file.size > MAX_BYTES) { errEl.textContent = 'The thesis paper is larger than 20 MB.'; return; }
+    if (type === 'research' && !imrad) { errEl.textContent = 'IMRAD file is required for a research paper.'; return; }
+    if (imrad) {
+      if (!/\.(pdf|docx)$/i.test(imrad.name)) { errEl.textContent = 'IMRAD file must be a PDF or DOCX.'; return; }
+      if (imrad.size > MAX_BYTES) { errEl.textContent = 'IMRAD file is larger than 20 MB.'; return; }
+    }
 
     var fd = new FormData();
     fd.append('title', title);
-    fd.append('authors', authors);
+    fd.append('course', course);
     fd.append('academic_year', year);
-    if (el('upCourse').value.trim()) fd.append('course', el('upCourse').value.trim());
-    if (el('upAdviser').value.trim()) fd.append('adviser_name', el('upAdviser').value.trim());
-    if (el('upAbstract').value.trim()) fd.append('abstract', el('upAbstract').value.trim());
+    fd.append('adviser_name', adviser);
+    fd.append('submission_type', type);
+    fd.append('abstract', abstractText);
+    if (authors) fd.append('authors', authors);
     fd.append('file', file);
+    if (imrad) fd.append('imrad_file', imrad);
 
     submit.disabled = true;
     var oldText = submit.textContent;

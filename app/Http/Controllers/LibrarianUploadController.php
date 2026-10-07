@@ -18,27 +18,41 @@ class LibrarianUploadController extends Controller
         }
 
         $v = $request->validate([
-            'title'         => 'required|string|max:500',
-            'authors'       => 'required|string|max:500',
-            'academic_year' => 'required|string|max:20',
-            'course'        => 'nullable|string|max:255',
-            'adviser_name'  => 'nullable|string|max:255',
-            'abstract'      => 'nullable|string',
-            'file'          => 'required|file|mimes:pdf|max:20480',
+            'title'           => 'required|string|max:500',
+            'course'          => 'required|in:BSCS,BEED,BSED,BSHM',
+            'academic_year'   => 'required|in:2026-2027,2027-2028,2028-2029,2029-2030',
+            'adviser_name'    => 'required|string|max:255',
+            'submission_type' => 'required|in:thesis,research',
+            'authors'         => 'nullable|string|max:500',
+            'abstract'        => 'required|string',
+            'file'            => 'required|file|mimes:pdf|max:20480',
+            'imrad_file'      => 'required_if:submission_type,research|nullable|file|mimes:pdf,docx|max:20480',
         ]);
+
+        $abstractText = trim($v['abstract']);
+        $wordCount = count(preg_split('/\s+/u', $abstractText, -1, PREG_SPLIT_NO_EMPTY));
+        if ($wordCount < 150 || $wordCount > 200) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'abstract' => ["Abstract must be 150 to 200 words (you entered {$wordCount})."],
+            ]);
+        }
 
         $file = $request->file('file');
         $path = $file->store('thesis_files', 'public');
+        $imradPath = $request->hasFile('imrad_file')
+            ? $request->file('imrad_file')->store('thesis_files', 'public')
+            : null;
 
         $doc = ThesisSubmission::create([
             'user_id'           => $user->id,
             'title'             => $v['title'],
-            'authors'           => $v['authors'],
+            'course'            => $v['course'],
             'academic_year'     => $v['academic_year'],
-            'course'            => $v['course'] ?? 'Library upload',
-            'adviser_name'      => $v['adviser_name'] ?? 'N/A',
-            'abstract'          => $v['abstract'] ?? '',
-            'submission_type'   => 'final',
+            'adviser_name'      => $v['adviser_name'],
+            'submission_type'   => $v['submission_type'],
+            'authors'           => $v['authors'] ?? null,
+            'abstract'          => $abstractText,
+            'imrad_file_path'   => $imradPath,
             'file_path'         => $path,
             'original_filename' => $file->getClientOriginalName(),
             'file_size'         => $file->getSize(),
