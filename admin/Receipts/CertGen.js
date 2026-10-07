@@ -604,8 +604,8 @@
                 ref = ps[i]; break;
             }
             if (!first || !ref) return;
-            var d = textLeft(ref) - textLeft(first);
-            if (d > 4 && d < 300) first.style.marginLeft = (parseFloat(first.style.marginLeft) || 0) + d + 'px';
+            first.style.marginLeft = ''; first.style.textIndent = ''; var d = textLeft(ref) - textLeft(first);
+            if (d > 4 && d < 300) first.style.textIndent = d + 'px';
         });
     }
     function svTightHdr(host) {
