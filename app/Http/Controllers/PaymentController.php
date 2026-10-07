@@ -77,7 +77,7 @@ class PaymentController extends Controller
             'type'    => 'required|in:files,certificate',
             'message' => 'nullable|string|max:1000',
             'files'   => 'required|array|min:1|max:10',
-            'files.*' => 'file|mimes:pdf,jpg,jpeg,png,webp|max:20480',
+            'files.*' => 'file|mimes:pdf,jpg,jpeg,png,webp,docx|max:20480',
         ]);
 
         $student = $payment->user ?? \App\Models\User::find($payment->user_id ?? null);
