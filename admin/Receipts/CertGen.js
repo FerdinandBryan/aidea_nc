@@ -433,7 +433,7 @@
         ov.innerHTML =
             '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 16px;background:#fff;border-bottom:1px solid #d1d5db">' +
             '<input id="gTitle" placeholder="Title" style="' + fi + ';flex:2;min-width:160px"><input id="gProto" placeholder="Protocol No." style="' + fi + ';width:130px"><input id="gDate" type="date" style="' + fi + '"><input id="gName" placeholder="Name" style="' + fi + ';width:170px">' +
-            '<button type="button" data-a="print" style="' + bs + '">Print / PDF</button><button type="button" data-a="docx" style="' + bs + '">Download Word (.docx)</button><button type="button" data-a="close" style="' + bs + '">Close</button></div>' +
+            '<button type="button" data-a="print" style="' + bs + '">Print / PDF</button><button type="button" data-a="docx" style="' + bs + '">Save</button><button type="button" data-a="close" style="' + bs + '">Close</button></div>' +
             '<div id="gTb" style="display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:6px 16px;background:#edf2fa;border-bottom:1px solid #d1d5db">' +
             cb('undo', '&#8630;', 'Undo') + cb('redo', '&#8631;', 'Redo') +
             '<select data-f="font" style="' + tb + '"><option value="">Font</option><option>Arial</option><option>Times New Roman</option><option>Calibri</option><option>Cambria</option><option>Georgia</option></select>' +
@@ -489,7 +489,7 @@
             w.document.close(); w.onload = function () { w.focus(); w.print(); };
         });
         ov.querySelector('[data-a="docx"]').addEventListener('click', function () {
-            svDownloadDocx(buf, name, { title: val('#gTitle'), protocol: val('#gProto'), name: val('#gName'), date: (function () { var d = val('#gDate'); return d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : ''; })() });
+            svSaveDocx(close, buf, name, { title: val('#gTitle'), protocol: val('#gProto'), name: val('#gName'), date: (function () { var d = val('#gDate'); return d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : ''; })() });
             return;
             svNeed(function () { return window.html2canvas; }, ['https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js']).then(function () {
                 var secs = host.querySelectorAll('section.docx'), i = 0;
@@ -744,6 +744,25 @@
                 setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
             })
             .catch(function () { alert('Could not create the Word file.'); });
+    }
+    function svSaveDocx(closeFn, buf, name, vals) {
+        if (!(cgExtra && typeof cgExtra.onDone === 'function')) { svDownloadDocx(buf, name, vals); return; }
+        var mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        var fname = 'certificate-' + String(vals.protocol || name || 'template').replace(/[^\w.-]+/g, '_') + '.docx';
+        svNeed(function () { return window.JSZip; }, ['https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'])
+            .then(function () { return window.JSZip.loadAsync(buf); })
+            .then(function (zip) {
+                var names = Object.keys(zip.files).filter(function (n) { return /^word\/(document|header\d*|footer\d*)\.xml$/.test(n); });
+                return Promise.all(names.map(function (n) {
+                    return zip.file(n).async('string').then(function (x) { zip.file(n, svFillXml(x, vals)); });
+                })).then(function () { return zip.generateAsync({ type: 'blob', mimeType: mime, compression: 'DEFLATE' }); });
+            })
+            .then(function (blob) {
+                var file = new File([blob], fname, { type: mime });
+                closeFn();
+                cgExtra.onDone(file);
+            })
+            .catch(function () { alert('Could not save the Word file.'); });
     }
     function svBlankPng() {
         var c = document.createElement('canvas'); c.width = 8; c.height = 6;
