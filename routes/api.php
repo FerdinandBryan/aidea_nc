@@ -286,3 +286,6 @@ Route::get('/pricing-sheet', [\App\Http\Controllers\PricingSheetController::clas
 Route::post('/pricing-sheet', [\App\Http\Controllers\PricingSheetController::class, 'store'])->middleware(['auth:sanctum', 'admin']);
 Route::delete('/pricing-sheet', [\App\Http\Controllers\PricingSheetController::class, 'destroy'])->middleware(['auth:sanctum', 'admin']);
 Route::post('/docx/format', [App\Http\Controllers\DocxFormatController::class, 'format'])->middleware('throttle:20,1');
+
+// --- Word -> PDF for the certificate editor ---
+\Illuminate\Support\Facades\Route::middleware(['auth:sanctum', 'admin'])->post('/certificates/docx-to-pdf', [\App\Http\Controllers\DocxPdfController::class, 'convert']);

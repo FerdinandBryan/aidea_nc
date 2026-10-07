@@ -759,6 +759,15 @@
             })
             .then(function (blob) {
                 var file = new File([blob], fname, { type: mime });
+                var cvFd = new FormData(); cvFd.append('file', file);
+                return fetch((typeof API_BASE !== 'undefined' ? API_BASE : 'https://aideanc-production.up.railway.app/api') + '/certificates/docx-to-pdf', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/pdf', 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') },
+                    body: cvFd
+                }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+                  .then(function (pb) { return new File([pb], fname.replace(/\.docx$/i, '.pdf'), { type: 'application/pdf' }); })
+                  .catch(function () { return file; })
+                  .then(function (out) { closeFn(); cgExtra.onDone(out); });
                 closeFn();
                 cgExtra.onDone(file);
             })
