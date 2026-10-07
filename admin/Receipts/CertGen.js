@@ -683,6 +683,13 @@
             ln.setAttribute('contenteditable', 'false');
             ln.style.cssText = 'position:absolute;left:-12px;width:648px;height:2px;background:#4a7ebb;pointer-events:none;top:' + Math.round(s2.bottom - hr.top + 19) + 'px';
             h.appendChild(ln);
+            var svRightLogo = imgs.reduce(function (a, b) { return b.getBoundingClientRect().left > a.getBoundingClientRect().left ? b : a; });
+            if (svRightLogo !== seal) {
+                svRightLogo.style.transform = '';
+                var rl = svRightLogo.getBoundingClientRect(), lr = ln.getBoundingClientRect(), sb = seal.getBoundingClientRect();
+                var dx = lr.right - rl.right, dy = sb.bottom - rl.bottom;
+                if (Math.abs(dx) < 300 && Math.abs(dy) < 120) svRightLogo.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+            }
         });
     }
     function svPdfToImage(f) {
