@@ -433,7 +433,7 @@
         ov.innerHTML =
             '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 16px;background:#fff;border-bottom:1px solid #d1d5db">' +
             '<input id="gTitle" placeholder="Title" style="' + fi + ';flex:2;min-width:160px"><input id="gProto" placeholder="Protocol No." style="' + fi + ';width:130px"><input id="gDate" type="date" style="' + fi + '"><input id="gName" placeholder="Name" style="' + fi + ';width:170px">' +
-            '<button type="button" data-a="print" style="' + bs + '">Print / PDF</button><button type="button" data-a="docx" style="' + bs + '">Save</button><button type="button" data-a="close" style="' + bs + '">Close</button></div>' +
+            '<select data-a="paper" title="Paper size" style="padding:6px 8px;border-radius:6px;border:1px solid #d1d5db;font:13px Arial,sans-serif"><option value="">Template size</option><option value="short">Short (8.5 x 11 in)</option><option value="long">Long (8.5 x 13 in)</option><option value="legal">Legal (8.5 x 14 in)</option><option value="a4">A4</option><option value="custom">Custom size...</option></select><span data-a="cwrap" style="display:none;align-items:center;gap:4px;font:13px Arial,sans-serif;color:#fff"><input data-a="cw" type="number" min="3" max="20" step="0.1" value="8.5" style="width:56px;padding:5px;border-radius:6px;border:1px solid #d1d5db"> x <input data-a="ch" type="number" min="3" max="30" step="0.1" value="13" style="width:56px;padding:5px;border-radius:6px;border:1px solid #d1d5db"> in</span><button type="button" data-a="print" style="' + bs + '">Print / PDF</button><button type="button" data-a="docx" style="' + bs + '">Save</button><button type="button" data-a="close" style="' + bs + '">Close</button></div>' +
             '<div id="gTb" style="display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:6px 16px;background:#edf2fa;border-bottom:1px solid #d1d5db">' +
             cb('undo', '&#8630;', 'Undo') + cb('redo', '&#8631;', 'Redo') +
             '<select data-f="font" style="' + tb + '"><option value="">Font</option><option>Arial</option><option>Times New Roman</option><option>Calibri</option><option>Cambria</option><option>Georgia</option></select>' +
@@ -481,6 +481,28 @@
         ov.querySelectorAll('#gTitle,#gProto,#gDate,#gName').forEach(function (i) { i.addEventListener('input', apply); });
         function close() { document.removeEventListener('selectionchange', onSel); ov.remove(); }
         ov.querySelector('[data-a="close"]').addEventListener('click', close);
+        var svPz = ov.querySelector('[data-a="paper"]');
+        var svFire = function () { if (svPz) svPz.dispatchEvent(new Event('change')); };
+        ['cw', 'ch'].forEach(function (k) { var el = ov.querySelector('[data-a="' + k + '"]'); if (el) el.addEventListener('input', svFire); });
+        if (svPz) svPz.addEventListener('change', function () {
+            var svCw = ov.querySelector('[data-a="cwrap"]');
+            if (svCw) svCw.style.display = svPz.value === 'custom' ? 'inline-flex' : 'none';
+            var sz = { short: [816, 1056, '8.5in 11in'], long: [816, 1248, '8.5in 13in'], legal: [816, 1344, '8.5in 14in'], a4: [794, 1123, '210mm 297mm'] }[svPz.value];
+            if (svPz.value === 'custom') {
+                var cw = parseFloat(ov.querySelector('[data-a="cw"]').value), ch = parseFloat(ov.querySelector('[data-a="ch"]').value);
+                if (cw >= 3 && cw <= 20 && ch >= 3 && ch <= 30) sz = [Math.round(cw * 96), Math.round(ch * 96), cw + 'in ' + ch + 'in'];
+            }
+            Array.prototype.forEach.call(ov.querySelectorAll('#gHost section.docx'), function (s) {
+                if (s.getAttribute('data-ow') === null) { s.setAttribute('data-ow', s.style.width || ' '); s.setAttribute('data-omh', s.style.minHeight || ' '); s.setAttribute('data-oh', s.style.height || ' '); }
+                if (sz) {
+                    s.style.width = sz[0] + 'px'; s.style.minHeight = sz[1] + 'px'; s.style.height = sz[1] + 'px';
+                } else {
+                    s.style.width = s.getAttribute('data-ow').trim(); s.style.minHeight = s.getAttribute('data-omh').trim(); s.style.height = s.getAttribute('data-oh').trim();
+                }
+                var ft = s.querySelector('footer'); if (ft) ft.style.marginTop = 'auto';
+            });
+            if (sz) ov.setAttribute('data-psize', sz[2]); else ov.removeAttribute('data-psize');
+        });
         ov.querySelector('[data-a="print"]').addEventListener('click', function () {
             svPrintLive(ov); return; var w = window.open('', '_blank'); if (!w) { alert('Allow pop-ups to print.'); return; }
             var st = ''; Array.prototype.forEach.call(host.querySelectorAll('style'), function (s) { st += s.outerHTML; });
@@ -635,7 +657,7 @@
     function svPrintLive(ov) { try { svAlignHdr(ov.querySelector('#gHost')); } catch (e) { } try { svHdrFinish(ov.querySelector('#gHost')); } catch (e) { }
         var st = document.createElement('style');
         st.textContent = '@media print{' +
-            '@page{margin:0}' +
+            '@page{margin:0' + (ov.getAttribute('data-psize') ? ';size:' + ov.getAttribute('data-psize') : '') + '}' +
             'html,body{height:auto!important;overflow:visible!important;background:#fff!important}' +
             'body>*{display:none!important}' +
             'body>.svprinting{display:block!important;position:static!important;transform:none!important;width:auto!important;box-shadow:none!important;overflow:visible!important;background:#fff!important;border-radius:0!important}' +
