@@ -33,7 +33,7 @@
     el('upImradReq').textContent = el('upType').value === 'research' ? ' *' : ' (optional)';
     var isRes = el('upType').value === 'research';
     el('upTitleLbl').textContent = isRes ? 'Research title *' : 'Thesis title *';
-    el('upFileLbl').textContent = (isRes ? 'Research' : 'Thesis') + ' paper file * (PDF, max 20 MB)';
+    el('upFileLbl').textContent = (isRes ? 'Research' : 'Thesis') + ' paper file * (PDF or DOCX, max 20 MB)';
   }
 
   function openModal() { errEl.textContent = ''; updateCount(); updateImradLabel(); modal.hidden = false; el('upTitle').focus(); }
@@ -69,9 +69,9 @@
 
     if (!title || !course || !year || !adviser) { errEl.textContent = 'Title, course, academic year and adviser are required.'; return; }
     if (words < MIN_WORDS || words > MAX_WORDS) { errEl.textContent = 'Abstract must be ' + MIN_WORDS + ' to ' + MAX_WORDS + ' words (you entered ' + words + ').'; return; }
-    if (!file) { errEl.textContent = 'Please choose the thesis paper PDF.'; return; }
-    if (!/\.pdf$/i.test(file.name)) { errEl.textContent = 'The thesis paper must be a PDF.'; return; }
-    if (file.size > MAX_BYTES) { errEl.textContent = 'The thesis paper is larger than 20 MB.'; return; }
+    if (!file) { errEl.textContent = 'Please choose the main file (PDF or DOCX).'; return; }
+    if (!/\.(pdf|docx)$/i.test(file.name)) { errEl.textContent = 'The main file must be a PDF or DOCX.'; return; }
+    if (file.size > MAX_BYTES) { errEl.textContent = 'The main file is larger than 20 MB.'; return; }
     if (type === 'research' && !imrad) { errEl.textContent = 'IMRAD file is required for a research paper.'; return; }
     if (imrad) {
       if (!/\.(pdf|docx)$/i.test(imrad.name)) { errEl.textContent = 'IMRAD file must be a PDF or DOCX.'; return; }

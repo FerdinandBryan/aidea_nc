@@ -25,7 +25,7 @@ class LibrarianUploadController extends Controller
             'submission_type' => 'required|in:thesis,research',
             'authors'         => 'nullable|string|max:500',
             'abstract'        => 'required|string',
-            'file'            => 'required|file|mimes:pdf|max:20480',
+            'file'            => 'required|file|mimes:pdf,docx|max:20480',
             'imrad_file'      => 'required_if:submission_type,research|nullable|file|mimes:pdf,docx|max:20480',
         ]);
 
