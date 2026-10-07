@@ -204,6 +204,15 @@
                     Authorization: 'Bearer ' + getToken(),
                 }
             });
+            if (res.status === 401) {
+                if (!window.__aideaSessionExpired) {
+                    window.__aideaSessionExpired = true;
+                    try { localStorage.removeItem('auth_token'); localStorage.removeItem('aidea_user'); } catch (e) { /* ignore */ }
+                    showToast('Session expired. Please sign in again.', 'error');
+                    setTimeout(function () { window.location.href = '../../user/login/login.html'; }, 1500);
+                }
+                return;
+            }
             if (!res.ok) throw new Error('Server error: ' + res.status);
             const data = await res.json();
 
