@@ -506,7 +506,7 @@
             .then(function () { return svNeed(function () { return window.docx; }, ['https://cdnjs.cloudflare.com/ajax/libs/docx-preview/0.3.2/docx-preview.min.js', 'https://cdn.jsdelivr.net/npm/docx-preview@0.3.2/dist/docx-preview.min.js']); })
             .then(function () { return svFixAlt(buf).then(function (fb) { return window.docx.renderAsync(fb, host, null, { className: 'docx', inWrapper: false, breakPages: true, ignoreLastRenderedPageBreak: false }); }); })
             .then(function () {
-                msg.remove(); svAlignHdr(host);
+                msg.remove(); svAlignHdr(host); svTightHdr(host);
                 var rx = /\{\{\s*(title|name|date|protocol)\s*\}\}/gi, nodes = [], w = document.createTreeWalker(host, NodeFilter.SHOW_TEXT), n;
                 while ((n = w.nextNode())) { if (/\{\{/.test(n.nodeValue)) nodes.push(n); }
                 nodes.forEach(function (tn) {
@@ -606,6 +606,30 @@
             if (!first || !ref) return;
             var d = textLeft(ref) - textLeft(first);
             if (d > 4 && d < 300) first.style.marginLeft = (parseFloat(first.style.marginLeft) || 0) + d + 'px';
+        });
+    }
+    function svTightHdr(host) {
+        function textTop(p) {
+            var w = document.createTreeWalker(p, NodeFilter.SHOW_TEXT), n;
+            while ((n = w.nextNode())) {
+                if (!n.nodeValue.trim()) continue;
+                var r = document.createRange(); r.selectNodeContents(n);
+                var rc = r.getClientRects();
+                if (rc.length) return rc[0].top;
+            }
+            return null;
+        }
+        var heads = host.querySelectorAll('header');
+        if (!heads.length) { var s0 = host.querySelector('section.docx'); heads = s0 ? [s0] : []; }
+        Array.prototype.forEach.call(heads, function (h) {
+            var ps = h.querySelectorAll('p'), lines = [], i;
+            for (i = 0; i < ps.length && lines.length < 3; i++) {
+                var tp = textTop(ps[i]);
+                if (tp !== null) lines.push({ p: ps[i], t: tp });
+            }
+            if (lines.length < 3) return;
+            var gap = lines[1].t - lines[0].t, pitch = lines[2].t - lines[1].t;
+            if (pitch > 4 && gap > pitch + 3 && gap < 120) lines[0].p.style.marginBottom = (pitch - gap) + 'px';
         });
     }
     function svPdfToImage(f) {
