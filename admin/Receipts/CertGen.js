@@ -746,6 +746,42 @@
             .catch(function () { alert('Could not create the Word file.'); });
     }
     function svSaveDocx(closeFn, buf, name, vals) {
+        if (!(cgExtra && typeof cgExtra.onDone === 'function')) { svSaveDocxOld(closeFn, buf, name, vals); return; }
+        var host = document.getElementById('gHost');
+        var secs = host ? host.querySelectorAll('section.docx') : [];
+        if (!secs.length) { svSaveDocxOld(closeFn, buf, name, vals); return; }
+        var fname = 'certificate-' + String((vals && vals.protocol) || name || 'template').replace(/[^\w.-]+/g, '_') + '.pdf';
+        try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) { }
+        try { svAlignHdr(host); } catch (e) { }
+        try { svHdrFinish(host); } catch (e) { }
+        svNeed(function () { return window.html2canvas; }, ['https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'])
+            .then(function () { return svNeed(function () { return window.jspdf && window.jspdf.jsPDF; }, ['https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js']); })
+            .then(function () {
+                var J = window.jspdf.jsPDF, pdf = null, i = 0;
+                return (function next() {
+                    if (i >= secs.length) return Promise.resolve();
+                    var s = secs[i];
+                    var w = s.offsetWidth, h = s.offsetHeight;
+                    return window.html2canvas(s, { scale: 1600 / w, backgroundColor: '#ffffff', useCORS: true }).then(function (c) {
+                        var pw = w * 0.75, ph = h * 0.75, o = pw > ph ? 'l' : 'p';
+                        if (!pdf) { pdf = new J({ orientation: o, unit: 'pt', format: [pw, ph] }); }
+                        else { pdf.addPage([pw, ph], o); }
+                        pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pw, ph);
+                        i++;
+                        return next();
+                    });
+                })().then(function () { return pdf.output('blob'); });
+            })
+            .then(function (blob) {
+                var file = new File([blob], fname, { type: 'application/pdf' });
+                closeFn();
+                cgExtra.onDone(file);
+            }, function () {
+                svSaveDocxOld(closeFn, buf, name, vals);
+            });
+    }
+
+    function svSaveDocxOld(closeFn, buf, name, vals) {
         if (!(cgExtra && typeof cgExtra.onDone === 'function')) { svDownloadDocx(buf, name, vals); return; }
         var mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
         var fname = 'certificate-' + String(vals.protocol || name || 'template').replace(/[^\w.-]+/g, '_') + '.docx';
