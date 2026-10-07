@@ -650,10 +650,23 @@
         window.addEventListener('afterprint', done);
         setTimeout(function () { window.print(); }, 60);
     }
+    function svHideBlank(host) {
+        function chk(im) {
+            if (im.naturalWidth <= 2 && im.naturalHeight <= 2) {
+                var r = im.getBoundingClientRect();
+                if (r.width > 100 || r.height > 100) im.style.visibility = 'hidden';
+            }
+        }
+        Array.prototype.forEach.call(host.querySelectorAll('img'), function (im) {
+            if (im.complete) chk(im);
+            else im.addEventListener('load', function () { chk(im); }, { once: true });
+        });
+    }
     function svHdrFinish(host) {
+        try { svHideBlank(host); } catch (e) { }
         Array.prototype.forEach.call(host.querySelectorAll('header'), function (h) {
             Array.prototype.forEach.call(h.querySelectorAll('.svhdrline'), function (o) { o.remove(); });
-            var imgs = Array.prototype.slice.call(h.querySelectorAll('img')).filter(function (im) { var r = im.getBoundingClientRect(); return r.height > 40 && r.width > 40; });
+            var imgs = Array.prototype.slice.call(h.querySelectorAll('img')).filter(function (im) { var r = im.getBoundingClientRect(); return r.height > 40 && r.width > 40 && im.style.visibility !== 'hidden'; });
             if (!imgs.length) return;
             imgs.forEach(function (im) { im.style.transform = ''; });
             var seal = imgs.reduce(function (a, b) { return b.getBoundingClientRect().left < a.getBoundingClientRect().left ? b : a; });
