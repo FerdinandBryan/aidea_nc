@@ -94,7 +94,7 @@
     }
 
         /* ---- layout that matches the Norzagaray certificate (template with header/footer only) ---- */
-    function drawLayout(ctx, d, role) {
+    function drawLayout(ctx, d, role, st) { var ov = (st && st.txt) || {};
         var k = ctx.canvas.width / 1170, F = 'Arial, Helvetica, sans-serif'; ctx.save(); ctx.translate(0, 44 * k);
         var L = 138 * k, R = 1018 * k, MW = R - L, px = Math.round(25 * k), lh = 29 * k, C = 585 * k;
         var analyst = /analy/i.test(String(role.head || '') + ' ' + String(role.label || ''));
@@ -134,7 +134,7 @@
         ctx.font = f(true, px); ctx.fillText(pv, R - wp, 218 * k);
 
         /* heading */
-        center(String(role.head || '').toUpperCase(), 364 * k, 34 * k, true, false);
+        center((ov.head ? String(ov.head) : String(role.head || '')).toUpperCase(), 364 * k, 34 * k, true, false);
 
         /* paragraph with the title in bold */
         var title = '\u201C' + String(d.title || 'TITLE OF THE DOCUMENT').toUpperCase() + '\u201D';
@@ -142,22 +142,22 @@
         var parts = analyst
             ? [{ t: 'This is to certify that the data for the research study', b: false }, { t: title, b: true },
                { t: 'have been evaluated and treated with the appropriate statistical treatment by the undersigned. The statistical treatment was aligned with the objectives and statement of the problem of the study for analysis, interpretation, and discussion.', b: false }]
-            : [{ t: 'This is to certify that the manuscript entitled', b: false }, { t: title, b: true },
-               { t: 'has been reviewed and finalized by the undersigned.', b: false }];
+            : [{ t: ov.intro || 'This is to certify that the manuscript entitled', b: false }, { t: title, b: true },
+               { t: ov.outro || 'has been reviewed and finalized by the undersigned.', b: false }];
         var y = para(parts, L, 501 * k, true);
-        para([{ t: 'This certification was issued on', b: false }, { t: dt + ',', b: true },
-              { t: "upon the researcher's request for whatever legal purpose this may serve.", b: false }], L, y + 2 * lh, true);
+        para([{ t: ov.issued || 'This certification was issued on', b: false }, { t: dt + ',', b: true },
+              { t: ov.purpose || "upon the researcher's request for whatever legal purpose this may serve.", b: false }], L, y + 2 * lh, true);
 
         /* name + signature line + caption */
         ctx.lineWidth = Math.max(1, 1.3 * k);
         center(d.name || 'Name', 962 * k, 25 * k, true, false);
         ctx.beginPath(); ctx.moveTo(C - 262 * k, 971 * k); ctx.lineTo(C + 262 * k, 971 * k); ctx.stroke();
-        center('Name of ' + (analyst ? 'Data Analyst' : 'Grammarian') + ' and Signature', 999 * k, 23 * k, false, true);
+        center(ov.cap || ('Name of ' + (analyst ? 'Data Analyst' : 'Grammarian') + ' and Signature'), 999 * k, 23 * k, false, true);
 
         /* date signed */
         center(String(dt).toUpperCase(), 1171 * k, 25 * k, true, false); ctx.beginPath(); ctx.moveTo(C - 262 * k, 1180 * k); ctx.lineTo(C + 262 * k, 1180 * k); ctx.stroke();
         
-        center('Date Signed', 1207 * k, 23 * k, false, true); ctx.restore();
+        center(ov.dsig || 'Date Signed', 1207 * k, 23 * k, false, true); ctx.restore();
     }
     /* ---- draw the certificate in the SYSTEM layout ---- */
     function draw(canvas, d, st) {
@@ -195,7 +195,7 @@
             boxes.push({ key: 'logo', ax: lx, ay: ly, x0: lx - lw / 2, x1: lx + lw / 2, y0: ly - lh / 2, y1: ly + lh / 2 });
         }
 
-        var LAY = !!BG; if (LAY) { drawLayout(ctx, d, role); } else { var h = put('head', role.head, 60, 'bold', SERIF, pal.primary, 'center', 0.5, 0.292);
+        var LAY = !!BG; if (LAY) { drawLayout(ctx, d, role, st); } else { var h = put('head', role.head, 60, 'bold', SERIF, pal.primary, 'center', 0.5, 0.292);
         ctx.fillStyle = pal.accent; ctx.fillRect(h.x - 180, h.y + 30, 360, 5);
         put('intro1', 'This is to certify that the manuscript entitled', 28, 'italic', SERIF, pal.text, 'center', 0.5, 0.398);
 
@@ -314,6 +314,42 @@
         }
         return out;
     }
+    function svTxtPanel(st, q, redraw) {
+        var old = q('#cgTxtEdit'); if (old) old.remove();
+        var anchor = q('#cgOcrStatus');
+        if (!anchor || !anchor.parentNode) return;
+        st.txt = st.txt || {};
+        var w = document.createElement('div');
+        w.id = 'cgTxtEdit';
+        w.style.cssText = 'margin:8px 0;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#111827';
+        var h = document.createElement('div');
+        h.style.cssText = 'font-weight:600;margin-bottom:6px';
+        h.textContent = 'Certificate wording (leave blank to keep the default)';
+        w.appendChild(h);
+        var defs = [
+            ['head', 'Heading', 'Default: from the selected service'],
+            ['intro', 'Opening sentence', 'This is to certify that the manuscript entitled'],
+            ['outro', 'Closing sentence', 'has been reviewed and finalized by the undersigned.'],
+            ['issued', 'Issued line', 'This certification was issued on'],
+            ['purpose', 'Purpose line', "upon the researcher's request for whatever legal purpose this may serve."],
+            ['cap', 'Name caption', 'Name of Grammarian and Signature'],
+            ['dsig', 'Date caption', 'Date Signed']
+        ];
+        defs.forEach(function (d) {
+            var lab = document.createElement('label');
+            lab.style.cssText = 'display:block;margin-bottom:6px;font-weight:600;color:#475569';
+            lab.appendChild(document.createTextNode(d[1]));
+            var inp = document.createElement('input');
+            inp.type = 'text';
+            inp.value = st.txt[d[0]] || '';
+            inp.placeholder = d[2];
+            inp.style.cssText = 'display:block;width:100%;margin-top:4px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font:inherit;color:#111827;background:#fff';
+            inp.addEventListener('input', function () { st.txt[d[0]] = inp.value; redraw(); });
+            lab.appendChild(inp);
+            w.appendChild(lab);
+        });
+        anchor.parentNode.insertAdjacentElement('afterend', w);
+    }
     function svTplPanel(st, q) {
         var old = q('#cgTplEdit'); if (old) old.remove();
         var keys = ['school', 'sub'].filter(function (k) { return st.tpl && st.tpl[k] && st.tpl[k].text; });
@@ -344,7 +380,7 @@
     function runOcr(st, q, redraw) {
         var img = st.img, status = q('#cgOcrStatus'), box = q('#cgOcr');
         function say(m) { if (status) status.textContent = m; }
-        function done(m) { say(m); if (box) box.disabled = false; svTplPanel(st, q); redraw(); }
+        function done(m) { say(m); if (box) box.disabled = false; svTplPanel(st, q); svTxtPanel(st, q, redraw); redraw(); }
         if (box) box.disabled = true;
         say('(reading template, first time may take a while...)');
         loadTess(function () {
