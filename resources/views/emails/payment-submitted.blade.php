@@ -1,3 +1,5 @@
+<div style="text-align:center;padding:20px 0 10px;"><img src="https://aideanc-production.up.railway.app/images/email-logo.png" alt="AIDEA" width="80" height="80" style="display:block;margin:0 auto;border:0;outline:none;"></div>
+
 <h2>New Request Submitted</h2>
 
 <p>A student has submitted a payment for a service. Details below:</p>

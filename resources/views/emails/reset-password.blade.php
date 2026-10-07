@@ -4,6 +4,8 @@
     <meta charset="UTF-8"/>
 </head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif;">
+<div style="text-align:center;padding:20px 0 10px;"><img src="https://aideanc-production.up.railway.app/images/email-logo.png" alt="AIDEA" width="80" height="80" style="display:block;margin:0 auto;border:0;outline:none;"></div>
+
   <div style="max-width:560px;margin:32px auto;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
     <!-- Header -->
     <div style="background:#1a1a1a;padding:32px;text-align:center;">

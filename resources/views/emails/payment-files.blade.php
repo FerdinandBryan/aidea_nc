@@ -10,6 +10,8 @@
 <title>{{ $title }}</title>
 </head>
 <body style="margin:0;padding:0;background:#f3f5fa;font-family:Arial,Helvetica,sans-serif;">
+<div style="text-align:center;padding:20px 0 10px;"><img src="https://aideanc-production.up.railway.app/images/email-logo.png" alt="AIDEA" width="80" height="80" style="display:block;margin:0 auto;border:0;outline:none;"></div>
+
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">{{ $title }}@if($service) for {{ $service }}@endif</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f5fa;padding:28px 12px;">
 <tr><td align="center">
