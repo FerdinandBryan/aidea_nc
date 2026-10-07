@@ -661,7 +661,8 @@
             if (!ps.length) return;
             var sr = seal.getBoundingClientRect(), t0 = ps[0].getBoundingClientRect(), t1 = ps[ps.length - 1].getBoundingClientRect();
             var d = (t0.top + t1.bottom) / 2 - (sr.top + sr.bottom) / 2;
-            if (Math.abs(d) > 2 && Math.abs(d) < 80) seal.style.transform = 'translateY(' + d + 'px)';
+            var hdrMid = (t0.top + t1.bottom) / 2;
+            imgs.forEach(function (im) { var ir = im.getBoundingClientRect(), dd = hdrMid - (ir.top + ir.bottom) / 2; if (Math.abs(dd) > 2 && Math.abs(dd) < 80) im.style.transform = 'translateY(' + dd + 'px)'; });
             if (getComputedStyle(h).position === 'static') h.style.position = 'relative';
             var hr = h.getBoundingClientRect(), s2 = seal.getBoundingClientRect();
             var ln = document.createElement('div');
