@@ -2641,6 +2641,7 @@ async function _dvGenerateFixedPdf() {
         var holder = document.getElementById('dvRedHolder');
         try {
             if (!_dvLastFile) throw new Error('Run a format check first.');
+            if (!_dvLastFlatViolations || !_dvLastFlatViolations.length) { holder.innerHTML = '<div style="color:#9ca3af;font-size:13px;">No formatting errors were found, so there are no red notes to show. Please check the items above manually.</div>'; return; } /* DV_NOERR_ATTENTION */
             var captured = null, capName = '';
             var orig = _dvTriggerDownload;
             _dvTriggerDownload = function (b, n) { captured = b; capName = n || ''; };
