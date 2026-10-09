@@ -2302,6 +2302,7 @@ async function _dvGenerateFixedPdf() {
                 return r >= 176 && g <= 112 && b <= 112;
             }
             function drop(n) { if (n.parentNode) n.parentNode.removeChild(n); }
+            /* DV_CLEAN_FIXED2 */ Array.from(doc.getElementsByTagNameNS(W, 'shd')).forEach(function (s) { var fl = (s.getAttributeNS(W, 'fill') || s.getAttribute('w:fill') || '').toUpperCase(); if (fl === 'FFF3B0') drop(s); });
             ['highlight', 'commentRangeStart', 'commentRangeEnd', 'commentReference'].forEach(function (nm) {
                 Array.from(doc.getElementsByTagNameNS(W, nm)).forEach(drop);
             });
