@@ -2287,6 +2287,43 @@ async function _dvGenerateFixedPdf() {
         document.head.appendChild(st);
     })();
 
+    /* DV_CLEAN_FIXED: strip redline notes from the fixed copy before previewing it */
+    async function dvCleanRedNotes(blob) {
+        try {
+            await new Promise(function (r) { _validatorDeps.ensureJSZip(r); });
+            var zip = await JSZip.loadAsync(blob);
+            var xf = zip.file('word/document.xml');
+            if (!xf) return blob;
+            var doc = new DOMParser().parseFromString(await xf.async('string'), 'application/xml');
+            var W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+            function isRed(v) {
+                if (!/^[0-9a-f]{6}$/i.test(v || '')) return false;
+                var r = parseInt(v.substr(0, 2), 16), g = parseInt(v.substr(2, 2), 16), b = parseInt(v.substr(4, 2), 16);
+                return r >= 176 && g <= 112 && b <= 112;
+            }
+            function drop(n) { if (n.parentNode) n.parentNode.removeChild(n); }
+            ['highlight', 'commentRangeStart', 'commentRangeEnd', 'commentReference'].forEach(function (nm) {
+                Array.from(doc.getElementsByTagNameNS(W, nm)).forEach(drop);
+            });
+            Array.from(doc.getElementsByTagNameNS(W, 'p')).forEach(function (p) {
+                var runs = Array.from(p.getElementsByTagNameNS(W, 'r')).filter(function (r) {
+                    return Array.from(r.getElementsByTagNameNS(W, 't')).some(function (t) { return (t.textContent || '').trim(); });
+                });
+                if (!runs.length) return;
+                var allRed = runs.every(function (r) {
+                    var c = r.getElementsByTagNameNS(W, 'color')[0];
+                    return c && isRed(c.getAttributeNS(W, 'val') || c.getAttribute('w:val'));
+                });
+                if (allRed) drop(p);
+            });
+            zip.file('word/document.xml', new XMLSerializer().serializeToString(doc));
+            return await zip.generateAsync({ type: 'blob' });
+        } catch (e) {
+            console.warn('[Validator] could not clean fixed copy', e);
+            return blob;
+        }
+    }
+
     function openOverlay(title) {
         var old = document.getElementById('dvPrevOverlay');
         if (old) old.remove();
@@ -2313,7 +2350,7 @@ async function _dvGenerateFixedPdf() {
             if (/\.pdf$/i.test(_dvLastFile.name || '')) throw new Error('Preview works on .docx files only. Upload the Word version.');
             await new Promise(function (r) { _validatorDeps.ensureJSZip(r); });
             await loadPreviewLib();
-            var blob = await _dvGenerateFixedDocx(_dvLastFile, _dvLastRules, _dvLastFormattingProfile);
+            var blob = await dvCleanRedNotes(await _dvGenerateFixedDocx(_dvLastFile, _dvLastRules, _dvLastFormattingProfile));
             body.innerHTML = '';
             var bar = document.createElement('div');
             bar.style.cssText = 'margin-bottom:10px;';
