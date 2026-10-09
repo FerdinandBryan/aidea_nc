@@ -2690,3 +2690,102 @@ async function _dvGenerateFixedPdf() {
     }
     if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
 })();
+/* DV_MISSING_SECTIONS: Needs attention preview lists required sections missing from the paper and marks highlighted text yellow */
+(function () {
+    var W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    var SECTIONS = [
+        { name: 'Approval Sheet', head: /^APPROVAL SHEET$/, rule: /approval sheet/i },
+        { name: 'Acknowledgement', head: /^ACKNOWLEDGE?MENTS?$/, rule: /acknowledg/i },
+        { name: 'Abstract', head: /^ABSTRACT$/, rule: /abstract/i },
+        { name: 'Table of Contents', head: /^TABLE OF CONTENTS?$/, rule: /table of contents/i },
+        { name: 'List of Tables', head: /^LIST OF TABLES$/, rule: /list of tables/i },
+        { name: 'List of Figures', head: /^LIST OF FIGURES$/, rule: /list of figures/i },
+        { name: 'List of Appendices', head: /^LIST OF APPENDICES$/, rule: /list of appendices/i },
+        { name: 'Chapter 1 (Introduction)', head: /^CHAPTER\s*(1|I|ONE)\b/, rule: /chapter\s*1|introduction/i },
+        { name: 'Theoretical Framework', head: /THEORETICAL FRAMEWORK|PHILOSOPHICAL UNDERPINNING/, rule: /theoretical framework|philosophical underpinning/i },
+        { name: 'Conceptual Framework', head: /CONCEPTUAL FRAMEWORK/, rule: /conceptual framework/i },
+        { name: 'Statement of the Problem', head: /STATEMENT OF THE PROBLEM/, rule: /statement of the problem/i },
+        { name: 'Scope and Limitations', head: /SCOPE AND LIMITATIONS?/, rule: /scope and limitations?/i },
+        { name: 'Significance of the Study', head: /SIGNIFICANCE OF THE STUDY/, rule: /significance of the study/i },
+        { name: 'Definition of Terms', head: /DEFINITION OF TERMS/, rule: /definition of terms/i },
+        { name: 'Chapter 2 (Review of Related Literature)', head: /^CHAPTER\s*(2|II|TWO)\b/, rule: /chapter\s*2|review of related/i },
+        { name: 'Chapter 3 (Methodology)', head: /^CHAPTER\s*(3|III|THREE)\b/, rule: /chapter\s*3|methodology/i },
+        { name: 'Research Instrument', head: /RESEARCH INSTRUMENT/, rule: /research instrument/i },
+        { name: 'Data Gathering Procedure', head: /DATA GATHERING PROCEDURE/, rule: /data gathering procedure/i },
+        { name: 'Data Analysis', head: /^DATA ANALYSIS$/, rule: /data analysis/i },
+        { name: 'Chapter 4 (Presentation, Analysis and Interpretation of Data)', head: /^CHAPTER\s*(4|IV|FOUR)\b/, rule: /chapter\s*4|presentation, analysis/i },
+        { name: 'Chapter 5 (Summary, Conclusions, Recommendations)', head: /^CHAPTER\s*(5|V|FIVE)\b/, rule: /chapter\s*5|summary of findings/i },
+        { name: 'Summary of Findings', head: /SUMMARY OF FINDINGS/, rule: /summary of findings/i },
+        { name: 'Conclusions', head: /^CONCLUSIONS?$/, rule: /conclusions/i },
+        { name: 'Recommendations', head: /^RECOMMENDATIONS?$/, rule: /recommendations/i },
+        { name: 'References', head: /^(REFERENCES|BIBLIOGRAPHY)$/, rule: /references/i },
+        { name: 'Appendices', head: /^APPENDICES$/, rule: /word appendices/i }
+    ];
+
+    var st = document.createElement('style');
+    st.textContent = '#dvPrevOverlay .docx-wrapper section.docx p span[style*="background"]{background-color:#fde047!important;color:#000!important;}';
+    document.head.appendChild(st);
+
+    function norm(t) {
+        return t.replace(/\s+/g, ' ').trim().toUpperCase()
+            .replace(/^(\d+(\.\d+)*[\.\)]?|[A-Z][\.\)]|[IVX]+[\.\)])\s+/, '')
+            .replace(/[:\.\s]+$/, '');
+    }
+
+    async function headings(file) {
+        await new Promise(function (r) { _validatorDeps.ensureJSZip(r); });
+        var zip = await JSZip.loadAsync(file);
+        var xf = zip.file('word/document.xml');
+        if (!xf) return null;
+        var doc = new DOMParser().parseFromString(await xf.async('string'), 'application/xml');
+        var out = [];
+        Array.from(doc.getElementsByTagNameNS(W, 'p')).forEach(function (p) {
+            var text = Array.from(p.getElementsByTagNameNS(W, 't')).map(function (n) { return n.textContent; }).join('');
+            text = text.replace(/\s+/g, ' ').trim();
+            if (!text || text.length > 100) return;
+            var ps = p.getElementsByTagNameNS(W, 'pStyle')[0];
+            var sid = ps ? (ps.getAttributeNS(W, 'val') || ps.getAttribute('w:val') || '') : '';
+            if (/^(TOC|TableofFigures|TableofAuthorities)/i.test(sid)) return;
+            var runTab = Array.from(p.getElementsByTagNameNS(W, 'tab')).some(function (t) { return t.parentNode && t.parentNode.localName === 'r'; });
+            if (runTab && /(\d|[ivxlc]{1,4})$/i.test(text.replace(/\s/g, '')) && !/^CHAPTER/i.test(text)) return;
+            out.push(norm(text));
+        });
+        return out;
+    }
+
+    async function showMissing() {
+        try {
+            var f = _dvLastFile;
+            if (!f || !(f instanceof Blob) || /\.pdf$/i.test(f.name || '')) return;
+            var ruleText = (_dvLastRules || []).map(function (r) { return (r.name || '') + ' ' + (r.detail || ''); }).join(' ');
+            var heads = await headings(f);
+            if (!heads) return;
+            var missing = SECTIONS.filter(function (s) {
+                return s.rule.test(ruleText) && !heads.some(function (h) { return s.head.test(h); });
+            });
+            var holder = document.getElementById('dvRedHolder');
+            if (!missing.length || !holder || !holder.parentNode) return;
+            var old = document.getElementById('dvMissingBox');
+            if (old) old.remove();
+            var box = document.createElement('div');
+            box.id = 'dvMissingBox';
+            box.style.cssText = 'background:#fef08a;color:#422006;border:1px solid #ca8a04;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:13px;';
+            box.innerHTML = '<strong>Missing from your paper (' + missing.length + ')</strong>' +
+                '<ul style="margin:6px 0 0 18px;padding:0;">' +
+                missing.map(function (m) { return '<li>' + m.name + '</li>'; }).join('') + '</ul>' +
+                '<div style="margin-top:6px;font-size:12px;">Checked by heading text. If a section exists under a different title, rename its heading to match.</div>';
+            holder.parentNode.insertBefore(box, holder.parentNode.firstChild);
+        } catch (e) { console.warn('[Validator] missing-sections check skipped', e); }
+    }
+
+    var orig = window._dvPreviewAttention;
+    if (typeof orig === 'function' && !orig.__dvMiss) {
+        var w = function () {
+            var r = orig.apply(this, arguments);
+            showMissing();
+            return r;
+        };
+        w.__dvMiss = true;
+        window._dvPreviewAttention = w;
+    }
+})();
