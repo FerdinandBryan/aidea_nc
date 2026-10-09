@@ -1820,8 +1820,8 @@ function _getFormatRules(templateId) {
         if (templateId != null && templateId !== '') {
             const chosen = templates.find(t => t && String(t.id) === String(templateId));
             if (chosen) {
-                const rules = (Array.isArray(chosen.rules) && chosen.rules.length) ? chosen.rules : _DEFAULT_FORMAT_RULES;
-                return { rules: _withMeasurableRules(rules), source: chosen.name || 'Selected Template', template: chosen };
+                const rules = Array.isArray(chosen.rules) ? chosen.rules : [];
+                return { rules: rules, source: chosen.name || 'Selected Template', template: chosen };
             }
         }
         const active = templates.find(t => t && t.active && Array.isArray(t.rules) && t.rules.length);
