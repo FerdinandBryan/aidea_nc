@@ -2276,6 +2276,17 @@ async function _dvGenerateFixedPdf() {
         }
         return next();
     }
+    /* DV_PAGE_VIEW: show the document as separate pages */
+    (function () {
+        if (document.getElementById('dvPageViewCss')) return;
+        var st = document.createElement('style');
+        st.id = 'dvPageViewCss';
+        st.textContent =
+            '#dvPrevOverlay .docx-wrapper{background:#6b7280!important;padding:20px 12px!important;display:flex;flex-flow:column;align-items:center;}' +
+            '#dvPrevOverlay .docx-wrapper>section.docx{background:#fff!important;color:#000;box-shadow:0 2px 10px rgba(0,0,0,.5);margin-bottom:20px!important;flex:none;}';
+        document.head.appendChild(st);
+    })();
+
     function openOverlay(title) {
         var old = document.getElementById('dvPrevOverlay');
         if (old) old.remove();
@@ -2308,10 +2319,10 @@ async function _dvGenerateFixedPdf() {
             bar.style.cssText = 'margin-bottom:10px;';
             bar.innerHTML = '<button type="button" class="btn-modal-close" onclick="window._dvDownloadFixed()">Download this fixed copy</button>';
             var holder = document.createElement('div');
-            holder.style.cssText = 'background:#fff;color:#000;border-radius:6px;overflow:auto;';
+            holder.style.cssText = 'background:#6b7280;color:#000;border-radius:6px;overflow:auto;';
             body.appendChild(bar);
             body.appendChild(holder);
-            await window.docx.renderAsync(blob, holder, null, { className: 'docx', inWrapper: true });
+            await window.docx.renderAsync(blob, holder, null, { className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: false, renderHeaders: true, renderFooters: true });
         } catch (e) {
             console.warn('[Validator] preview failed', e);
             body.textContent = 'Could not build the preview: ' + (e && e.message ? e.message : e);
@@ -2350,9 +2361,9 @@ async function _dvGenerateFixedPdf() {
             } else {
                 await loadPreviewLib();
                 var page = document.createElement('div');
-                page.style.cssText = 'background:#fff;color:#000;border-radius:6px;overflow:auto;';
+                page.style.cssText = 'background:#6b7280;color:#000;border-radius:6px;overflow:auto;';
                 holder.appendChild(page);
-                await window.docx.renderAsync(captured, page, null, { className: 'docx', inWrapper: true, renderComments: true });
+                await window.docx.renderAsync(captured, page, null, { className: 'docx', inWrapper: true, renderComments: true, breakPages: true, ignoreLastRenderedPageBreak: false, renderHeaders: true, renderFooters: true });
             }
         } catch (e) {
             console.warn('[Validator] redline preview failed', e);
