@@ -2789,3 +2789,31 @@ async function _dvGenerateFixedPdf() {
         window._dvPreviewAttention = w;
     }
 })();
+/* DV_YELLOW_MARK: redline highlights paragraphs with formatting errors in yellow */
+(function () {
+    try {
+        var AFTER = ['u', 'effect', 'bdr', 'shd', 'fitText', 'vertAlign', 'rtl', 'cs', 'em', 'lang', 'eastAsianLayout', 'specVanish', 'oMath'];
+        _dvApplyHighlight = function (xmlDoc, pEl) {
+            Array.from(pEl.getElementsByTagNameNS(_WORD_NS, 'r')).forEach(function (r) {
+                var rPr = null;
+                for (var c = r.firstChild; c; c = c.nextSibling) {
+                    if (c.nodeType === 1 && c.localName === 'rPr') { rPr = c; break; }
+                }
+                if (!rPr) {
+                    rPr = xmlDoc.createElementNS(_WORD_NS, 'w:rPr');
+                    r.insertBefore(rPr, r.firstChild);
+                }
+                Array.from(rPr.childNodes).forEach(function (c) {
+                    if (c.nodeType === 1 && c.localName === 'highlight') rPr.removeChild(c);
+                });
+                var h = xmlDoc.createElementNS(_WORD_NS, 'w:highlight');
+                h.setAttributeNS(_WORD_NS, 'w:val', 'yellow');
+                var ref = null;
+                for (var k = rPr.firstChild; k; k = k.nextSibling) {
+                    if (k.nodeType === 1 && AFTER.indexOf(k.localName) >= 0) { ref = k; break; }
+                }
+                rPr.insertBefore(h, ref);
+            });
+        };
+    } catch (e) { console.warn('[Validator] yellow marks not installed', e); }
+})();
