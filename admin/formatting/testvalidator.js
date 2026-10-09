@@ -2325,18 +2325,40 @@ async function _dvGenerateFixedPdf() {
         });
     }
 
-    window._dvPreviewAttention = function () {
-        var body = openOverlay('Needs attention: required by the template but not met by your paper');
+    window._dvPreviewAttention = async function () {
+        var body = openOverlay('Needs attention: redlines and suggestions');
+        var items = [];
+        try { items = attentionRules(); } catch (e) {}
+        var listHtml = items.length
+            ? '<div class="dv-rule-rows">' + items.map(function (r) { return _dvRenderRuleRow(r, _dvLastFormattingProfile); }).join('') + '</div>'
+            : '<div>Nothing needs attention. Your paper meets every rule in this template.</div>';
+        body.innerHTML = listHtml + '<div id="dvRedHolder" style="margin-top:14px;">Preparing redlined preview...</div>';
+        var holder = document.getElementById('dvRedHolder');
         try {
-            var items = attentionRules();
-            if (!items.length) { body.textContent = 'Nothing needs attention. Your paper meets every rule in this template.'; return; }
-            body.innerHTML = '<div class="dv-rule-rows">' +
-                items.map(function (r) { return _dvRenderRuleRow(r, _dvLastFormattingProfile); }).join('') + '</div>';
+            if (!_dvLastFile) throw new Error('Run a format check first.');
+            var captured = null, capName = '';
+            var orig = _dvTriggerDownload;
+            _dvTriggerDownload = function (b, n) { captured = b; capName = n || ''; };
+            try { await window._dvDownloadRedline(); } finally { _dvTriggerDownload = orig; }
+            if (!captured) throw new Error('No redlined copy was produced.');
+            holder.innerHTML = '';
+            if (/\.pdf$/i.test(capName)) {
+                var fr = document.createElement('iframe');
+                fr.src = URL.createObjectURL(captured);
+                fr.style.cssText = 'width:100%;height:70vh;border:0;background:#fff;';
+                holder.appendChild(fr);
+            } else {
+                await loadPreviewLib();
+                var page = document.createElement('div');
+                page.style.cssText = 'background:#fff;color:#000;border-radius:6px;overflow:auto;';
+                holder.appendChild(page);
+                await window.docx.renderAsync(captured, page, null, { className: 'docx', inWrapper: true, renderComments: true });
+            }
         } catch (e) {
-            body.textContent = 'Could not list the items: ' + (e && e.message ? e.message : e);
+            console.warn('[Validator] redline preview failed', e);
+            holder.textContent = 'Could not build the redlined preview: ' + (e && e.message ? e.message : e);
         }
     };
-
     function addButtons() {
         document.querySelectorAll('.dv-download-row').forEach(function (row) {
             if (row.getAttribute('data-dv-extra')) return;
