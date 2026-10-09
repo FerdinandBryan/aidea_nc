@@ -2626,7 +2626,7 @@ async function _dvGenerateFixedPdf() {
     function attentionRules() {
         return (_dvLastRules || []).filter(function (r) {
             var ev = _evaluateFormattingRule(r, _dvLastFormattingProfile);
-            return ev && ev.status !== 'pass';
+            return !ev || ev.status !== 'pass';
         });
     }
 
