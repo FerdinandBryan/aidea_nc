@@ -2248,6 +2248,105 @@ async function _dvGenerateFixedPdf() {
     };
     window._dvRefreshTemplates();
 })();
+/* DV_PAGES: split the fixed paper into pages and apply page-specific fixes (title page date) */
+(function () {
+    var W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    var MONTH = /^(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2},\s*)?\d{4}$/i;
+    var FIRST_HEAD = /^(APPROVAL SHEET|ACKNOWLEDGEMENTS?|ABSTRACT|TABLE OF CONTENTS|LIST OF TABLES|CHAPTER\s*\d)/;
+    var PPR_ORDER = ['pStyle','keepNext','keepLines','pageBreakBefore','framePr','widowControl','numPr','suppressLineNumbers','pBdr','shd','tabs','suppressAutoHyphens','kinsoku','wordWrap','overflowPunct','topLinePunct','autoSpaceDE','autoSpaceDN','bidi','adjustRightInd','snapToGrid','spacing','ind','contextualSpacing','mirrorIndents','suppressOverlap','jc','textDirection','textAlignment','textboxTightWrap','outlineLvl','divId','cnfStyle','rPr','sectPr','pPrChange'];
+
+    function kid(parent, name) {
+        for (var c = parent.firstChild; c; c = c.nextSibling) {
+            if (c.nodeType === 1 && c.localName === name && c.namespaceURI === W) return c;
+        }
+        return null;
+    }
+    function getOrCreate(doc, parent, name) {
+        var ex = kid(parent, name);
+        if (ex) return ex;
+        var el = doc.createElementNS(W, 'w:' + name);
+        var idx = PPR_ORDER.indexOf(name), ref = null;
+        for (var c = parent.firstChild; c; c = c.nextSibling) {
+            if (c.nodeType === 1 && PPR_ORDER.indexOf(c.localName) > idx) { ref = c; break; }
+        }
+        parent.insertBefore(el, ref);
+        return el;
+    }
+    function ptext(p) {
+        return Array.from(p.getElementsByTagNameNS(W, 't')).map(function (n) { return n.textContent; }).join('').trim();
+    }
+    function inTable(p) {
+        for (var n = p.parentNode; n; n = n.parentNode) { if (n.localName === 'tc') return true; }
+        return false;
+    }
+    function pageBrs(p) {
+        return Array.from(p.getElementsByTagNameNS(W, 'br')).filter(function (b) {
+            return (b.getAttributeNS(W, 'type') || b.getAttribute('w:type')) === 'page';
+        });
+    }
+
+    /* returns [{p, page, text, tbl}] in document order; page starts at 0 */
+    window._dvSplitPages = function (doc) {
+        var page = 0, has = false, info = [];
+        Array.from(doc.getElementsByTagNameNS(W, 'p')).forEach(function (p) {
+            var text = ptext(p), tbl = inTable(p);
+            var pPr = kid(p, 'pPr');
+            var brs = pageBrs(p), firstT = p.getElementsByTagNameNS(W, 't')[0];
+            var brBefore = brs.length && firstT && (brs[0].compareDocumentPosition(firstT) & 4);
+            var before = (pPr && kid(pPr, 'pageBreakBefore')) || p.getElementsByTagNameNS(W, 'lastRenderedPageBreak').length || brBefore;
+            if (before && has) { page++; has = false; }
+            info.push({ p: p, page: page, text: text, tbl: tbl });
+            if (text) has = true;
+            if ((brs.length && !brBefore) || (pPr && kid(pPr, 'sectPr'))) { page++; has = false; }
+        });
+        return info;
+    };
+
+    async function dvPageFix(blob) {
+        await new Promise(function (r) { _validatorDeps.ensureJSZip(r); });
+        var zip = await JSZip.loadAsync(blob);
+        var xf = zip.file('word/document.xml');
+        if (!xf) return blob;
+        var doc = new DOMParser().parseFromString(await xf.async('string'), 'application/xml');
+        var info = window._dvSplitPages(doc);
+
+        var headIdx = Infinity;
+        for (var i = 0; i < info.length; i++) {
+            var up = info[i].text.toUpperCase();
+            if (!info[i].tbl && info[i].text && up.length <= 60 && FIRST_HEAD.test(up)) { headIdx = i; break; }
+        }
+
+        var changed = 0;
+        info.forEach(function (it, idx) {
+            if (it.tbl || it.page !== 0 || idx >= headIdx) return;   /* title page only */
+            if (!MONTH.test(it.text)) return;
+            var pPr = kid(it.p, 'pPr');
+            if (!pPr) { pPr = doc.createElementNS(W, 'w:pPr'); it.p.insertBefore(pPr, it.p.firstChild); }
+            var jc = getOrCreate(doc, pPr, 'jc');
+            jc.setAttributeNS(W, 'w:val', 'center');
+            var ind = kid(pPr, 'ind');
+            if (ind) pPr.removeChild(ind);
+            Array.from(it.p.getElementsByTagNameNS(W, 'tab')).forEach(function (t) {
+                if (t.parentNode && t.parentNode.localName === 'r') t.parentNode.removeChild(t);
+            });
+            var firstT = it.p.getElementsByTagNameNS(W, 't')[0];
+            if (firstT) firstT.textContent = firstT.textContent.replace(/^\s+/, '');
+            changed++;
+        });
+        if (!changed) return blob;
+        zip.file('word/document.xml', new XMLSerializer().serializeToString(doc));
+        return await zip.generateAsync({ type: 'blob' });
+    }
+
+    var prev = _dvGenerateFixedDocx;
+    _dvGenerateFixedDocx = async function (file, rules, formattingProfile) {
+        var blob = await prev(file, rules, formattingProfile);
+        var useChecklist = (rules || []).some(function (r) { return r && (r.id === 'checklist-spacing' || r.id === 'checklist-margin'); });
+        if (!useChecklist) return blob;
+        try { return await dvPageFix(blob); }
+        catch (e) { console.warn('[Validator] page fixes skipped', e); return blob; }
+    };
+})();
 /* DV_PREVIEW_BUTTONS: preview of the fixed paper + list of rules that need attention */
 (function () {
     var DPS = [
