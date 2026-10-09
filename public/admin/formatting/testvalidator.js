@@ -2347,6 +2347,139 @@ async function _dvGenerateFixedPdf() {
         catch (e) { console.warn('[Validator] page fixes skipped', e); return blob; }
     };
 })();
+/* DV_PAGINATE: add page breaks to continuous papers so the preview shows separate pages */
+(function () {
+    var W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    window._dvPaginateOn = true;   /* set to false in Console to turn off */
+
+    function kid(parent, name) {
+        for (var c = parent.firstChild; c; c = c.nextSibling) {
+            if (c.nodeType === 1 && c.localName === name && c.namespaceURI === W) return c;
+        }
+        return null;
+    }
+    function wAttr(el, n) { return el ? (el.getAttributeNS(W, n) || el.getAttribute('w:' + n)) : null; }
+    function px(twips) { return twips / 1440 * 96; }
+
+    function forcedBefore(el) {
+        if (el.localName !== 'p') return false;
+        var pPr = kid(el, 'pPr');
+        if (pPr && kid(pPr, 'pageBreakBefore')) return true;
+        var br = Array.from(el.getElementsByTagNameNS(W, 'br')).filter(function (b) { return wAttr(b, 'type') === 'page'; })[0];
+        var t = el.getElementsByTagNameNS(W, 't')[0];
+        return !!(br && (!t || (br.compareDocumentPosition(t) & 4)));
+    }
+    function forcedAfter(el) {
+        if (el.localName !== 'p' || forcedBefore(el)) return false;
+        return Array.from(el.getElementsByTagNameNS(W, 'br')).some(function (b) { return wAttr(b, 'type') === 'page'; });
+    }
+
+    async function paginate(blob, orig) {
+        await new Promise(function (r) { _validatorDeps.ensureJSZip(r); });
+        var zip = await JSZip.loadAsync(blob);
+        var xf = zip.file('word/document.xml');
+        if (!xf) return blob;
+        var doc = new DOMParser().parseFromString(await xf.async('string'), 'application/xml');
+        var body = doc.getElementsByTagNameNS(W, 'body')[0];
+        if (!body) return blob;
+
+        /* drop Word's old page markers; we compute our own */
+        Array.from(doc.getElementsByTagNameNS(W, 'lastRenderedPageBreak')).forEach(function (n) { n.parentNode.removeChild(n); });
+
+        /* page size from the last section */
+        var sects = doc.getElementsByTagNameNS(W, 'sectPr');
+        var sp = sects[sects.length - 1], pgSz = sp && kid(sp, 'pgSz'), pgMar = sp && kid(sp, 'pgMar');
+        var pageH = parseInt(wAttr(pgSz, 'h'), 10) || 15840;
+        var pageW = parseInt(wAttr(pgSz, 'w'), 10) || 12240;
+        var top = parseInt(wAttr(pgMar, 'top'), 10) || 1440;
+        var bottom = parseInt(wAttr(pgMar, 'bottom'), 10) || 1440;
+        var contentH = px(pageH - Math.abs(top) - Math.abs(bottom));
+
+        var kids = Array.from(body.childNodes).filter(function (n) {
+            return n.nodeType === 1 && n.namespaceURI === W && (n.localName === 'p' || n.localName === 'tbl');
+        });
+
+        /* measure: render without page breaks in a hidden box */
+        var tmpBlob = new Blob([await (async function () {
+            zip.file('word/document.xml', new XMLSerializer().serializeToString(doc));
+            return await zip.generateAsync({ type: 'arraybuffer' });
+        })()], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+
+        var box = document.createElement('div');
+        box.style.cssText = 'position:absolute;left:-99999px;top:0;width:' + Math.ceil(px(pageW) + 40) + 'px;visibility:hidden;';
+        document.body.appendChild(box);
+        try {
+            await orig.call(window.docx, tmpBlob, box, null, {
+                inWrapper: false, breakPages: false, ignoreLastRenderedPageBreak: true,
+                ignoreHeight: true, renderHeaders: false, renderFooters: false
+            });
+            if (document.fonts && document.fonts.ready) await document.fonts.ready;
+
+            var items = [];
+            Array.from(box.querySelectorAll('section.docx > article')).forEach(function (art, ai) {
+                var artTop = art.getBoundingClientRect().top;
+                Array.from(art.children).forEach(function (ch) {
+                    var r = ch.getBoundingClientRect(), cs = getComputedStyle(ch);
+                    items.push({
+                        art: ai,
+                        top: r.top - artTop - (parseFloat(cs.marginTop) || 0),
+                        bottom: r.bottom - artTop + (parseFloat(cs.marginBottom) || 0)
+                    });
+                });
+            });
+            if (items.length !== kids.length) {
+                console.warn('[Validator] paginate skipped: element count mismatch', items.length, kids.length);
+                return blob;
+            }
+
+            var pageTop = null, curArt = -1, forceNext = false, breaks = 0;
+            kids.forEach(function (k, i) {
+                var it = items[i], mark = false;
+                if (it.art !== curArt) { curArt = it.art; pageTop = it.top; forceNext = false; }
+                else if (forceNext || forcedBefore(k)) { pageTop = it.top; forceNext = false; }
+                else if (it.bottom - pageTop > contentH + 1 && it.top > pageTop + 1) { mark = true; pageTop = it.top; }
+                if (forcedAfter(k)) forceNext = true;
+                if (mark) {
+                    var p = k.localName === 'p' ? k : k.getElementsByTagNameNS(W, 'p')[0];
+                    if (!p) return;
+                    var run = doc.createElementNS(W, 'w:r');
+                    run.appendChild(doc.createElementNS(W, 'w:lastRenderedPageBreak'));
+                    var pPr = kid(p, 'pPr');
+                    p.insertBefore(run, pPr ? pPr.nextSibling : p.firstChild);
+                    breaks++;
+                }
+            });
+            console.log('[Validator] paginate: inserted', breaks, 'page breaks');
+            if (!breaks) return blob;
+        } finally {
+            box.parentNode.removeChild(box);
+        }
+        zip.file('word/document.xml', new XMLSerializer().serializeToString(doc));
+        return await zip.generateAsync({ type: 'blob' });
+    }
+
+    function hook() {
+        if (!window.docx || !window.docx.renderAsync || window.docx.__dvPaged) return false;
+        var orig = window.docx.renderAsync;
+        window.docx.renderAsync = async function (data, bodyEl, styleEl, opts) {
+            if (!window._dvPaginateOn || (opts && (opts.__dvMeasure || opts.renderComments))) return orig.apply(this, arguments);
+            try {
+                var blob = (data instanceof Blob) ? data : new Blob([data]);
+                var nb = await paginate(blob, orig);
+                var o = Object.assign({}, opts || {}, { breakPages: true, ignoreLastRenderedPageBreak: false });
+                return await orig.call(this, nb, bodyEl, styleEl, o);
+            } catch (e) {
+                console.warn('[Validator] paginate failed, rendering normally', e);
+                return orig.apply(this, arguments);
+            }
+        };
+        window.docx.__dvPaged = true;
+        return true;
+    }
+    if (!hook()) {
+        var tries = 0, t = setInterval(function () { if (hook() || ++tries > 7200) clearInterval(t); }, 500);
+    }
+})();
 /* DV_PREVIEW_BUTTONS: preview of the fixed paper + list of rules that need attention */
 (function () {
     var DPS = [
