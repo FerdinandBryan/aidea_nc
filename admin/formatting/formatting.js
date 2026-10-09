@@ -945,20 +945,19 @@ function loadThesisChecklist() {
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', pull); else pull();
 })();
-/* DV_REQUIRE_FILE: Save Template stays disabled in the New Format Template modal until a reference file is chosen */
+/* DV_LOAD_NEEDS_FILE: Load thesis checklist button stays disabled in the New Format Template modal until a reference file is chosen */
 (function () {
     var st = document.createElement('style');
-    st.textContent = '#createModal .btn-modal-submit:disabled{opacity:.5;cursor:not-allowed;}' +
-                     '#tplFileRequired{margin-top:6px;font-size:12px;color:#b45309;}';
+    st.textContent = '#btnLoadChecklist:disabled{opacity:.5;cursor:not-allowed;}';
     document.head.appendChild(st);
 
-    function btn() { return document.querySelector('#createModal .btn-modal-submit'); }
+    function btn() { return document.getElementById('btnLoadChecklist'); }
     function isNew() {
         var t = document.getElementById('createModalTitle');
         return !!t && t.textContent.trim() === 'New Format Template';
     }
     function hasFile() {
-        try { return !!tplSelectedFile; } catch (e) { /* variable not reachable, use the input */ }
+        try { if (tplSelectedFile) return true; } catch (e) { /* not reachable, use the input */ }
         var inp = document.getElementById('tplFileInput');
         return !!(inp && inp.files && inp.files.length);
     }
@@ -968,28 +967,11 @@ function loadThesisChecklist() {
         var need = isNew() && !hasFile();
         b.disabled = need;
         b.title = need ? 'Upload the reference file (PDF, DOC or DOCX) first' : '';
-        var h = document.getElementById('tplFileRequired');
-        if (h) h.style.display = need ? 'block' : 'none';
-    }
-
-    var dz = document.getElementById('tplDropzone');
-    if (dz && dz.parentNode && !document.getElementById('tplFileRequired')) {
-        var h = document.createElement('div');
-        h.id = 'tplFileRequired';
-        h.textContent = 'Upload the reference file to enable Save Template.';
-        dz.parentNode.appendChild(h);
-        var lab = dz.parentNode.querySelector('.form-label');
-        if (lab && lab.firstChild && !lab.querySelector('.req')) {
-            var s = document.createElement('span');
-            s.className = 'req';
-            s.textContent = ' *';
-            lab.firstChild.after(s);
-        }
     }
 
     function wrap(name, before) {
         var o = window[name];
-        if (typeof o !== 'function' || o.__dvReq) return;
+        if (typeof o !== 'function' || o.__dvLoad) return;
         var w = function () {
             if (before) before();
             var r = o.apply(this, arguments);
@@ -997,7 +979,7 @@ function loadThesisChecklist() {
             if (r && typeof r.then === 'function') r.then(update, update);
             return r;
         };
-        w.__dvReq = true;
+        w.__dvLoad = true;
         window[name] = w;
     }
     wrap('handleTplFile');
@@ -1007,15 +989,13 @@ function loadThesisChecklist() {
         if (inp) inp.value = '';
     });
 
-    var os = window.saveTemplate;
-    if (typeof os === 'function' && !os.__dvReq) {
-        var ws = function () {
-            if (isNew() && !hasFile()) { update(); return; }
-            return os.apply(this, arguments);
-        };
-        ws.__dvReq = true;
-        window.saveTemplate = ws;
-    }
     var inp0 = document.getElementById('tplFileInput');
     if (inp0) inp0.addEventListener('change', function () { setTimeout(update, 0); });
+
+    /* the button is created by script, so update it as soon as it appears */
+    new MutationObserver(function () {
+        var b = btn();
+        if (b && b.__dvSeen !== true) { b.__dvSeen = true; update(); }
+    }).observe(document.body, { childList: true, subtree: true });
+    update();
 })();
