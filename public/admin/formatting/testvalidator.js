@@ -2817,3 +2817,206 @@ async function _dvGenerateFixedPdf() {
         };
     } catch (e) { console.warn('[Validator] yellow marks not installed', e); }
 })();
+/* DV_MANUAL_IN_PAPER: Needs attention preview places each manual-check item under its heading in the paper, in yellow */
+(function () {
+    var W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    var XMLNS = 'http://www.w3.org/XML/1998/namespace';
+    var KW = [
+        { k: /title page/i, first: true },
+        { k: /approval sheet/i, h: /^APPROVAL SHEET$/ },
+        { k: /acknowledg/i, h: /^ACKNOWLEDGE?MENTS?$/ },
+        { k: /abstract|keywords/i, h: /^ABSTRACT$/ },
+        { k: /table of contents/i, h: /^TABLE OF CONTENTS?$/ },
+        { k: /list of tables/i, h: /^LIST OF TABLES$/ },
+        { k: /list of figures/i, h: /^LIST OF FIGURES$/ },
+        { k: /list of appendices/i, h: /^LIST OF APPENDICES$/ },
+        { k: /theoretical|philosophical/i, h: /THEORETICAL FRAMEWORK|PHILOSOPHICAL UNDERPINNING/ },
+        { k: /conceptual framework|research paradigm/i, h: /CONCEPTUAL FRAMEWORK/ },
+        { k: /statement of the problem|specific objectives/i, h: /STATEMENT OF THE PROBLEM/ },
+        { k: /hypothes/i, h: /HYPOTHES[EI]S/ },
+        { k: /scope and limitations/i, h: /SCOPE AND LIMITATIONS?/ },
+        { k: /significance of the study/i, h: /SIGNIFICANCE OF THE STUDY/ },
+        { k: /definition of terms/i, h: /DEFINITION OF TERMS/ },
+        { k: /research instrument|questionnaire/i, h: /RESEARCH INSTRUMENT/ },
+        { k: /data gathering/i, h: /DATA GATHERING PROCEDURE/ },
+        { k: /data analysis|statistical tools/i, h: /^DATA ANALYSIS$/ },
+        { k: /ethical/i, h: /ETHICAL CONSIDERATIONS?/ },
+        { k: /summary of findings/i, h: /SUMMARY OF FINDINGS/ },
+        { k: /references/i, h: /^(REFERENCES|BIBLIOGRAPHY)$/ },
+        { k: /appendices|appendix/i, h: /^APPENDICES$/ }
+    ];
+    var CH = [
+        [/chapter\s*1|introduction/i, /^CHAPTER\s*(1|I|ONE)\b/],
+        [/chapter\s*2|review of related/i, /^CHAPTER\s*(2|II|TWO)\b/],
+        [/chapter\s*3|methodology/i, /^CHAPTER\s*(3|III|THREE)\b/],
+        [/chapter\s*4|presentation/i, /^CHAPTER\s*(4|IV|FOUR)\b/],
+        [/chapter\s*5|summary of findings/i, /^CHAPTER\s*(5|V|FIVE)\b/]
+    ];
+
+    function norm(t) {
+        return t.replace(/\s+/g, ' ').trim().toUpperCase()
+            .replace(/^(\d+(\.\d+)*[\.\)]?|[A-Z][\.\)]|[IVX]+[\.\)])\s+/, '')
+            .replace(/[:\.\s]+$/, '');
+    }
+    function inTable(p) { for (var n = p.parentNode; n; n = n.parentNode) { if (n.localName === 'tc') return true; } return false; }
+
+    function target(r) {
+        var prefix = String(r.name || '').split(':')[0];
+        var d = String(r.detail || r.name || '');
+        if (/general/i.test(prefix)) return { top: true };
+        var ap = d.match(/\bAppendix\s+([A-K])\b/i);
+        if (ap) return { heads: [new RegExp('^APPENDIX\\s*' + ap[1].toUpperCase() + '\\b'), /^APPENDICES$/] };
+        for (var i = 0; i < KW.length; i++) {
+            if (KW[i].k.test(d)) return KW[i].first ? { first: true } : { heads: [KW[i].h] };
+        }
+        for (var j = 0; j < CH.length; j++) { if (CH[j][0].test(prefix)) return { heads: [CH[j][1]] }; }
+        if (/preliminary/i.test(prefix)) return { first: true };
+        return { top: true };
+    }
+
+    function note(doc, text, bold) {
+        var p = doc.createElementNS(W, 'w:p');
+        var pPr = doc.createElementNS(W, 'w:pPr');
+        var sp = doc.createElementNS(W, 'w:spacing');
+        sp.setAttributeNS(W, 'w:before', '0'); sp.setAttributeNS(W, 'w:after', '40');
+        sp.setAttributeNS(W, 'w:line', '240'); sp.setAttributeNS(W, 'w:lineRule', 'auto');
+        pPr.appendChild(sp);
+        var ind = doc.createElementNS(W, 'w:ind');
+        ind.setAttributeNS(W, 'w:left', '360');
+        pPr.appendChild(ind);
+        p.appendChild(pPr);
+        var r = doc.createElementNS(W, 'w:r');
+        var rPr = doc.createElementNS(W, 'w:rPr');
+        if (bold) rPr.appendChild(doc.createElementNS(W, 'w:b'));
+        rPr.appendChild(doc.createElementNS(W, 'w:i'));
+        var col = doc.createElementNS(W, 'w:color'); col.setAttributeNS(W, 'w:val', '7A5B00'); rPr.appendChild(col);
+        var sz = doc.createElementNS(W, 'w:sz'); sz.setAttributeNS(W, 'w:val', '18'); rPr.appendChild(sz);
+        var szc = doc.createElementNS(W, 'w:szCs'); szc.setAttributeNS(W, 'w:val', '18'); rPr.appendChild(szc);
+        var hl = doc.createElementNS(W, 'w:highlight'); hl.setAttributeNS(W, 'w:val', 'yellow'); rPr.appendChild(hl);
+        r.appendChild(rPr);
+        var t = doc.createElementNS(W, 'w:t');
+        t.setAttributeNS(XMLNS, 'xml:space', 'preserve');
+        t.textContent = text;
+        r.appendChild(t);
+        p.appendChild(r);
+        return p;
+    }
+    function yellow(doc, p) {
+        var AFTER = ['u', 'effect', 'bdr', 'shd', 'fitText', 'vertAlign', 'rtl', 'cs', 'em', 'lang', 'eastAsianLayout', 'specVanish', 'oMath'];
+        Array.from(p.getElementsByTagNameNS(W, 'r')).forEach(function (r) {
+            var rPr = null;
+            for (var c = r.firstChild; c; c = c.nextSibling) { if (c.nodeType === 1 && c.localName === 'rPr') { rPr = c; break; } }
+            if (!rPr) { rPr = doc.createElementNS(W, 'w:rPr'); r.insertBefore(rPr, r.firstChild); }
+            Array.from(rPr.childNodes).forEach(function (c) { if (c.nodeType === 1 && c.localName === 'highlight') rPr.removeChild(c); });
+            var h = doc.createElementNS(W, 'w:highlight'); h.setAttributeNS(W, 'w:val', 'yellow');
+            var ref = null;
+            for (var k = rPr.firstChild; k; k = k.nextSibling) { if (k.nodeType === 1 && AFTER.indexOf(k.localName) >= 0) { ref = k; break; } }
+            rPr.insertBefore(h, ref);
+        });
+    }
+
+    function loadLib() {
+        if (window.docx && window.docx.renderAsync) return Promise.resolve();
+        var urls = ['https://cdn.jsdelivr.net/npm/docx-preview@0.3.2/dist/docx-preview.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/docx-preview/0.3.2/docx-preview.min.js'];
+        var i = 0;
+        function next() {
+            if (i >= urls.length) return Promise.reject(new Error('Preview library could not load.'));
+            return new Promise(function (res, rej) {
+                var s = document.createElement('script');
+                s.src = urls[i++]; s.onload = res; s.onerror = function () { s.remove(); rej(); };
+                document.head.appendChild(s);
+            }).then(function () { if (!(window.docx && window.docx.renderAsync)) throw new Error('bad'); }).catch(next);
+        }
+        return next();
+    }
+
+    async function build() {
+        var file = _dvLastFile;
+        if (!file || /\.pdf$/i.test(file.name || '')) return;
+        var items = (_dvLastRules || []).filter(function (r) {
+            var ev = _evaluateFormattingRule(r, _dvLastFormattingProfile);
+            return !ev || ev.status === 'manual';
+        });
+        var holder = document.getElementById('dvRedHolder');
+        if (!items.length || !holder) return;
+
+        var ab;
+        var viol = _dvLastFlatViolations || [];
+        if (viol.length) {
+            var byP = new Map();
+            viol.forEach(function (v) {
+                if (v.index == null) return;
+                var n = v.ruleName + ': expected ' + v.target + (v.unit ? ' ' + v.unit : '') + ', found ' + v.actual;
+                if (!byP.has(v.index)) byP.set(v.index, []);
+                byP.get(v.index).push(n);
+            });
+            ab = byP.size ? await (await _dvGenerateRedlinedDocx(file, byP)).arrayBuffer() : await _resolveArrayBuffer(file);
+        } else {
+            ab = await _resolveArrayBuffer(file);
+        }
+        var zip = await JSZip.loadAsync(ab);
+        var xf = zip.file('word/document.xml');
+        if (!xf) return;
+        var doc = new DOMParser().parseFromString(await xf.async('string'), 'application/xml');
+        var body = doc.getElementsByTagNameNS(W, 'body')[0];
+        if (!body) return;
+
+        var paras = [];
+        Array.from(doc.getElementsByTagNameNS(W, 'p')).forEach(function (p) {
+            if (inTable(p)) return;
+            var text = Array.from(p.getElementsByTagNameNS(W, 't')).map(function (n) { return n.textContent; }).join('').replace(/\s+/g, ' ').trim();
+            if (!text || text.length > 100) return;
+            var ps = p.getElementsByTagNameNS(W, 'pStyle')[0];
+            var sid = ps ? (ps.getAttributeNS(W, 'val') || ps.getAttribute('w:val') || '') : '';
+            if (/^(TOC|TableofFigures)/i.test(sid)) return;
+            var runTab = Array.from(p.getElementsByTagNameNS(W, 'tab')).some(function (t) { return t.parentNode && t.parentNode.localName === 'r'; });
+            if (runTab && /(\d|[ivxlc]{1,4})$/i.test(text.replace(/\s/g, '')) && !/^CHAPTER/i.test(text)) return;
+            paras.push({ p: p, t: norm(text) });
+        });
+
+        var groups = new Map(), top = [], placed = 0;
+        items.forEach(function (r) {
+            var tg = target(r), anchor = null;
+            if (tg.first && paras.length) anchor = paras[0].p;
+            else if (tg.heads) {
+                for (var i = 0; i < tg.heads.length && !anchor; i++) {
+                    var m = paras.filter(function (x) { return tg.heads[i].test(x.t); })[0];
+                    if (m) anchor = m.p;
+                }
+            }
+            var txt = '\u2022 ' + (r.detail || r.name);
+            if (anchor) { if (!groups.has(anchor)) groups.set(anchor, []); groups.get(anchor).push(txt); placed++; }
+            else top.push(txt);
+        });
+
+        groups.forEach(function (arr, p) {
+            yellow(doc, p);
+            var ref = p.nextSibling;
+            arr.forEach(function (t) { p.parentNode.insertBefore(note(doc, t), ref); });
+        });
+        if (top.length) {
+            var first = body.firstChild;
+            body.insertBefore(note(doc, 'General checks and items for sections not found (verify manually): ' + top.length, true), first);
+            top.forEach(function (t) { body.insertBefore(note(doc, t), first); });
+        }
+
+        zip.file('word/document.xml', new XMLSerializer().serializeToString(doc));
+        var blob = await zip.generateAsync({ type: 'blob' });
+        await loadLib();
+        holder.innerHTML = '<div style="margin-bottom:8px;font-size:12px;color:#9ca3af;">Yellow notes in the paper mark ' + items.length + ' items to verify manually.</div>';
+        var page = document.createElement('div');
+        page.style.cssText = 'background:#6b7280;color:#000;border-radius:6px;overflow:auto;';
+        holder.appendChild(page);
+        await window.docx.renderAsync(blob, page, null, { className: 'docx', inWrapper: true, renderComments: true, breakPages: true, ignoreLastRenderedPageBreak: false, renderHeaders: true, renderFooters: true });
+    }
+
+    var orig = window._dvPreviewAttention;
+    if (typeof orig === 'function' && !orig.__dvManual) {
+        var w = async function () {
+            try { await orig.apply(this, arguments); } catch (e) { }
+            try { await build(); } catch (e) { console.warn('[Validator] manual items not placed in paper', e); }
+        };
+        w.__dvManual = true;
+        window._dvPreviewAttention = w;
+    }
+})();
