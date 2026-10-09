@@ -905,3 +905,43 @@ function loadThesisChecklist() {
         localStorage.setItem(FLAG, '1');
     } catch (e) { console.warn('checklist auto-apply skipped', e); }
 })();
+/* FORMAT_TEMPLATES_SERVER_SYNC: templates are saved on the server so students can use them */
+(function () {
+    var API = 'https://aideanc-production.up.railway.app/api';
+    function token() { try { return localStorage.getItem('auth_token'); } catch (e) { return null; } }
+    function asList(res) { return Array.isArray(res) ? res : ((res && res.templates) || []); }
+    function call(method, body) {
+        var t = token();
+        if (!t) return Promise.reject(new Error('no token'));
+        return fetch(API + '/format-templates', {
+            method: method,
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: 'Bearer ' + t },
+            body: body ? JSON.stringify(body) : undefined
+        }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    }
+    function push(arr) {
+        return call('PUT', { templates: arr }).catch(function (e) {
+            console.warn('[Templates] server save failed', e);
+            if (typeof showToast === 'function') showToast('Saved on this device only. Could not reach the server.', 'warning');
+        });
+    }
+    var origSave = saveTemplates;
+    saveTemplates = function (arr) { origSave(arr); push(arr); };
+
+    function pull() {
+        call('GET').then(function (res) {
+            var server = asList(res);
+            if (server.length) {
+                templates.length = 0;
+                Array.prototype.push.apply(templates, server);
+                origSave(templates);
+                filtered = templates.slice();
+                applyFilter();
+                updateStats();
+            } else if (templates.length) {
+                push(templates);
+            }
+        }).catch(function (e) { console.warn('[Templates] could not load from server', e); });
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', pull); else pull();
+})();

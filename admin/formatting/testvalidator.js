@@ -2222,3 +2222,29 @@ async function _dvGenerateFixedPdf() {
         return zip.generateAsync({ type: 'blob' });
     };
 })();
+/* FORMAT_TEMPLATES_FROM_SERVER: load published templates from the backend (they used to be browser-only) */
+(function () {
+    if (document.getElementById('createModal')) return; // the admin templates page does its own sync
+    var API = 'https://aideanc-production.up.railway.app/api';
+    var FLAG = 'aidea_ft_from_server';
+    function token() { try { return localStorage.getItem('auth_token'); } catch (e) { return null; } }
+    window._dvRefreshTemplates = function () {
+        var t = token();
+        if (!t) return Promise.resolve();
+        return fetch(API + '/format-templates', { headers: { Accept: 'application/json', Authorization: 'Bearer ' + t } })
+            .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(function (res) {
+                var all = Array.isArray(res) ? res : (Array.isArray(res && res.templates) ? res.templates : []);
+                var list = all.filter(function (x) { return x && x.active !== false; });
+                if (list.length) {
+                    localStorage.setItem(_TEMPLATE_STORAGE_KEY, JSON.stringify(list));
+                    localStorage.setItem(FLAG, '1');
+                } else if (localStorage.getItem(FLAG)) {
+                    localStorage.setItem(_TEMPLATE_STORAGE_KEY, '[]');
+                    localStorage.removeItem(FLAG);
+                }
+            })
+            .catch(function (e) { console.warn('[Validator] could not load templates from server', e); });
+    };
+    window._dvRefreshTemplates();
+})();

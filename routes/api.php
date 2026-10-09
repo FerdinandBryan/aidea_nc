@@ -208,7 +208,7 @@ require __DIR__ . '/profile.php';
 \Illuminate\Support\Facades\Route::get('/format-templates', function () {
     $row = \Illuminate\Support\Facades\DB::table('format_templates')->orderBy('id')->first();
     return response()->json($row ? json_decode($row->data, true) : []);
-});
+})->middleware('auth:sanctum');
 \Illuminate\Support\Facades\Route::put('/format-templates', function (\Illuminate\Http\Request $request) {
     $list = $request->input('templates', []);
     abort_unless(is_array($list), 422);
