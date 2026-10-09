@@ -2250,18 +2250,32 @@ async function _dvGenerateFixedPdf() {
 })();
 /* DV_PREVIEW_BUTTONS: preview of the fixed paper + list of rules that need attention */
 (function () {
-    var DP = 'https://cdnjs.cloudflare.com/ajax/libs/docx-preview/0.3.2/docx-preview.min.js';
+    var DPS = [
+        'https://cdn.jsdelivr.net/npm/docx-preview@0.3.2/dist/docx-preview.min.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/docx-preview/0.3.2/docx-preview.min.js',
+        'https://unpkg.com/docx-preview@0.3.2/dist/docx-preview.min.js'
+    ];
 
-    function loadPreviewLib() {
+    function loadScript(src) {
         return new Promise(function (resolve, reject) {
-            if (window.docx && window.docx.renderAsync) { resolve(); return; }
             var s = document.createElement('script');
-            s.src = DP; s.onload = resolve;
-            s.onerror = function () { reject(new Error('Preview library could not load')); };
+            s.src = src; s.onload = resolve;
+            s.onerror = function () { s.remove(); reject(new Error('failed: ' + src)); };
             document.head.appendChild(s);
         });
     }
 
+    function loadPreviewLib() {
+        if (window.docx && window.docx.renderAsync) return Promise.resolve();
+        var i = 0;
+        function next() {
+            if (i >= DPS.length) return Promise.reject(new Error('Preview library could not load from any source. Check your internet connection or ad blocker.'));
+            return loadScript(DPS[i++]).then(function () {
+                if (!(window.docx && window.docx.renderAsync)) throw new Error('bad library');
+            }).catch(next);
+        }
+        return next();
+    }
     function openOverlay(title) {
         var old = document.getElementById('dvPrevOverlay');
         if (old) old.remove();
