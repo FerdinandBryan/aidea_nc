@@ -2333,6 +2333,30 @@ async function _dvGenerateFixedPdf() {
             if (firstT) firstT.textContent = firstT.textContent.replace(/^\s+/, '');
             changed++;
         });
+        /* DV_TITLEFIT: title page in single spacing, next section starts on a new page */
+        var titleEnd = headIdx;
+        if (titleEnd === Infinity) {
+            var lastP0 = -1;
+            info.forEach(function (it, i) { if (it.page === 0) lastP0 = i; });
+            titleEnd = (lastP0 >= 0 && lastP0 < info.length - 1) ? lastP0 + 1 : -1;
+        }
+        if (titleEnd > 0) {
+            info.forEach(function (it, idx) {
+                if (it.tbl || it.page !== 0 || idx >= titleEnd) return;
+                var tpPr = kid(it.p, 'pPr');
+                if (!tpPr) { tpPr = doc.createElementNS(W, 'w:pPr'); it.p.insertBefore(tpPr, it.p.firstChild); }
+                var tsp = getOrCreate(doc, tpPr, 'spacing');
+                tsp.setAttributeNS(W, 'w:line', '240');
+                tsp.setAttributeNS(W, 'w:lineRule', 'auto');
+                changed++;
+            });
+            if (headIdx !== Infinity && info[headIdx] && info[headIdx].page === 0) {
+                var hpPr = kid(info[headIdx].p, 'pPr');
+                if (!hpPr) { hpPr = doc.createElementNS(W, 'w:pPr'); info[headIdx].p.insertBefore(hpPr, info[headIdx].p.firstChild); }
+                getOrCreate(doc, hpPr, 'pageBreakBefore');
+                changed++;
+            }
+        }
         if (!changed) return blob;
         zip.file('word/document.xml', new XMLSerializer().serializeToString(doc));
         return await zip.generateAsync({ type: 'blob' });
