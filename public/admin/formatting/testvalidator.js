@@ -1202,7 +1202,7 @@ function _dvRenderPickerStep() {
         ).join('')}
            </select>
            <div class="dv-template-desc" id="dvTemplateDesc"></div>`
-        : `<div class="fp-notice warning">⚠️ No active format templates are available yet. Ask an admin to publish one in Format Templates — the default thesis format will be used for now.</div>`;
+        : `<div class="fp-notice warning">⚠️ No active format templates are available yet. Ask an admin to publish one in Format Templates before running a check.</div>`;
 
     body.innerHTML = `
         ${fileSectionHtml}
@@ -1212,7 +1212,7 @@ function _dvRenderPickerStep() {
         </div>
     `;
 
-    const canRun = !!_dvPendingFile;
+    const canRun = !!_dvPendingFile && _dvActiveTemplates.length > 0;
     footer.innerHTML = `
         <button class="btn-modal-close" onclick="window._dvCloseModal('docValidationModal')">Cancel</button>
         <button class="btn-modal-submit" id="dvRunBtn" ${canRun ? '' : 'disabled style="opacity:0.5;cursor:not-allowed;"'} onclick="window._dvRunPendingCheck()">
@@ -1229,7 +1229,7 @@ function _dvRenderPickerStep() {
         descEl.textContent = t && t.description ? t.description : '';
     };
     if (sel) {
-        sel.addEventListener('change', () => { _dvSelectedTemplateId = sel.value; updateDesc(); });
+        _dvSelectedTemplateId = sel.value; sel.addEventListener('change', () => { _dvSelectedTemplateId = sel.value; updateDesc(); });
         updateDesc();
     }
 }
@@ -2042,11 +2042,9 @@ async function _dvGenerateFixedDocx(file, rules, formattingProfile) {
     }
 }
 
-/* CHECKLIST_ONLY: the checklist is the only format used for checking and auto-fix */
-_getActiveFormatTemplates = function () { return [_CHECKLIST_PSEUDO]; };
-_getFormatRules = function () {
-    return { rules: _DEFAULT_FORMAT_RULES, source: 'Thesis Format and Assessment Checklist', template: _CHECKLIST_PSEUDO };
-};
+/* TEMPLATES_ONLY: only published format templates are listed; built-in checklist removed from the picker */
+_getActiveFormatTemplates = function () { return _getActiveFormatTemplatesOriginal(); };
+
 
 /* PDF_FIX_DISABLED: a PDF cannot be corrected faithfully, so the rebuilt copy is turned off */
 async function _dvGenerateFixedPdf() {
