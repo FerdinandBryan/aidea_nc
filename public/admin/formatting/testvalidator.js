@@ -2248,3 +2248,103 @@ async function _dvGenerateFixedPdf() {
     };
     window._dvRefreshTemplates();
 })();
+/* DV_PREVIEW_BUTTONS: preview of the fixed paper + list of rules that need attention */
+(function () {
+    var DP = 'https://cdnjs.cloudflare.com/ajax/libs/docx-preview/0.3.2/docx-preview.min.js';
+
+    function loadPreviewLib() {
+        return new Promise(function (resolve, reject) {
+            if (window.docx && window.docx.renderAsync) { resolve(); return; }
+            var s = document.createElement('script');
+            s.src = DP; s.onload = resolve;
+            s.onerror = function () { reject(new Error('Preview library could not load')); };
+            document.head.appendChild(s);
+        });
+    }
+
+    function openOverlay(title) {
+        var old = document.getElementById('dvPrevOverlay');
+        if (old) old.remove();
+        var o = document.createElement('div');
+        o.id = 'dvPrevOverlay';
+        o.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:16px;';
+        o.innerHTML =
+            '<div style="background:#111827;color:#e5e7eb;border:1px solid #374151;border-radius:12px;width:min(900px,100%);max-height:92vh;display:flex;flex-direction:column;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #374151;">' +
+            '<strong>' + title + '</strong>' +
+            '<button type="button" id="dvPrevClose" style="background:none;border:0;color:#e5e7eb;font-size:22px;cursor:pointer;">&times;</button></div>' +
+            '<div id="dvPrevBody" style="padding:14px 16px;overflow:auto;"></div></div>';
+        o.addEventListener('click', function (e) { if (e.target === o) o.remove(); });
+        document.body.appendChild(o);
+        document.getElementById('dvPrevClose').onclick = function () { o.remove(); };
+        return document.getElementById('dvPrevBody');
+    }
+
+    window._dvPreviewFixed = async function () {
+        var body = openOverlay('Preview: Fix paper (aligned to the template)');
+        body.textContent = 'Preparing preview...';
+        try {
+            if (!_dvLastFile) throw new Error('Run a format check first.');
+            if (/\.pdf$/i.test(_dvLastFile.name || '')) throw new Error('Preview works on .docx files only. Upload the Word version.');
+            await new Promise(function (r) { _validatorDeps.ensureJSZip(r); });
+            await loadPreviewLib();
+            var blob = await _dvGenerateFixedDocx(_dvLastFile, _dvLastRules, _dvLastFormattingProfile);
+            body.innerHTML = '';
+            var bar = document.createElement('div');
+            bar.style.cssText = 'margin-bottom:10px;';
+            bar.innerHTML = '<button type="button" class="btn-modal-close" onclick="window._dvDownloadFixed()">Download this fixed copy</button>';
+            var holder = document.createElement('div');
+            holder.style.cssText = 'background:#fff;color:#000;border-radius:6px;overflow:auto;';
+            body.appendChild(bar);
+            body.appendChild(holder);
+            await window.docx.renderAsync(blob, holder, null, { className: 'docx', inWrapper: true });
+        } catch (e) {
+            console.warn('[Validator] preview failed', e);
+            body.textContent = 'Could not build the preview: ' + (e && e.message ? e.message : e);
+        }
+    };
+
+    function attentionRules() {
+        return (_dvLastRules || []).filter(function (r) {
+            var ev = _evaluateFormattingRule(r, _dvLastFormattingProfile);
+            return ev && ev.status !== 'pass';
+        });
+    }
+
+    window._dvPreviewAttention = function () {
+        var body = openOverlay('Needs attention: required by the template but not met by your paper');
+        try {
+            var items = attentionRules();
+            if (!items.length) { body.textContent = 'Nothing needs attention. Your paper meets every rule in this template.'; return; }
+            body.innerHTML = '<div class="dv-rule-rows">' +
+                items.map(function (r) { return _dvRenderRuleRow(r, _dvLastFormattingProfile); }).join('') + '</div>';
+        } catch (e) {
+            body.textContent = 'Could not list the items: ' + (e && e.message ? e.message : e);
+        }
+    };
+
+    function addButtons() {
+        document.querySelectorAll('.dv-download-row').forEach(function (row) {
+            if (row.getAttribute('data-dv-extra')) return;
+            row.setAttribute('data-dv-extra', '1');
+            var n = 0;
+            try { n = attentionRules().length; } catch (e) {}
+            var b1 = document.createElement('button');
+            b1.type = 'button'; b1.className = 'btn-modal-close';
+            b1.textContent = 'Preview Fix paper';
+            b1.onclick = window._dvPreviewFixed;
+            var b2 = document.createElement('button');
+            b2.type = 'button'; b2.className = 'btn-modal-close';
+            b2.textContent = 'Preview Needs attention (' + n + ')';
+            b2.onclick = window._dvPreviewAttention;
+            row.appendChild(b1);
+            row.appendChild(b2);
+        });
+    }
+
+    function start() {
+        new MutationObserver(addButtons).observe(document.body, { childList: true, subtree: true });
+        addButtons();
+    }
+    if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+})();
