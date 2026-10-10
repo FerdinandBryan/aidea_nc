@@ -2366,7 +2366,7 @@ async function _dvGenerateFixedPdf() {
     _dvGenerateFixedDocx = async function (file, rules, formattingProfile) {
         var blob = await prev(file, rules, formattingProfile);
         var useChecklist = (rules || []).some(function (r) { return r && (r.id === 'checklist-spacing' || r.id === 'checklist-margin'); });
-        if (!useChecklist) return blob;
+        if (!useChecklist && !/double-spaced|Margins are strictly followed|Times New Roman/i.test(JSON.stringify(rules || []))) return blob;
         try { return await dvPageFix(blob); }
         catch (e) { console.warn('[Validator] page fixes skipped', e); return blob; }
     };
