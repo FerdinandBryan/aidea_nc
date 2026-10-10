@@ -2606,7 +2606,7 @@ async function _dvGenerateFixedPdf() {
             if (!_dvLastFile) throw new Error('Run a format check first.');
             if (/\.pdf$/i.test(_dvLastFile.name || '')) throw new Error('Preview works on .docx files only. Upload the Word version.');
             await new Promise(function (r) { _validatorDeps.ensureJSZip(r); });
-            await loadPreviewLib();
+            await loadPreviewLib(); if (typeof hook === 'function') hook();
             var blob = await dvCleanRedNotes(await _dvGenerateFixedDocx(_dvLastFile, _dvLastRules, _dvLastFormattingProfile));
             body.innerHTML = '';
             var bar = document.createElement('div');
@@ -2616,7 +2616,9 @@ async function _dvGenerateFixedPdf() {
             holder.style.cssText = 'background:#6b7280;color:#000;border-radius:6px;overflow:auto;';
             body.appendChild(bar);
             body.appendChild(holder);
-            await window.docx.renderAsync(blob, holder, null, { className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: false, renderHeaders: true, renderFooters: true });
+            var _dvPrevPg = window._dvPaginateOn; window._dvPaginateOn = true;
+            try { await window.docx.renderAsync(blob, holder, null, { className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: false, renderHeaders: true, renderFooters: true }); }
+            finally { window._dvPaginateOn = _dvPrevPg; }
         } catch (e) {
             console.warn('[Validator] preview failed', e);
             body.textContent = 'Could not build the preview: ' + (e && e.message ? e.message : e);
