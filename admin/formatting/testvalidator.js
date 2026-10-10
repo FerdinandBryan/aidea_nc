@@ -1140,7 +1140,7 @@ function _createValidationModal() {
     modal.id = 'docValidationModal';
     modal.className = 'modal-overlay';
     modal.innerHTML = `
-        <div class="modal-box" style="max-width:640px;">
+        <div class="modal-box" style="max-width:1100px;">
             <div class="modal-header">
                 <h2>Document Type & Format Check</h2>
                 <button class="modal-close" onclick="window._dvCloseModal('docValidationModal')">✕</button>
