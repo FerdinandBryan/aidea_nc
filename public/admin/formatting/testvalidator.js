@@ -2251,7 +2251,7 @@ async function _dvGenerateFixedPdf() {
 /* DV_PAGES: split the fixed paper into pages and apply page-specific fixes (title page date) */
 (function () {
     var W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-    var MONTH = /^(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2},\s*)?\d{4}$/i;
+    var MONTH = /^(January|February|March|April|May|June|July|August|September|October|November|December)\.?,?\s+(\d{1,2}(st|nd|rd|th)?,?\s*)?\d{4}\.?$/i;
     var FIRST_HEAD = /^(APPROVAL SHEET|ACKNOWLEDGEMENTS?|ABSTRACT|TABLE OF CONTENTS|LIST OF TABLES|CHAPTER\s*\d)/;
     var PPR_ORDER = ['pStyle','keepNext','keepLines','pageBreakBefore','framePr','widowControl','numPr','suppressLineNumbers','pBdr','shd','tabs','suppressAutoHyphens','kinsoku','wordWrap','overflowPunct','topLinePunct','autoSpaceDE','autoSpaceDN','bidi','adjustRightInd','snapToGrid','spacing','ind','contextualSpacing','mirrorIndents','suppressOverlap','jc','textDirection','textAlignment','textboxTightWrap','outlineLvl','divId','cnfStyle','rPr','sectPr','pPrChange'];
 
