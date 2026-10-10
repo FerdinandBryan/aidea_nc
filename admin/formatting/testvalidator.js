@@ -2681,6 +2681,15 @@ async function _dvGenerateFixedPdf() {
             b2.onclick = window._dvPreviewAttention;
             row.appendChild(b1);
             row.appendChild(b2);
+            /* DV_BUTTONS_TOP: move the button row to the top of the result */
+            try {
+                var hostBody = document.getElementById('docValidationBody');
+                if (hostBody && row.getAttribute('data-dv-top') !== '1') {
+                    row.setAttribute('data-dv-top', '1');
+                    row.style.cssText += ';display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px;position:sticky;top:0;z-index:5;background:#12152a;padding:8px 0;';
+                    hostBody.insertBefore(row, hostBody.firstChild);
+                }
+            } catch (e) {}
         });
     }
 
