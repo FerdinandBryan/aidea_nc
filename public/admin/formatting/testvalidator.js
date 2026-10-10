@@ -3022,3 +3022,163 @@ async function _dvGenerateFixedPdf() {
         window._dvPreviewAttention = w;
     }
 })();
+/* DV_TEMPLATE_APPLY: apply the values written in the selected template's rules to the fixed paper */
+(function () {
+    if (typeof _dvGenerateFixedDocx !== 'function') return;
+    var W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    var PPR = ['pStyle','keepNext','keepLines','pageBreakBefore','framePr','widowControl','numPr','suppressLineNumbers','pBdr','shd','tabs','suppressAutoHyphens','kinsoku','wordWrap','overflowPunct','topLinePunct','autoSpaceDE','autoSpaceDN','bidi','adjustRightInd','snapToGrid','spacing','ind','contextualSpacing','mirrorIndents','suppressOverlap','jc','textDirection','textAlignment','textboxTightWrap','outlineLvl','divId','cnfStyle','rPr','sectPr','pPrChange'];
+    var RPR = ['rStyle','rFonts','b','bCs','i','iCs','caps','smallCaps','strike','dstrike','outline','shadow','emboss','imprint','noProof','snapToGrid','vanish','webHidden','color','spacing','w','kern','position','sz','szCs','highlight','u','effect','bdr','shd','fitText','vertAlign','rtl','cs','em','lang','eastAsianLayout','specVanish','oMath'];
+    var SECT = ['headerReference','footerReference','footnotePr','endnotePr','type','pgSz','pgMar','paperSrc','pgBorders','lnNumType','pgNumType','cols','formProt','vAlign','noEndnote','titlePg','textDirection','bidi','rtlGutter','docGrid'];
+    var FIRST_HEAD = /^(APPROVAL SHEET|ACKNOWLEDGEMENTS?|ABSTRACT|TABLE OF CONTENTS|LIST OF TABLES|LIST OF FIGURES|LIST OF APPENDICES|CHAPTER\s*\d|INTRODUCTION)/;
+    var HEAD_END = /^(TABLE OF CONTENTS|LIST OF TABLES|LIST OF FIGURES|LIST OF APPENDICES|CHAPTER\s*\d|INTRODUCTION|ACKNOWLEDGEMENTS?)/;
+
+    function kid(parent, name) {
+        for (var c = parent.firstChild; c; c = c.nextSibling) {
+            if (c.nodeType === 1 && c.localName === name && c.namespaceURI === W) return c;
+        }
+        return null;
+    }
+    function ensure(doc, parent, order, name) {
+        var e = kid(parent, name);
+        if (e) return e;
+        e = doc.createElementNS(W, 'w:' + name);
+        var idx = order.indexOf(name), ref = null;
+        for (var c = parent.firstChild; c; c = c.nextSibling) {
+            if (c.nodeType === 1 && c.namespaceURI === W && order.indexOf(c.localName) > idx) { ref = c; break; }
+        }
+        parent.insertBefore(e, ref);
+        return e;
+    }
+    function setA(el, n, v) { el.setAttributeNS(W, 'w:' + n, String(v)); }
+    function ptext(p) {
+        return Array.from(p.getElementsByTagNameNS(W, 't')).map(function (n) { return n.textContent; }).join('').trim();
+    }
+    function inTable(p) {
+        for (var n = p.parentNode; n; n = n.parentNode) { if (n.localName === 'tbl' && n.namespaceURI === W) return true; }
+        return false;
+    }
+
+    function parseRules(rules) {
+        var cfg = { body: null, abs: null, top: null, bottom: null, left: null, right: null, font: null, size: null, hanging: false, heads: {} };
+        (rules || []).forEach(function (r) {
+            var d = String((r && (r.detail || r.name)) || ''), m;
+            var hw = /\bword\s+(REFERENCES|APPENDICES)\b/i.exec(d);
+            if (hw) {
+                var h = { size: null, center: /cent/i.test(d), bold: /\bbold\b/i.test(d), caps: /capital/i.test(d) };
+                if ((m = /font size\s*(\d+(?:\.\d+)?)/i.exec(d))) h.size = parseFloat(m[1]);
+                cfg.heads[hw[1].toUpperCase()] = h;
+                return;
+            }
+            if (/spac/i.test(d)) {
+                var v = null;
+                if (/double[- ]?spac/i.test(d)) v = 2;
+                else if (/single[- ]?spac/i.test(d)) v = 1;
+                else if ((m = /\b(1\.5|2(?:\.0)?)\s*(?:line\s*)?spac/i.exec(d))) v = parseFloat(m[1]);
+                if (v !== null) {
+                    if (/abstract/i.test(d)) { if (cfg.abs === null) cfg.abs = v; }
+                    else if (cfg.body === null) cfg.body = v;
+                }
+            }
+            if (/margin/i.test(d)) {
+                if ((m = /left\s*([\d.]+)/i.exec(d))) cfg.left = parseFloat(m[1]);
+                if ((m = /right\s*([\d.]+)/i.exec(d))) cfg.right = parseFloat(m[1]);
+                if ((m = /top\s*and\s*bottom\s*([\d.]+)/i.exec(d))) { cfg.top = cfg.bottom = parseFloat(m[1]); }
+                else {
+                    if ((m = /top\s*([\d.]+)/i.exec(d))) cfg.top = parseFloat(m[1]);
+                    if ((m = /bottom\s*([\d.]+)/i.exec(d))) cfg.bottom = parseFloat(m[1]);
+                }
+            }
+            if ((m = /font (?:style|name|family)\b.*?\bis\s+([A-Za-z][A-Za-z ]*?)\s*\.?\s*$/i.exec(d))) cfg.font = m[1];
+            if ((m = /font size\b.*?\bis\s+(\d+(?:\.\d+)?)/i.exec(d))) cfg.size = parseFloat(m[1]);
+            if (/hanging inden/i.test(d)) cfg.hanging = true;
+        });
+        var any = cfg.body !== null || cfg.abs !== null || cfg.left !== null || cfg.right !== null || cfg.top !== null ||
+            cfg.bottom !== null || cfg.font || cfg.size !== null || cfg.hanging || Object.keys(cfg.heads).length;
+        return any ? cfg : null;
+    }
+
+    var prev = _dvGenerateFixedDocx;
+    _dvGenerateFixedDocx = async function (file, rules, formattingProfile) {
+        var blob = await prev(file, rules, formattingProfile);
+        try {
+            if ((rules || []).some(function (r) { return r && (r.id === 'checklist-spacing' || r.id === 'checklist-margin'); })) return blob;
+            var cfg = parseRules(rules);
+            if (!cfg) return blob;
+            if (!window.JSZip) await new Promise(function (res) { _validatorDeps.ensureJSZip(res); });
+            var zip = await JSZip.loadAsync(await blob.arrayBuffer());
+            var xf = zip.file('word/document.xml');
+            if (!xf) return blob;
+            var doc = new DOMParser().parseFromString(await xf.async('string'), 'application/xml');
+
+            var zone = 'front';
+            Array.from(doc.getElementsByTagNameNS(W, 'p')).forEach(function (p) {
+                var t = ptext(p), up = t.toUpperCase(), tbl = inTable(p), kind = 'body', head = null;
+                if (!tbl && t && t.length <= 60) {
+                    if (up === 'ABSTRACT') { zone = 'abstract'; kind = 'head'; }
+                    else if (up === 'REFERENCES' || up === 'APPENDICES') { zone = up === 'REFERENCES' ? 'references' : 'appendices'; kind = 'big'; head = cfg.heads[up] || null; }
+                    else if (zone !== 'appendices' && HEAD_END.test(up)) { zone = 'body'; }
+                    else if (zone === 'front' && FIRST_HEAD.test(up)) { zone = 'body'; }
+                }
+                var pPr = kid(p, 'pPr');
+                if (!pPr) { pPr = doc.createElementNS(W, 'w:pPr'); p.insertBefore(pPr, p.firstChild); }
+
+                if (!tbl && t) {
+                    var lineMult = null;
+                    if (kind === 'big') { lineMult = null; }
+                    else if (zone === 'abstract' && kind !== 'head') { lineMult = cfg.abs; }
+                    else if (zone === 'body' || zone === 'references' || zone === 'abstract') { lineMult = cfg.body; }
+                    if (lineMult !== null) {
+                        var sp = ensure(doc, pPr, PPR, 'spacing');
+                        setA(sp, 'line', Math.round(lineMult * 240));
+                        setA(sp, 'lineRule', 'auto');
+                    }
+                    if (kind === 'big' && head && head.center) setA(ensure(doc, pPr, PPR, 'jc'), 'val', 'center');
+                    if (kind === 'big' && head && head.caps) {
+                        Array.from(p.getElementsByTagNameNS(W, 't')).forEach(function (n) { n.textContent = n.textContent.toUpperCase(); });
+                    }
+                    if (cfg.hanging && zone === 'references' && kind === 'body') {
+                        var ind = ensure(doc, pPr, PPR, 'ind');
+                        ind.removeAttributeNS(W, 'firstLine');
+                        setA(ind, 'left', 720);
+                        setA(ind, 'hanging', 720);
+                    }
+                }
+
+                Array.from(p.getElementsByTagNameNS(W, 'r')).forEach(function (r) {
+                    var rPr = kid(r, 'rPr');
+                    if (!rPr) { rPr = doc.createElementNS(W, 'w:rPr'); r.insertBefore(rPr, r.firstChild); }
+                    if (cfg.font) {
+                        var f = ensure(doc, rPr, RPR, 'rFonts');
+                        ['asciiTheme', 'hAnsiTheme', 'cstheme', 'eastAsiaTheme'].forEach(function (a) { f.removeAttributeNS(W, a); });
+                        ['ascii', 'hAnsi', 'cs', 'eastAsia'].forEach(function (a) { setA(f, a, cfg.font); });
+                    }
+                    var size = (kind === 'big' && head && head.size) ? head.size : cfg.size;
+                    if (size) {
+                        setA(ensure(doc, rPr, RPR, 'sz'), 'val', Math.round(size * 2));
+                        setA(ensure(doc, rPr, RPR, 'szCs'), 'val', Math.round(size * 2));
+                    }
+                    if (kind === 'big' && head && head.bold) {
+                        var b = ensure(doc, rPr, RPR, 'b'); b.removeAttributeNS(W, 'val');
+                    }
+                });
+            });
+
+            Array.from(doc.getElementsByTagNameNS(W, 'sectPr')).forEach(function (s) {
+                if (cfg.left !== null || cfg.right !== null || cfg.top !== null || cfg.bottom !== null) {
+                    var mar = ensure(doc, s, SECT, 'pgMar');
+                    if (cfg.top !== null) setA(mar, 'top', Math.round(cfg.top * 1440));
+                    if (cfg.bottom !== null) setA(mar, 'bottom', Math.round(cfg.bottom * 1440));
+                    if (cfg.left !== null) setA(mar, 'left', Math.round(cfg.left * 1440));
+                    if (cfg.right !== null) setA(mar, 'right', Math.round(cfg.right * 1440));
+                }
+            });
+
+            zip.file('word/document.xml', new XMLSerializer().serializeToString(doc));
+            console.log('[Validator] template rules applied to fixed paper', cfg);
+            return await zip.generateAsync({ type: 'blob' });
+        } catch (e) {
+            console.warn('[Validator] template apply skipped', e);
+            return blob;
+        }
+    };
+})();
