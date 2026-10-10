@@ -541,49 +541,125 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Thesis submitted per month, one series per academic year (chart) ──────
 (function () {
-  const ORDER  = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5];
-  const LABELS = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'];
-  const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#8b5cf6', '#ec4899', '#84cc16'];
+  const STYLE_ID = 'thesisSkelStyle';
+  let chart = null;
+
+  function addStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    const s = document.createElement('style');
+    s.id = STYLE_ID;
+    s.textContent =
+      '.chart-box.tsk-host{position:relative}' +
+      '.tsk-overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:14px;padding:8px 4px;z-index:2}' +
+      '.tsk-row{display:flex;align-items:center;gap:10px}' +
+      '.tsk-label{width:70px;height:12px;border-radius:6px;flex:none}' +
+      '.tsk-bar{height:18px;border-radius:6px}' +
+      '.tsk-shimmer{background:linear-gradient(90deg,rgba(148,163,184,.18) 25%,rgba(148,163,184,.38) 50%,rgba(148,163,184,.18) 75%);background-size:200% 100%;animation:tskShimmer 1.2s infinite linear}' +
+      '@keyframes tskShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}' +
+      '.tsk-msg{margin:auto;text-align:center;font-size:13px;color:var(--chart-text,#64748b)}' +
+      '.tsk-msg button{margin-top:10px;padding:6px 14px;border-radius:8px;border:1px solid rgba(148,163,184,.5);background:transparent;color:inherit;cursor:pointer;font:inherit}';
+    document.head.appendChild(s);
+  }
+
+  function clearOverlay(box) {
+    const o = box.querySelector('.tsk-overlay');
+    if (o) o.remove();
+  }
+
+  function showSkeleton(box) {
+    clearOverlay(box);
+    const o = document.createElement('div');
+    o.className = 'tsk-overlay';
+    [85, 65, 45, 30, 55].forEach(function (w) {
+      const row = document.createElement('div');
+      row.className = 'tsk-row';
+      row.innerHTML = '<div class="tsk-label tsk-shimmer"></div><div class="tsk-bar tsk-shimmer" style="width:' + w + '%"></div>';
+      o.appendChild(row);
+    });
+    box.appendChild(o);
+  }
+
+  function showMessage(box, text, onRetry) {
+    clearOverlay(box);
+    const o = document.createElement('div');
+    o.className = 'tsk-overlay';
+    const m = document.createElement('div');
+    m.className = 'tsk-msg';
+    m.textContent = text;
+    if (onRetry) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = 'Retry';
+      b.addEventListener('click', onRetry);
+      m.appendChild(document.createElement('br'));
+      m.appendChild(b);
+    }
+    o.appendChild(m);
+    box.appendChild(o);
+  }
+
+  function withTimeout(promise, ms) {
+    return Promise.race([
+      promise,
+      new Promise(function (_, reject) { setTimeout(function () { reject(new Error('timeout')); }, ms); })
+    ]);
+  }
 
   async function initThesisChart() {
     if (typeof Chart === 'undefined') return;
     const canvas = document.getElementById('thesisYearChart');
     if (!canvas) return;
+    const box = canvas.parentElement;
+    addStyle();
+    box.classList.add('tsk-host');
 
     const sub = document.getElementById('revenueYear');
-    if (sub) sub.textContent = 'Number of thesis submitted per month';
+    if (sub) sub.textContent = 'Number of thesis submitted per academic year';
 
     const v = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
-    let rows = [];
-    try {
-      const json = await load('/dashboard/thesis-by-year-month');
-      rows = Array.isArray(json) ? json : (json.data || []);
-    } catch (e) { console.error('Thesis chart load failed', e); }
+    showSkeleton(box);
 
-    new Chart(canvas.getContext('2d'), {
+    let rows;
+    try {
+      const json = await withTimeout(load('/dashboard/thesis-by-year'), 15000);
+      rows = Array.isArray(json) ? json : (json.data || []);
+    } catch (e) {
+      console.error('Thesis chart load failed', e);
+      showMessage(box, "Couldn't load data", initThesisChart);
+      return;
+    }
+
+    if (chart) { chart.destroy(); chart = null; }
+
+    if (!rows.length) {
+      showMessage(box, 'No thesis submissions yet.');
+      return;
+    }
+    clearOverlay(box);
+
+    chart = new Chart(canvas.getContext('2d'), {
       type: 'bar',
       data: {
-        labels: LABELS,
-        datasets: rows.map((r, i) => ({
-          label: r.academic_year,
-          data: ORDER.map(mo => Number((r.months || {})[mo] || 0)),
-          backgroundColor: COLORS[i % COLORS.length],
+        labels: rows.map(function (r) { return r.academic_year; }),
+        datasets: [{
+          label: 'Thesis submitted',
+          data: rows.map(function (r) { return Number(r.total) || 0; }),
+          backgroundColor: '#4f46e5',
           borderRadius: 4
-        }))
+        }]
       },
       options: {
+        indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
-        plugins: {
-          legend: { display: true, position: 'top', labels: { color: v('--chart-text'), boxWidth: 12 } }
-        },
+        plugins: { legend: { display: false } },
         scales: {
-          x: { grid: { display: false }, ticks: { color: v('--chart-text') },
-               title: { display: true, text: 'Month', color: v('--chart-text') } },
-          y: { beginAtZero: true, grid: { color: v('--chart-grid') },
+          x: { beginAtZero: true, grid: { color: v('--chart-grid') },
                ticks: { color: v('--chart-text'), precision: 0, stepSize: 1 },
-               title: { display: true, text: 'Number of thesis submitted', color: v('--chart-text') } }
+               title: { display: true, text: 'Number of thesis submitted', color: v('--chart-text') } },
+          y: { grid: { display: false }, ticks: { color: v('--chart-text') },
+               title: { display: true, text: 'Academic year', color: v('--chart-text') } }
         }
       }
     });
