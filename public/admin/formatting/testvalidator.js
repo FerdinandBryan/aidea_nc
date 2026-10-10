@@ -3182,3 +3182,11 @@ async function _dvGenerateFixedPdf() {
         }
     };
 })();
+/* DV_FIXPAPER_LOADER */
+(function () {
+    var s = document.currentScript;
+    var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
+    var e = document.createElement('script');
+    e.src = base + 'fixpaper.js?v=1';
+    document.head.appendChild(e);
+})();
