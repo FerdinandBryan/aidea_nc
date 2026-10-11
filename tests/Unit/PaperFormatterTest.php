@@ -334,4 +334,16 @@ class PaperFormatterTest extends TestCase
         $this->assertSame(2, $other['cv']['spacing']);
     }
 
+    public function test_appendix_letters_start_their_own_pages_without_breaking_contents_entries(): void
+    {
+        $file = $this->paper('<w:p><w:pPr><w:pStyle w:val="TOC1"/></w:pPr><w:r><w:t>Appendix A - Letter</w:t></w:r></w:p><w:p><w:r><w:t>APPENDICES</w:t></w:r></w:p><w:p><w:r><w:t>APPENDIX A</w:t></w:r></w:p><w:p><w:r><w:t>Letter content.</w:t></w:r></w:p><w:p><w:r><w:t>Appendix B - Questionnaire</w:t></w:r></w:p><w:p><w:r><w:t>Questions.</w:t></w:r></w:p>');
+        (new PaperFormatter)->format($file, $this->rules()); $xp = $this->xml($file);
+        $this->assertEquals(0, $xp->evaluate('count(//w:p[w:pPr/w:pStyle[@w:val="TOC1"]]//w:br[@w:type="page"])'));
+        $this->assertEquals(1, $xp->evaluate('count(//w:p[w:r/w:t="APPENDIX A"]//w:br[@w:type="page"])'));
+        $this->assertEquals(1, $xp->evaluate('count(//w:p[w:r/w:t="Appendix B - Questionnaire"]//w:br[@w:type="page"])'));
+        $this->assertSame('1', $xp->evaluate('string(//w:p[w:r/w:t="APPENDIX A"]/w:pPr/w:keepNext/@w:val)'));
+        $this->assertSame('480', $xp->evaluate('string(//w:p[w:r/w:t="Letter content."]/w:pPr/w:spacing/@w:line)'));
+        $this->assertSame('Letter content.', $xp->evaluate('string(//w:p[w:r/w:t="Letter content."]//w:t)'));
+    }
+
 }

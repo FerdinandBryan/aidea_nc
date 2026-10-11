@@ -151,7 +151,9 @@ class PaperFormatter
                 $table = $xp->query('ancestor::w:tbl', $p)->length > 0;
                 $firstText = $p->getElementsByTagNameNS(self::W, 't')->item(0)?->textContent ?? '';
                 $chapter = !$table && ($this->isChapter($text) || $this->isChapter($firstText));
-                $heading = $chapter || in_array($upper, ['ABSTRACT', 'APPROVAL SHEET', 'ACKNOWLEDGEMENT', 'ACKNOWLEDGEMENTS', 'TABLE OF CONTENTS', 'LIST OF TABLES', 'LIST OF FIGURES', 'LIST OF APPENDICES', 'REFERENCES', 'APPENDICES'], true);
+                $appendixHeading = !$table && $this->isAppendixHeading($p, $xp);
+                if ($appendixHeading && !preg_match('/curriculum\s+vitae/i', $text)) $cv = false;
+                $heading = $chapter || $appendixHeading || in_array($upper, ['ABSTRACT', 'APPROVAL SHEET', 'ACKNOWLEDGEMENT', 'ACKNOWLEDGEMENTS', 'TABLE OF CONTENTS', 'LIST OF TABLES', 'LIST OF FIGURES', 'LIST OF APPENDICES', 'REFERENCES', 'APPENDICES'], true);
                 if ($heading) $zone = $upper === 'ABSTRACT' ? 'abstract' : ($upper === 'REFERENCES' ? 'references' : 'body');
                 if ($zone === 'front' && !$table) $title[] = $p;
                 $pr = $this->ensure($p, 'pPr', true);
@@ -202,7 +204,7 @@ class PaperFormatter
                         $this->attr($this->ensure($pr, 'spacing'), 'after', round($gap));
                     }
                 }
-                if ($chapter) $this->pageBreak($p, $xp);
+                if ($chapter || $appendixHeading) $this->pageBreak($p, $xp);
                 $special = $cfg['headings'][$upper] ?? [];
                 if ($special['center'] ?? false) $this->attr($this->ensure($pr, 'jc'), 'val', 'center');
                 foreach ($xp->query('.//w:r', $p) as $run) {
@@ -268,7 +270,7 @@ class PaperFormatter
                 $following = $next->nextSibling; $next->parentNode->removeChild($next); $next = $following;
             }
             if (!$next instanceof DOMElement || $next->localName !== 'p' || $this->text($next) === '') continue;
-            if ($this->isChapter($this->text($next)) || $this->isTopicHeading($next, $xp)) continue;
+            if ($this->isChapter($this->text($next)) || $this->isAppendixHeading($next, $xp) || $this->isTopicHeading($next, $xp)) continue;
             foreach (iterator_to_array($xp->query('./w:pPr/w:pageBreakBefore', $next)) as $br) {
                 if (!in_array($br->getAttributeNS(self::W, 'val'), ['0', 'false', 'off'], true)) $moveBreak = true;
                 $br->parentNode->removeChild($br);
@@ -290,6 +292,14 @@ class PaperFormatter
             }
             if ($moveBreak) $this->pageBreak($heading, $xp);
         }
+    }
+
+    private function isAppendixHeading(DOMElement $p, DOMXPath $xp): bool
+    {
+        $text = $this->text($p);
+        if (mb_strlen($text) > 180 || preg_match('/\.{3,}/', $text) || $xp->query('.//w:tab', $p)->length) return false;
+        if (preg_match('/^TOC/i', $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $p))) return false;
+        return (bool) preg_match('/^APPENDIX\s+[A-Z](?:\s*[-:.]\s*[^!?]+)?$/i', $text);
     }
 
     private function resizeCvPhoto(DOMElement $p, array $settings, DOMXPath $xp): void
