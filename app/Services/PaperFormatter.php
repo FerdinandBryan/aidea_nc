@@ -106,6 +106,7 @@ class PaperFormatter
             $xp = new DOMXPath($doc); $xp->registerNamespace('w', self::W);
             $body = $xp->query('/w:document/w:body')->item(0);
             if (!$body instanceof DOMElement) throw new InvalidArgumentException('The Word document has no body.');
+            foreach (iterator_to_array($xp->query('//w:lastRenderedPageBreak')) as $old) $old->parentNode->removeChild($old);
             $this->splitChapterParagraphs($doc, $xp);
             $zone = 'front'; $title = [];
             foreach (iterator_to_array($xp->query('//w:body//w:p')) as $p) {
@@ -121,7 +122,22 @@ class PaperFormatter
                     $line = $zone === 'abstract' && !$heading ? ($cfg['abstract'] ?? $cfg['spacing']) : $cfg['spacing'];
                     if ($line !== null) {
                         $sp = $this->ensure($pr, 'spacing'); $this->attr($sp, 'line', round($line * 240)); $this->attr($sp, 'lineRule', 'auto');
+                        // Old paragraph gaps and document grids must not expand
+                        // the template's line spacing or shorten printable pages.
+                        foreach (['before', 'after', 'beforeLines', 'afterLines'] as $key) $this->attr($sp, $key, 0);
+                        foreach (['beforeAutospacing', 'afterAutospacing'] as $key) $this->attr($sp, $key, 0);
+                        $this->attr($this->ensure($pr, 'snapToGrid'), 'val', 0);
                     }
+                    if (!$heading && $zone !== 'front' && $zone !== 'references' && $text !== '') {
+                        // Let body paragraphs flow onto the next page rather
+                        // than moving entire groups because of inherited styles.
+                        $this->attr($this->ensure($pr, 'keepNext'), 'val', 0);
+                        $this->attr($this->ensure($pr, 'keepLines'), 'val', 0);
+                        $ind = $this->ensure($pr, 'ind');
+                        foreach (['left', 'right', 'start', 'end'] as $key) $this->attr($ind, $key, 0);
+                        foreach (['leftChars', 'rightChars', 'startChars', 'endChars'] as $key) $ind->removeAttributeNS(self::W, $key);
+                    }
+                    if ($zone === 'front' && $this->isDate($text)) $this->centerTitleParagraph($p, $xp);
                     if (!$heading && $zone !== 'front' && $cfg['alignment']) $this->attr($this->ensure($pr, 'jc'), 'val', $cfg['alignment']);
                     if (!$heading && $zone !== 'front' && $cfg['indentation'] !== null) {
                         $ind = $this->ensure($pr, 'ind'); $ind->removeAttributeNS(self::W, 'hanging'); $ind->removeAttributeNS(self::W, 'firstLineChars');
@@ -203,7 +219,7 @@ class PaperFormatter
             if ($text !== '') $visible[] = $p;
             if (preg_match('/in partial fulfi[l]?lment/i', $text)) $partial = $p;
             if (preg_match('/^by$/i', $text)) $by = $p;
-            if (preg_match('/^(January|February|March|April|May|June|July|August|September|October|November|December)\b.*\d{4}\.?$/i', $text)) { $date = $p; break; }
+            if ($this->isDate($text)) { $date = $p; break; }
         }
         if (!$partial || !$by || !$date) return;
         $datePr = $this->ensure($date, 'pPr', true);
@@ -215,7 +231,7 @@ class PaperFormatter
             $sp = $this->ensure($this->ensure($p, 'pPr', true), 'spacing');
             $this->attr($sp, 'before', 0); $this->attr($sp, 'after', 0);
             $sp->removeAttributeNS(self::W, 'beforeAutospacing'); $sp->removeAttributeNS(self::W, 'afterAutospacing');
-            $this->attr($this->ensure($this->ensure($p, 'pPr', true), 'jc'), 'val', 'center');
+            $this->centerTitleParagraph($p, $xp);
             $lineCount = max(1, ceil(mb_strlen($this->text($p)) * ($cfg['size'] ?? 12) * 10 / $width));
             $lineCount += $xp->query('.//w:br[not(@w:type="page")]', $p)->length;
             $used += $lineCount * ($cfg['size'] ?? 12) * 20 * ($cfg['spacing'] ?? 1) * 1.2;
@@ -224,8 +240,30 @@ class PaperFormatter
             if ($this->text($p) === '' && !$xp->query('.//w:drawing | .//w:pict | .//w:sectPr', $p)->length) $p->parentNode?->removeChild($p);
             if ($p === $date) break;
         }
-        $extra = max(0, $height * .85 - $used);
+        $extra = max(0, $height * .92 - $used);
         foreach ([[$partial, .45], [$by, .35], [$date, .20]] as [$p, $fraction]) $this->attr($this->ensure($this->ensure($p, 'pPr', true), 'spacing'), 'before', round($extra * $fraction));
+    }
+
+    private function isDate(string $text): bool
+    {
+        return (bool) preg_match('/^(January|February|March|April|May|June|July|August|September|October|November|December)\b.*\d{4}\.?$/i', trim($text));
+    }
+
+    private function centerTitleParagraph(DOMElement $p, DOMXPath $xp): void
+    {
+        $pr = $this->ensure($p, 'pPr', true);
+        $this->attr($this->ensure($pr, 'jc'), 'val', 'center');
+        // Explicit zeros also override indentation inherited from a Word style.
+        $ind = $this->ensure($pr, 'ind');
+        foreach (['left', 'right', 'start', 'end', 'firstLine', 'hanging'] as $key) $this->attr($ind, $key, 0);
+        foreach (['leftChars', 'rightChars', 'startChars', 'endChars', 'firstLineChars', 'hangingChars'] as $key) $ind->removeAttributeNS(self::W, $key);
+        foreach (iterator_to_array($xp->query('./w:tabs | ./w:numPr', $pr)) as $old) $old->parentNode->removeChild($old);
+        foreach (iterator_to_array($xp->query('.//w:tab', $p)) as $tab) $tab->parentNode->removeChild($tab);
+        $texts = $p->getElementsByTagNameNS(self::W, 't');
+        if ($texts->length) {
+            $texts->item(0)->textContent = ltrim($texts->item(0)->textContent);
+            $texts->item($texts->length - 1)->textContent = rtrim($texts->item($texts->length - 1)->textContent);
+        }
     }
 
     private function ensure(DOMElement $parent, string $name, bool $first = false): DOMElement
@@ -233,7 +271,7 @@ class PaperFormatter
         foreach ($parent->childNodes as $child) if ($child instanceof DOMElement && $child->namespaceURI === self::W && $child->localName === $name) return $child;
         $child = $parent->ownerDocument->createElementNS(self::W, 'w:'.$name);
         $orders = [
-            'pPr' => ['pStyle','keepNext','keepLines','pageBreakBefore','framePr','widowControl','numPr','pBdr','shd','tabs','spacing','ind','contextualSpacing','jc','outlineLvl','rPr','sectPr'],
+            'pPr' => ['pStyle','keepNext','keepLines','pageBreakBefore','framePr','widowControl','numPr','pBdr','shd','tabs','snapToGrid','spacing','ind','contextualSpacing','jc','outlineLvl','rPr','sectPr'],
             'rPr' => ['rStyle','rFonts','b','bCs','i','iCs','caps','smallCaps','color','spacing','sz','szCs','highlight','u','vertAlign','lang'],
             'sectPr' => ['headerReference','footerReference','type','pgSz','pgMar','pgNumType','cols','vAlign','titlePg','docGrid'],
         ];

@@ -122,4 +122,30 @@ class PaperFormatterTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         (new PaperFormatter)->settings([['type' => 'spacing', 'value' => -1]]);
     }
+
+    public function test_date_is_centered_even_without_a_complete_title_layout(): void
+    {
+        $file = $this->paper('<w:p><w:r><w:t>Title</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="OffsetDate"/><w:ind w:left="2160" w:firstLine="720" w:firstLineChars="100"/><w:tabs><w:tab w:val="left" w:pos="2160"/></w:tabs></w:pPr><w:r><w:tab/><w:t xml:space="preserve">   April 2026   </w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p>');
+        (new PaperFormatter)->format($file, $this->rules()); $xp = $this->xml($file);
+        $date = '//w:p[w:r/w:t="April 2026"]';
+        $this->assertSame('center', $xp->evaluate('string('.$date.'/w:pPr/w:jc/@w:val)'));
+        $this->assertSame('0', $xp->evaluate('string('.$date.'/w:pPr/w:ind/@w:left)'));
+        $this->assertSame('0', $xp->evaluate('string('.$date.'/w:pPr/w:ind/@w:firstLine)'));
+        $this->assertEquals(0, $xp->evaluate('count('.$date.'//w:tab)'));
+        $this->assertSame('480', $xp->evaluate('string('.$date.'/w:pPr/w:spacing/@w:line)'));
+    }
+
+    public function test_body_uses_printable_width_and_template_spacing_without_inherited_gaps(): void
+    {
+        $file = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before="1440" w:after="1440" w:beforeLines="200" w:beforeAutospacing="1"/><w:ind w:left="2160" w:right="2160" w:leftChars="100"/></w:pPr><w:r><w:lastRenderedPageBreak/><w:t>Body text</w:t></w:r></w:p>');
+        (new PaperFormatter)->format($file, $this->rules()); $xp = $this->xml($file);
+        $body = '//w:p[w:r/w:t="Body text"]/w:pPr';
+        $this->assertSame('480', $xp->evaluate('string('.$body.'/w:spacing/@w:line)'));
+        foreach (['before', 'after', 'beforeLines', 'beforeAutospacing'] as $key) $this->assertSame('0', $xp->evaluate('string('.$body.'/w:spacing/@w:'.$key.')'));
+        foreach (['keepNext', 'keepLines', 'snapToGrid'] as $key) $this->assertSame('0', $xp->evaluate('string('.$body.'/w:'.$key.'/@w:val)'));
+        $this->assertSame('0', $xp->evaluate('string('.$body.'/w:ind/@w:left)'));
+        $this->assertSame('0', $xp->evaluate('string('.$body.'/w:ind/@w:right)'));
+        $this->assertEquals(0, $xp->evaluate('count(//w:lastRenderedPageBreak)'));
+        $this->assertSame('2160', $xp->evaluate('string(//w:pgMar/@w:left)'));
+    }
 }
