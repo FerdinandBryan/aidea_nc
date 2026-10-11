@@ -135,6 +135,18 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('480', $xp->evaluate('string('.$date.'/w:pPr/w:spacing/@w:line)'));
     }
 
+    public function test_reference_title_layout_separates_thesis_statement_and_authors(): void
+    {
+        $body = '';
+        foreach (['THESIS TITLE', 'A Thesis', 'Presented to the Faculty', 'In Partial Fulfillment of the Requirements', 'Computer Science', 'by', 'FIRST AUTHOR', 'SECOND AUTHOR', 'April 2026', 'CHAPTER 1'] as $text) $body .= '<w:p><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
+        $file = $this->paper($body); (new PaperFormatter)->format($file, $this->rules()); $xp = $this->xml($file);
+        foreach (['A Thesis', 'In Partial Fulfillment of the Requirements', 'by', 'FIRST AUTHOR', 'April 2026'] as $text) {
+            $this->assertGreaterThan(0, (int) $xp->evaluate('string(//w:p[w:r/w:t="'.$text.'"]/w:pPr/w:spacing/@w:before)'));
+            $this->assertSame('480', $xp->evaluate('string(//w:p[w:r/w:t="'.$text.'"]/w:pPr/w:spacing/@w:line)'));
+        }
+        $this->assertSame('0', $xp->evaluate('string(//w:p[w:r/w:t="SECOND AUTHOR"]/w:pPr/w:spacing/@w:before)'));
+    }
+
     public function test_body_uses_printable_width_and_template_spacing_without_inherited_gaps(): void
     {
         $file = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before="1440" w:after="1440" w:beforeLines="200" w:beforeAutospacing="1"/><w:ind w:left="2160" w:right="2160" w:leftChars="100"/></w:pPr><w:r><w:lastRenderedPageBreak/><w:t>Body text</w:t></w:r></w:p>');

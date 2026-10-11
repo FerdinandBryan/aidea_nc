@@ -241,7 +241,16 @@ class PaperFormatter
             if ($p === $date) break;
         }
         $extra = max(0, $height * .92 - $used);
-        foreach ([[$partial, .45], [$by, .35], [$date, .20]] as [$p, $fraction]) $this->attr($this->ensure($this->ensure($p, 'pPr', true), 'spacing'), 'before', round($extra * $fraction));
+        $thesis = null; $firstAuthor = null;
+        foreach ($visible as $index => $p) {
+            if (preg_match('/^A Thesis$/i', $this->text($p))) $thesis = $p;
+            if ($p === $by && isset($visible[$index + 1]) && $visible[$index + 1] !== $date) $firstAuthor = $visible[$index + 1];
+        }
+        // Match the reference's five blocks: title, thesis statement, degree
+        // statement, "by", authors, then the date at the bottom of the cover.
+        $groups = [[$thesis, .25], [$partial, .24], [$by, .24], [$firstAuthor, .10], [$date, .17]];
+        $total = array_sum(array_map(fn ($group) => $group[0] ? $group[1] : 0, $groups));
+        foreach ($groups as [$p, $fraction]) if ($p) $this->attr($this->ensure($this->ensure($p, 'pPr', true), 'spacing'), 'before', round($extra * $fraction / $total));
     }
 
     private function isDate(string $text): bool
