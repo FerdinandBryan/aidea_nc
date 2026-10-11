@@ -2626,6 +2626,42 @@ async function _dvGenerateFixedPdf() {
         return document.getElementById('dvPrevBody');
     }
 
+    function keepCoverDateOnFirstPage(holder) {
+        var sheets = holder.querySelectorAll('.docx-wrapper > section.docx');
+        if (sheets.length < 2) return;
+        var first = sheets[0].querySelector('article');
+        var second = sheets[1].querySelector('article');
+        if (!first || !second) return;
+        var datePattern = /^(January|February|March|April|May|June|July|August|September|October|November|December)\b.*\d{4}\.?$/i;
+        if (Array.from(first.children).some(function (p) { return datePattern.test((p.textContent || '').trim()); })) return;
+        var date = null;
+        for (var p of Array.from(second.children)) {
+            var text = (p.textContent || '').trim();
+            if (/^CHAPTER\s*(1|I|ONE)\b/i.test(text)) break;
+            if (datePattern.test(text)) { date = p; break; }
+            if (text) return;
+        }
+        if (!date || !Array.from(first.children).some(function (p) { return /^by$/i.test((p.textContent || '').trim()); })) return;
+        while (first.lastElementChild && !(first.lastElementChild.textContent || '').trim() &&
+            !first.lastElementChild.querySelector('img,svg,table')) first.lastElementChild.remove();
+        first.appendChild(date);
+        date.style.textAlign = 'center';
+        var sheetStyle = getComputedStyle(sheets[0]);
+        var available = sheets[0].clientHeight - (parseFloat(sheetStyle.paddingTop) || 0) -
+            (parseFloat(sheetStyle.paddingBottom) || 0);
+        var bottom = date.getBoundingClientRect().bottom - first.getBoundingClientRect().top;
+        var overflow = Math.max(0, bottom - available + 8);
+        if (overflow) {
+            var gaps = Array.from(first.children).map(function (p) {
+                return { node: p, gap: Math.max(0, parseFloat(getComputedStyle(p).marginTop) || 0) };
+            });
+            var total = gaps.reduce(function (sum, p) { return sum + p.gap; }, 0);
+            gaps.forEach(function (p) {
+                if (p.gap && total) p.node.style.marginTop = Math.max(0, p.gap - overflow * p.gap / total) + 'px';
+            });
+        }
+    }
+
     window._dvPreviewFixed = async function () {
         var body = openOverlay('Preview: Fix paper (aligned to the template)');
         body.textContent = 'Preparing preview...';
@@ -2635,6 +2671,7 @@ async function _dvGenerateFixedPdf() {
             await new Promise(function (r) { _validatorDeps.ensureJSZip(r); });
             await loadPreviewLib(); if (window._dvEnsurePagination) window._dvEnsurePagination();
             if (window._dvFixApiReady) await window._dvFixApiReady;
+            if (window._dvInvalidateFixedCopy) window._dvInvalidateFixedCopy();
             var blob = await _dvGenerateFixedDocx(_dvLastFile, _dvLastRules, _dvLastFormattingProfile);
             body.innerHTML = '';
             var bar = document.createElement('div');
@@ -2666,6 +2703,7 @@ async function _dvGenerateFixedPdf() {
             var _dvPrevPg = window._dvPaginateOn; window._dvPaginateOn = true;
             try { await window.docx.renderAsync(blob, holder, null, { className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: false, renderHeaders: true, renderFooters: true }); }
             finally { window._dvPaginateOn = _dvPrevPg; }
+            keepCoverDateOnFirstPage(holder);
             // Show one rendered paper page at a time.
             var pages = Array.from(holder.querySelectorAll('.docx-wrapper > section.docx'));
             if (!pages.length) throw new Error('The document renderer did not produce any pages.');
@@ -3352,7 +3390,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=2';
+    e.src = base + 'fixpaper-api.js?v=3';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };

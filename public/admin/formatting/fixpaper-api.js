@@ -2,6 +2,7 @@
 (function () {
     var endpoint = 'https://aideanc-production.up.railway.app/api/papers/fix';
     var cached = null;
+    window._dvInvalidateFixedCopy = function () { cached = null; };
     _dvGenerateFixedDocx = async function (file) {
         var templateId = window._dvFixTemplateId;
         if (templateId == null || templateId === '') throw new Error('Choose an admin template and run Check formatting first.');
