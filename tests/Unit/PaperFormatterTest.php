@@ -348,4 +348,20 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('Letter content.', $xp->evaluate('string(//w:p[w:r/w:t="Letter content."]//w:t)'));
     }
 
+    public function test_appendices_divider_is_bold_38_point_centered_for_different_templates(): void
+    {
+        foreach ([['type' => 'size', 'value' => 10], ['type' => 'size', 'value' => 14]] as $sizeRule) {
+            $file = $this->paper('<w:p><w:pPr><w:ind w:left="720" w:firstLine="720"/></w:pPr><w:r><w:t>Appendices</w:t></w:r></w:p><w:p><w:r><w:t>Appendix A</w:t></w:r></w:p>');
+            (new PaperFormatter)->format($file, array_merge($this->rules(), [$sizeRule])); $xp = $this->xml($file);
+            $divider = '//w:p[w:r/w:t="APPENDICES"]';
+            $this->assertSame('center', $xp->evaluate('string('.$divider.'/w:pPr/w:jc/@w:val)'));
+            $this->assertSame('76', $xp->evaluate('string('.$divider.'/w:r/w:rPr/w:sz/@w:val)'));
+            $this->assertSame('1', $xp->evaluate('string('.$divider.'/w:r/w:rPr/w:b/@w:val)'));
+            $this->assertSame('6024', $xp->evaluate('string('.$divider.'/w:pPr/w:spacing/@w:before)'));
+            $this->assertSame('exact', $xp->evaluate('string('.$divider.'/w:pPr/w:spacing/@w:lineRule)'));
+            $this->assertSame('0', $xp->evaluate('string('.$divider.'/w:pPr/w:ind/@w:left)'));
+            $this->assertSame((string) ($sizeRule['value'] * 2), $xp->evaluate('string(//w:p[w:r/w:t="Appendix A"]/w:r/w:rPr/w:sz/@w:val)'));
+        }
+    }
+
 }

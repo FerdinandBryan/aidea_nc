@@ -225,7 +225,7 @@ class PaperFormatter
                 foreach ($cfg['margins'] as $side => $inch) $this->attr($margins, $side, round($inch * 1440));
             }
             $this->attachHeadingText($xp);
-            $this->isolateAppendicesDivider($xp);
+            $this->isolateAppendicesDivider($xp, $cfg);
             $this->attachFigureCaptions($xp);
             $this->layoutTitle($title, $cfg, $xp);
             $zip->addFromString('word/document.xml', $doc->saveXML());
@@ -293,11 +293,27 @@ class PaperFormatter
         }
     }
 
-    private function isolateAppendicesDivider(DOMXPath $xp): void
+    private function isolateAppendicesDivider(DOMXPath $xp, array $cfg): void
     {
         foreach ($xp->query('/w:document/w:body/w:p') as $p) {
             if (strtoupper($this->text($p)) !== 'APPENDICES') continue;
             if (preg_match('/^TOC/i', $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $p))) continue;
+            // Shared divider style requested for every admin template.
+            foreach ($p->getElementsByTagNameNS(self::W, 't') as $text) $text->textContent = strtoupper($text->textContent);
+            $this->centerTitleParagraph($p, $xp);
+            foreach ($xp->query('.//w:r', $p) as $run) {
+                $rPr = $this->ensure($run, 'rPr', true);
+                foreach (['b', 'bCs'] as $key) $this->attr($this->ensure($rPr, $key), 'val', 1);
+                foreach (['sz', 'szCs'] as $key) $this->attr($this->ensure($rPr, $key), 'val', 76);
+            }
+            $section = $xp->query('.//w:sectPr | following::w:sectPr[1]', $p)->item(0);
+            $top = $xp->evaluate('string(./w:pgMar/@w:top)', $section);
+            $bottom = $xp->evaluate('string(./w:pgMar/@w:bottom)', $section);
+            $height = $cfg['height'] - ($top !== '' ? (float) $top : 1440) - ($bottom !== '' ? (float) $bottom : 1440);
+            $spacing = $this->ensure($this->ensure($p, 'pPr', true), 'spacing');
+            $this->attr($spacing, 'line', 912); $this->attr($spacing, 'lineRule', 'exact');
+            $this->attr($spacing, 'before', max(0, round(($height - 912) / 2))); $this->attr($spacing, 'after', 0);
+            foreach (['beforeLines', 'afterLines', 'beforeAutospacing', 'afterAutospacing'] as $key) $this->attr($spacing, $key, 0);
             $this->pageBreak($p, $xp);
             $this->attr($this->ensure($this->ensure($p, 'pPr', true), 'keepNext'), 'val', 0);
             $next = $p->nextSibling;
