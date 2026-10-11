@@ -1950,6 +1950,6 @@ document.addEventListener('DOMContentLoaded', () => {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper.js?v=7';
+    e.src = base + 'fixpaper.js?v=8';
     document.head.appendChild(e);
 })();

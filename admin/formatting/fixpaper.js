@@ -51,7 +51,7 @@
     function parseRules(rules) {
         var cfg = { body: null, abs: null, top: null, bottom: null, left: null, right: null, font: null, size: null, alignment: null, indentation: null, hanging: false, heads: {} };
         (rules || []).forEach(function (r) {
-            var d = String((r && (r.detail || r.name)) || ''), m;
+            var d = String((r && (r.detail || r.name)) || '').replace(/[^\x00-\x7F]+/g, ' '), m;
             var hw = /\bword\s+(REFERENCES|APPENDICES)\b/i.exec(d);
             if (hw) {
                 var h = { size: null, center: /cent/i.test(d), bold: /\bbold\b/i.test(d), caps: /capital/i.test(d) };
@@ -61,8 +61,8 @@
             }
             if (/spac/i.test(d)) {
                 var v = null;
-                if (/double[- ]?spac/i.test(d)) v = 2;
-                else if (/single[- ]?spac/i.test(d)) v = 1;
+                if (/double(?:[- ]+line)?[- ]*spac/i.test(d)) v = 2;
+                else if (/single(?:[- ]+line)?[- ]*spac/i.test(d)) v = 1;
                 else if ((m = /\b(1\.5|2(?:\.0)?)\s*(?:line\s*)?spac/i.exec(d))) v = parseFloat(m[1]);
                 if (v !== null) {
                     if (/abstract/i.test(d)) { if (cfg.abs === null) cfg.abs = v; }
@@ -180,12 +180,12 @@
             }
             if (t) seenText = true;
 
-            // Blank title-page paragraphs also occupy space; do not leave them
-            // double-spaced while only the visible title text is single-spaced.
+            // Apply the template's line spacing to title-page paragraphs,
+            // including blank paragraphs used as spacers.
             if (!tbl && zone === 'front') {
                 var titlePr = pPrOf(doc, p);
                 var titleSpacing = ensure(doc, titlePr, PPR, 'spacing');
-                setA(titleSpacing, 'line', 240);
+                setA(titleSpacing, 'line', Math.round((cfg.body !== null ? cfg.body : 1) * 240));
                 setA(titleSpacing, 'lineRule', 'auto');
                 setA(titleSpacing, 'before', 0);
                 setA(titleSpacing, 'after', 0);
@@ -204,9 +204,9 @@
             if (!tbl && t) {
                 var line = null;
                 if (!big) {
-                    if (zone === 'front') line = (cfg.body !== null) ? 1 : null;
-                    else if (zone === 'abstract' && kind !== 'abstract') line = cfg.abs;
-                    else if (zone === 'body' || zone === 'references') line = cfg.body;
+                    if (zone === 'front') line = cfg.body;
+                    else if (zone === 'abstract' && kind !== 'abstract') line = cfg.abs !== null ? cfg.abs : cfg.body;
+                    else line = cfg.body;
                 }
                 if (line !== null) {
                     var sp = ensure(doc, pPrOf(doc, p), PPR, 'spacing');
