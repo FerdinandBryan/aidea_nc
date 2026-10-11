@@ -26,15 +26,18 @@ class PaperAttentionMarker
             if (!$xml || stripos($xml, '<!DOCTYPE') !== false || !@$doc->loadXML($xml, LIBXML_NONET)) throw new InvalidArgumentException('The Word document contains invalid XML.');
             $xp = new DOMXPath($doc); $xp->registerNamespace('w', self::W);
             $paragraphs = iterator_to_array($xp->query('//w:body//w:p'));
-            $notes = []; $issues = []; $abstract = false;
+            $notes = []; $issues = []; $abstract = false; $cv = false; $appendices = false;
             foreach ($paragraphs as $index => $p) {
                 $text = ''; foreach ($xp->query('.//w:t', $p) as $t) $text .= $t->textContent;
                 $text = trim($text); if ($text === '') continue;
+                if (preg_match('/^APPENDI(?:X|CES)\b/i', $text)) $appendices = true;
+                if ((preg_match('/curriculum\s+vitae/i', $text) && mb_strlen($text) < 140) || ($appendices && strtoupper($text) === 'PERSONAL INFORMATION' && !empty($settings['cv']))) $cv = true;
                 $isHeading = strtoupper($text) === 'ABSTRACT';
                 if ($isHeading) $abstract = true;
                 elseif (preg_match('/^(CHAPTER\s|TABLE OF CONTENTS|LIST OF|ACKNOWLEDGEMENT|REFERENCES|APPENDICES)/i', $text)) $abstract = false;
                 if ($xp->query('ancestor::w:tbl', $p)->length) continue;
                 $target = $abstract && !$isHeading ? ($settings['abstract'] ?? $settings['spacing']) : $settings['spacing'];
+                if ($cv) $target = $settings['cv']['spacing'] ?? $target;
                 $spacing = $xp->query('./w:pPr/w:spacing', $p)->item(0);
                 if ($target !== null && $spacing && $spacing->hasAttributeNS(self::W, 'line') &&
                     in_array($spacing->getAttributeNS(self::W, 'lineRule'), ['', 'auto'], true)) {

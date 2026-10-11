@@ -27,10 +27,21 @@ class PaperFormatter
     {
         $cfg = ['font' => null, 'size' => null, 'spacing' => null, 'abstract' => null,
             'alignment' => null, 'indentation' => null, 'hanging' => false,
-            'margins' => [], 'width' => 12240, 'height' => 15840, 'headings' => []];
+            'margins' => [], 'width' => 12240, 'height' => 15840, 'headings' => [], 'cv' => []];
         foreach ($rules as $rule) {
             if (!is_array($rule)) throw new InvalidArgumentException('The template contains an invalid rule.');
             $text = preg_replace('/[^\x00-\x7F]+/', ' ', (string) ($rule['detail'] ?? $rule['name'] ?? ''));
+            if (preg_match('/curriculum\s+vitae|\bCV\b/i', $text)) {
+                if (preg_match('/\b(\d+(?:\.\d+)?)\s*(?:by|x)\s*(\d+(?:\.\d+)?)\s*(?:inch|in\b)/i', $text, $m)) {
+                    $cfg['cv']['photo_width'] = (float) $m[1]; $cfg['cv']['photo_height'] = (float) $m[2];
+                }
+                if (preg_match('/single(?:[- ]+line)?[- ]*spac/i', $text)) $cfg['cv']['spacing'] = 1;
+                elseif (preg_match('/double(?:[- ]+line)?[- ]*spac/i', $text)) $cfg['cv']['spacing'] = 2;
+                elseif (preg_match('/\b(\d+(?:\.\d+)?)\s*(?:line\s*)?spac/i', $text, $m)) $cfg['cv']['spacing'] = (float) $m[1];
+                if (preg_match('/one\s*\(1\)\s*page|one\s+page|1\s+page/i', $text)) $cfg['cv']['one_page'] = true;
+                if (preg_match('/\b(left|right|center)[- ]aligned\b/i', $text, $m)) $cfg['cv']['alignment'] = strtolower($m[1]);
+                continue;
+            }
             if (preg_match('/\bword\s+(REFERENCES|APPENDICES)\b/i', $text, $m)) {
                 $heading = ['center' => (bool) preg_match('/cent(?:er|re)/i', $text), 'bold' => (bool) preg_match('/\bbold\b/i', $text)];
                 if (preg_match('/font size\s*(\d+(?:\.\d+)?)/i', $text, $size)) $heading['size'] = (float) $size[1];
@@ -89,6 +100,7 @@ class PaperFormatter
             ($cfg['size'] !== null && ($cfg['size'] < 1 || $cfg['size'] > 100)) ||
             ($cfg['indentation'] !== null && ($cfg['indentation'] < 0 || $cfg['indentation'] > 5))) throw new InvalidArgumentException('The template has invalid formatting values.');
         foreach ($cfg['margins'] as $margin) if ($margin < 0 || $margin > 4) throw new InvalidArgumentException('The template has invalid margins.');
+        foreach (['photo_width', 'photo_height', 'spacing'] as $key) if (isset($cfg['cv'][$key]) && ($cfg['cv'][$key] <= 0 || $cfg['cv'][$key] > 5)) throw new InvalidArgumentException('The template has invalid Curriculum Vitae settings.');
         if (($cfg['margins']['left'] ?? 1) + ($cfg['margins']['right'] ?? 1) >= $cfg['width'] / 1440 ||
             ($cfg['margins']['top'] ?? 1) + ($cfg['margins']['bottom'] ?? 1) >= $cfg['height'] / 1440) throw new InvalidArgumentException('The template margins leave no printable area.');
         return $cfg;
@@ -119,8 +131,19 @@ class PaperFormatter
             if (!$body instanceof DOMElement) throw new InvalidArgumentException('The Word document has no body.');
             foreach (iterator_to_array($xp->query('//w:lastRenderedPageBreak')) as $old) $old->parentNode->removeChild($old);
             $this->splitChapterParagraphs($doc, $xp);
-            $zone = 'front'; $title = []; $paragraphs = 0;
+            $zone = 'front'; $title = []; $paragraphs = 0; $cv = false; $appendices = false; $cvAuthors = 0;
             foreach (iterator_to_array($xp->query('//w:body//w:p')) as $p) {
+                $cvText = $this->text($p);
+                if (preg_match('/^APPENDI(?:X|CES)\b/i', $cvText)) $appendices = true;
+                if (preg_match('/curriculum\s+vitae/i', $cvText) && mb_strlen($cvText) < 140) $cv = true;
+                if ($appendices && strtoupper($cvText) === 'PERSONAL INFORMATION' && $cfg['cv']) $cv = true;
+                if ($cv && $zone === 'front') $zone = 'body';
+                if ($cv && !$xp->query('ancestor::w:txbxContent', $p)->length) {
+                    $this->resizeCvPhoto($p, $cfg['cv'], $xp);
+                    if (strtoupper($cvText) === 'PERSONAL INFORMATION') {
+                        if ($cvAuthors++ > 0 && ($cfg['cv']['one_page'] ?? false)) $this->pageBreak($p, $xp);
+                    }
+                }
                 // Drawing anchors and text boxes have their own geometry and typography.
                 // Body spacing/indent changes can collapse or displace a Word diagram.
                 if ($xp->query('ancestor::w:txbxContent | .//w:drawing | .//w:pict | .//w:object', $p)->length) continue;
@@ -136,11 +159,11 @@ class PaperFormatter
                 if (!$table) {
                     $paragraphs++;
                     $list = $xp->query('./w:numPr', $pr)->length > 0;
-                    if ($zone !== 'front' && !$heading && !preg_match('/\.{3,}/', $text)) {
+                    if ($zone !== 'front' && !$heading && !$cv && !preg_match('/\.{3,}/', $text)) {
                         $this->cleanLineStarts($p);
                         if ($list && !$cfg['alignment']) $this->attr($this->ensure($pr, 'jc'), 'val', 'left');
                     }
-                    $line = $zone === 'abstract' && !$heading ? ($cfg['abstract'] ?? $cfg['spacing']) : $cfg['spacing'];
+                    $line = $cv ? ($cfg['cv']['spacing'] ?? $cfg['spacing']) : ($zone === 'abstract' && !$heading ? ($cfg['abstract'] ?? $cfg['spacing']) : $cfg['spacing']);
                     if ($line !== null) {
                         $sp = $this->ensure($pr, 'spacing'); $this->attr($sp, 'line', round($line * 240)); $this->attr($sp, 'lineRule', 'auto');
                         // Old paragraph gaps and document grids must not expand
@@ -154,15 +177,16 @@ class PaperFormatter
                         // than moving entire groups because of inherited styles.
                         $this->attr($this->ensure($pr, 'keepNext'), 'val', 0);
                         $this->attr($this->ensure($pr, 'keepLines'), 'val', 0);
-                        if (!$list) {
+                        if (!$list && !$cv) {
                             $ind = $this->ensure($pr, 'ind');
                             foreach (['left', 'right', 'start', 'end'] as $key) $this->attr($ind, $key, 0);
                             foreach (['leftChars', 'rightChars', 'startChars', 'endChars'] as $key) $ind->removeAttributeNS(self::W, $key);
                         }
                     }
                     if ($zone === 'front' && $this->isDate($text)) $this->centerTitleParagraph($p, $xp);
-                    if (!$heading && $zone !== 'front' && $cfg['alignment']) $this->attr($this->ensure($pr, 'jc'), 'val', $cfg['alignment']);
-                    if (!$heading && !$list && $zone !== 'front' && $cfg['indentation'] !== null) {
+                    if (!$heading && $zone !== 'front' && !$cv && $cfg['alignment']) $this->attr($this->ensure($pr, 'jc'), 'val', $cfg['alignment']);
+                    if ($cv && isset($cfg['cv']['alignment'])) $this->attr($this->ensure($pr, 'jc'), 'val', $cfg['cv']['alignment']);
+                    if (!$heading && !$list && !$cv && $zone !== 'front' && $cfg['indentation'] !== null) {
                         $ind = $this->ensure($pr, 'ind'); $ind->removeAttributeNS(self::W, 'hanging'); $ind->removeAttributeNS(self::W, 'firstLineChars');
                         $this->attr($ind, 'firstLine', round($cfg['indentation'] * 1440));
                     }
@@ -170,7 +194,7 @@ class PaperFormatter
                         $ind = $this->ensure($pr, 'ind'); $ind->removeAttributeNS(self::W, 'firstLine'); $this->attr($ind, 'left', 720); $this->attr($ind, 'hanging', 720);
                     }
                 }
-                if ($topicHeading) {
+                if ($topicHeading && !$cv) {
                     $this->attr($this->ensure($pr, 'keepNext'), 'val', 1);
                     $this->attr($this->ensure($pr, 'keepLines'), 'val', 1);
                     if (!$chapter) {
@@ -211,6 +235,7 @@ class PaperFormatter
                 if ($single !== $defaults || preg_match('/short bond|\bA4\b|8\.5.*11/i', (string) ($rule['detail'] ?? ''))) $applied[] = $name;
                 else $manual[] = $name;
             }
+            if ($cv && ($cfg['cv']['one_page'] ?? false)) $manual[] = 'Curriculum Vitae: verify that each author fits within the template page limit; content is not removed to force a fit.';
             return ['settings' => $cfg, 'paragraphs_processed' => $paragraphs,
                 'applied_rules' => $applied, 'manual_review_rules' => $manual,
                 'manual_review_required' => count($manual) > 0,
@@ -264,6 +289,24 @@ class PaperFormatter
                 }
             }
             if ($moveBreak) $this->pageBreak($heading, $xp);
+        }
+    }
+
+    private function resizeCvPhoto(DOMElement $p, array $settings, DOMXPath $xp): void
+    {
+        if (!isset($settings['photo_width'], $settings['photo_height'])) return;
+        foreach ($xp->query('.//w:drawing', $p) as $drawing) {
+            // Resize actual pictures only, leaving charts and other drawings intact.
+            $pictures = $xp->query('.//*[local-name()="pic" and namespace-uri()="http://schemas.openxmlformats.org/drawingml/2006/picture"]', $drawing);
+            if (!$pictures->length) continue;
+            foreach ($xp->query('.//*[local-name()="extent" and namespace-uri()="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"]', $drawing) as $extent) {
+                $extent->setAttribute('cx', (string) round($settings['photo_width'] * 914400));
+                $extent->setAttribute('cy', (string) round($settings['photo_height'] * 914400));
+            }
+            foreach ($pictures as $picture) foreach ($xp->query('.//*[local-name()="xfrm"]/*[local-name()="ext"]', $picture) as $extent) {
+                $extent->setAttribute('cx', (string) round($settings['photo_width'] * 914400));
+                $extent->setAttribute('cy', (string) round($settings['photo_height'] * 914400));
+            }
         }
     }
 

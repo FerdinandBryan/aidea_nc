@@ -315,4 +315,23 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('0', $xp->evaluate('string(//w:p[w:r/w:t="Figure 2. Conceptual framework"]/w:pPr/w:pageBreakBefore/@w:val)'));
     }
 
+    public function test_cv_rules_are_scoped_and_photo_size_comes_from_selected_template(): void
+    {
+        $rules = array_merge($this->rules(), [['detail' => 'Curriculum Vitae: single-spaced, left-aligned, a 1.5 by 1.5 inch picture, maximum of one (1) page per author.']]);
+        $formatter = new PaperFormatter;
+        $this->assertSame(2, $formatter->settings($rules)['spacing']);
+        $file = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Body text</w:t></w:r></w:p><w:p><w:r><w:t>APPENDICES</w:t></w:r></w:p><w:p><w:r><w:t>Curriculum Vitae</w:t></w:r></w:p><w:p><w:r><w:t>PERSONAL INFORMATION</w:t></w:r></w:p><w:p><w:pPr><w:ind w:left="720"/></w:pPr><w:r><w:t>Name: Researcher</w:t></w:r></w:p><w:p><w:r><w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="100" cy="200"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:spPr><a:xfrm><a:ext cx="100" cy="200"/></a:xfrm></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p><w:p><w:r><w:t>PERSONAL INFORMATION</w:t></w:r></w:p>');
+        $formatter->format($file, $rules); $xp = $this->xml($file);
+        $this->assertSame('480', $xp->evaluate('string(//w:p[w:r/w:t="Body text"]/w:pPr/w:spacing/@w:line)'));
+        $this->assertSame('240', $xp->evaluate('string(//w:p[w:r/w:t="Name: Researcher"]/w:pPr/w:spacing/@w:line)'));
+        $this->assertSame('720', $xp->evaluate('string(//w:p[w:r/w:t="Name: Researcher"]/w:pPr/w:ind/@w:left)'));
+        $this->assertSame('left', $xp->evaluate('string(//w:p[w:r/w:t="Name: Researcher"]/w:pPr/w:jc/@w:val)'));
+        $this->assertSame('1371600', $xp->evaluate('string(//*[local-name()="extent"]/@cx)'));
+        $this->assertSame('1371600', $xp->evaluate('string(//*[local-name()="extent"]/@cy)'));
+        $this->assertEquals(1, $xp->evaluate('count((//w:p[w:r/w:t="PERSONAL INFORMATION"])[2]//w:br[@w:type="page"])'));
+        $other = $formatter->settings([['detail' => 'Curriculum Vitae: a 2 by 2 inch picture, double-spaced.']]);
+        $this->assertSame(2.0, $other['cv']['photo_width']);
+        $this->assertSame(2, $other['cv']['spacing']);
+    }
+
 }
