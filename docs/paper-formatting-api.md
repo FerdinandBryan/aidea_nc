@@ -1,0 +1,41 @@
+# Paper formatting API
+
+`POST /api/papers/fix` requires a Sanctum bearer token and multipart form data:
+
+- `file`: Word `.docx`, up to 20 MB.
+- `template_id`: ID of an active template saved in the admin Format Templates screen.
+
+The response is a downloadable `_fixed.docx`. The server reads the template
+from `format_templates`; it does not accept client-supplied rules or document
+URLs. The original upload is unchanged. The temporary output is private and
+deleted after the response is streamed.
+
+Supported rules include font, font size, line spacing, abstract spacing,
+margins, alignment, indentation, hanging reference indents, and the special
+References/Appendices headings. Explicit rule `type`/`value` settings take
+precedence over recognized descriptions. Paper size defaults to short bond
+(US Letter), with A4 supported when specified by the template. Chapter headings
+get explicit page breaks. A title page with a degree statement, authors and
+date receives additional space between groups without changing line spacing.
+Its vertical layout is estimated from text length; Word's rendering can vary.
+
+Content criteria (citation accuracy, required argumentation, word counts and
+section completeness) need review. An attached template reference document
+is not treated as a replacement for the template's written rules. Existing
+pagination headers are preserved rather than rebuilt.
+
+The browser API client captures the template ID when the format check runs.
+Preview and download share the returned document for that check. A new check
+invalidates the cached result. API failures are shown to the user; the browser
+does not silently fall back to the previous local fixer.
+
+Deploy the Laravel backend with the new controller, service and route before
+testing the frontend. PHP's DOM, ZIP and mbstring extensions are required. No
+new Composer dependencies, database migrations or third-party AI keys are needed.
+
+Validation:
+
+```shell
+php vendor/bin/phpunit tests/Unit/PaperFormatterTest.php tests/Feature/PaperFormattingApiTest.php
+php artisan route:list --path=papers/fix
+```

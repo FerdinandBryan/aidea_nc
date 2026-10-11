@@ -1522,12 +1522,13 @@ window._dvDownloadRedline = async function () {
 
 window._dvDownloadFixed = async function () {
     const btn = document.getElementById('dvFixedBtn');
-    if (!_dvLastFile || !_dvLastFormattingProfile || !_dvLastRules) return;
+    if (!_dvLastFile || !_dvLastRules) return;
     const ext = (_dvLastFile.name || '').split('.').pop().toLowerCase();
     if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
     try {
         let blob;
         if (ext === 'docx') {
+            if (window._dvFixApiReady) await window._dvFixApiReady;
             blob = await _dvGenerateFixedDocx(_dvLastFile, _dvLastRules, _dvLastFormattingProfile);
         } else if (ext === 'pdf') {
             blob = await _dvGenerateFixedPdf(_dvLastFile, _dvLastRules, _dvLastFormattingProfile);
@@ -1657,6 +1658,8 @@ async function _dvRunFileCheck(fileObj, actionLabel, onValidCallback, meta, temp
     _dvLastFile = fileObj;
     _dvLastFormattingProfile = formattingProfile;
     _dvLastRules = rules;
+    window._dvFixTemplateId = templateId;
+    window._dvFixRevision = (window._dvFixRevision || 0) + 1;
     _dvLastFlatViolations = _dvComputeFlatViolations(rules, formattingProfile);
 
     _renderValidationResult(result, onValidCallback, actionLabel, formattingProfile, rules, rulesSource);
@@ -2609,7 +2612,8 @@ async function _dvGenerateFixedPdf() {
             if (/\.pdf$/i.test(_dvLastFile.name || '')) throw new Error('Preview works on .docx files only. Upload the Word version.');
             await new Promise(function (r) { _validatorDeps.ensureJSZip(r); });
             await loadPreviewLib(); if (window._dvEnsurePagination) window._dvEnsurePagination();
-            var blob = await dvCleanRedNotes(await _dvGenerateFixedDocx(_dvLastFile, _dvLastRules, _dvLastFormattingProfile));
+            if (window._dvFixApiReady) await window._dvFixApiReady;
+            var blob = await _dvGenerateFixedDocx(_dvLastFile, _dvLastRules, _dvLastFormattingProfile);
             body.innerHTML = '';
             var bar = document.createElement('div');
             bar.style.cssText = 'margin-bottom:10px;';
@@ -3219,6 +3223,11 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper.js?v=8';
+    e.src = base + 'fixpaper-api.js?v=1';
+    window._dvFixApiReady = new Promise(function (resolve, reject) {
+        e.onload = resolve;
+        e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };
+    });
+    window._dvFixApiReady.catch(function () {});
     document.head.appendChild(e);
 })();
