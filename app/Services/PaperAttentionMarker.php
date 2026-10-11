@@ -84,17 +84,10 @@ class PaperAttentionMarker
                 if (!$expected) continue;
                 $actual = trim($m[2] ?? '');
                 $targetIndex = $index;
-                {
-                    $next = $p->nextSibling;
-                    while ($next instanceof DOMElement && $next->localName === 'p' && $this->paragraphText($next) === '' && !$xp->query('.//w:drawing | .//w:pict | .//w:sectPr', $next)->length) $next = $next->nextSibling;
-                    if ($next instanceof DOMElement && $next->localName === 'p') {
-                        $after = $next->nextSibling;
-                        while ($after instanceof DOMElement && $after->localName === 'p' && $this->paragraphText($after) === '' && !$xp->query('.//w:drawing | .//w:pict | .//w:sectPr', $after)->length) $after = $after->nextSibling;
-                        if ($actual === '' || (mb_strlen($this->paragraphText($next)) <= 180 && !$xp->query('.//w:drawing | .//w:pict | .//w:object', $next)->length && $after instanceof DOMElement && $xp->query('.//w:drawing | .//w:pict | .//w:object', $after)->length)) {
-                            $actual = $this->paragraphText($next);
-                            $targetIndex = array_search($next, $paragraphs, true);
-                        }
-                    }
+                $separateTitle = AppendixTitleLocator::find($p, $xp);
+                if ($separateTitle) {
+                    $actual = AppendixTitleLocator::text($separateTitle, $xp);
+                    $targetIndex = array_search($separateTitle, $paragraphs, true);
                 }
                 if (mb_strtolower(trim($actual)) === mb_strtolower(trim($expected))) continue;
                 $message = 'Appendix '.strtoupper($m[1]).' title should be "'.$expected.'" according to the selected admin template.';

@@ -452,4 +452,23 @@ class PaperFormatterTest extends TestCase
         }
     }
 
+    public function test_appendix_title_is_replaced_when_it_shares_an_image_paragraph_or_table(): void
+    {
+        $inline = '<w:p><w:r><w:t>Research Ethics Clearance</w:t><w:br/><w:drawing/></w:r></w:p>';
+        $table = '<w:tbl><w:tr><w:tc><w:p><w:r><w:t>Research Ethics Clearance</w:t></w:r></w:p><w:p><w:r><w:drawing/></w:r></w:p></w:tc></w:tr></w:tbl>';
+        foreach ([$inline, $table] as $attachment) {
+            $file = $this->paper('<w:p><w:r><w:t>Appendix D - Certificate of Validation</w:t></w:r></w:p>'.$attachment);
+            $rules = [['detail' => 'Appendix D - Certificate of Validation: scanned signed form.']];
+            $formatter = new PaperFormatter;
+            $attention = (new PaperAttentionMarker)->mark($file, $formatter->settings($rules));
+            $this->assertSame('appendix-title', $attention['issues'][0]['type']);
+            $this->assertSame(2, $attention['issues'][0]['paragraph']);
+            $formatter->format($file, $rules); $xp = $this->xml($file);
+            $this->assertSame('Appendix D', $xp->evaluate('string(/w:document/w:body/w:p[1]//w:t)'));
+            $this->assertEquals(1, $xp->evaluate('count(//w:t[text()="Certificate of Validation"])'));
+            $this->assertEquals(0, $xp->evaluate('count(//w:t[contains(text(),"Research Ethics")])'));
+            $this->assertEquals(1, $xp->evaluate('count(//w:drawing)'));
+        }
+    }
+
 }
