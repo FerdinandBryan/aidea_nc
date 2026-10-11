@@ -2794,48 +2794,39 @@ async function _dvGenerateFixedPdf() {
                 });
             });
             if (listResets.size && wrapper) wrapper.style.counterReset = Array.from(listResets.values()).join(' ');
-            var controls = document.createElement('div');
-            controls.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:14px;margin:12px 0;';
-            var previous = document.createElement('button');
-            previous.type = 'button'; previous.className = 'btn-modal-close'; previous.textContent = 'Previous page';
-            var pageLabel = document.createElement('span');
-            pageLabel.setAttribute('role', 'status');
-            pageLabel.setAttribute('aria-live', 'polite');
-            var next = document.createElement('button');
-            next.type = 'button'; next.className = 'btn-modal-close'; next.textContent = 'Next page';
-            controls.appendChild(previous); controls.appendChild(pageLabel); controls.appendChild(next);
-            body.insertBefore(controls, holder);
-            var pageIndex = 0;
-            function showPage(index) {
-                pageIndex = Math.max(0, Math.min(pages.length - 1, index));
-                pages.forEach(function (page, i) {
-                    page.style.setProperty('display', 'flex', 'important');
-                    page.style.position = i === pageIndex ? 'relative' : 'absolute';
-                    page.style.left = i === pageIndex ? 'auto' : '-100000px';
-                    page.style.visibility = i === pageIndex ? 'visible' : 'hidden';
-                    page.style.pointerEvents = i === pageIndex ? 'auto' : 'none';
-                    page.setAttribute('aria-hidden', i === pageIndex ? 'false' : 'true');
-                });
-                // Fit the sheet to the modal width for readable text,
-                // with vertical scrolling and unchanged print dimensions.
-                var activePage = pages[pageIndex];
-                activePage.style.zoom = '1';
-                var sheetWidth = activePage.offsetWidth;
-                var sheetHeight = activePage.offsetHeight;
+            var pageCount = document.createElement('p');
+            pageCount.textContent = pages.length + ' pages - scroll down to view each page';
+            pageCount.style.cssText = 'margin:12px 0;color:#cbd5e1;font-size:13px;';
+            body.insertBefore(pageCount, holder);
+            pages.forEach(function (page, index) {
+                page.style.setProperty('display', 'flex', 'important');
+                page.style.position = 'relative';
+                page.style.left = 'auto';
+                page.style.visibility = 'visible';
+                page.style.pointerEvents = 'auto';
+                page.removeAttribute('aria-hidden');
+                page.setAttribute('aria-label', 'Page ' + (index + 1) + ' of ' + pages.length);
+                var label = document.createElement('div');
+                label.textContent = 'Page ' + (index + 1) + ' of ' + pages.length;
+                label.style.cssText = 'color:#f1f5f9;font:13px Arial,sans-serif;margin:6px 0 10px;';
+                page.parentNode.insertBefore(label, page);
+            });
+            function fitPages() {
                 var availableWidth = Math.max(1, holder.clientWidth - 24);
-
-                if (sheetWidth > 0 && sheetHeight > 0) {
-                    activePage.style.zoom = String(availableWidth / sheetWidth);
-                }
-                pageLabel.textContent = 'Page ' + (pageIndex + 1) + ' of ' + pages.length;
-                previous.disabled = pageIndex === 0;
-                next.disabled = pageIndex === pages.length - 1;
-                holder.scrollTop = 0;
-                body.scrollTop = 0;
+                pages.forEach(function (page) {
+                    page.style.zoom = '1';
+                    var sheetWidth = page.offsetWidth;
+                    if (sheetWidth > 0) page.style.zoom = String(availableWidth / sheetWidth);
+                });
             }
-            previous.onclick = function () { showPage(pageIndex - 1); };
-            next.onclick = function () { showPage(pageIndex + 1); };
-            showPage(0);
+            fitPages();
+            if (window.ResizeObserver) {
+                var pageObserver = new ResizeObserver(function () {
+                    if (!holder.isConnected) { pageObserver.disconnect(); return; }
+                    fitPages();
+                });
+                pageObserver.observe(holder);
+            }
         } catch (e) {
             console.warn('[Validator] preview failed', e);
             body.textContent = 'Could not build the preview: ' + (e && e.message ? e.message : e);
@@ -3405,7 +3396,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=15';
+    e.src = base + 'fixpaper-api.js?v=16';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };
