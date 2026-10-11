@@ -2452,11 +2452,13 @@ async function _dvGenerateFixedPdf() {
                 var artTop = art.getBoundingClientRect().top;
                 Array.from(art.children).forEach(function (ch) {
                     var r = ch.getBoundingClientRect(), cs = getComputedStyle(ch);
+                    var visualBottom = r.bottom;
+                    ch.querySelectorAll('img,svg').forEach(function (graphic) { visualBottom = Math.max(visualBottom, graphic.getBoundingClientRect().bottom); });
                     items.push({
                         art: ai,
                         leadHeight: 2 * (parseFloat(cs.lineHeight) || (parseFloat(cs.fontSize) || 16) * 1.2),
                         top: r.top - artTop - (parseFloat(cs.marginTop) || 0),
-                        bottom: r.bottom - artTop + (parseFloat(cs.marginBottom) || 0)
+                        bottom: visualBottom - artTop + (parseFloat(cs.marginBottom) || 0)
                     });
                 });
             });
@@ -2722,7 +2724,7 @@ async function _dvGenerateFixedPdf() {
                     return (node.textContent || '').trim() || node.querySelector('img,svg,table');
                 });
                 var last = meaningful[meaningful.length - 1];
-                if (!last || last.tagName !== 'P') return;
+                if (!last || last.tagName !== 'P' || last.querySelector('img,svg,table')) return;
                 var raw = last.textContent || '';
                 // A bold cover date is not a topic heading. Keep it on the cover.
                 if (/^(January|February|March|April|May|June|July|August|September|October|November|December)\b.*\d{4}\.?$/i.test(raw.trim())) return;
@@ -3387,7 +3389,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=13';
+    e.src = base + 'fixpaper-api.js?v=14';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };

@@ -121,6 +121,9 @@ class PaperFormatter
             $this->splitChapterParagraphs($doc, $xp);
             $zone = 'front'; $title = []; $paragraphs = 0;
             foreach (iterator_to_array($xp->query('//w:body//w:p')) as $p) {
+                // Drawing anchors and text boxes have their own geometry and typography.
+                // Body spacing/indent changes can collapse or displace a Word diagram.
+                if ($xp->query('ancestor::w:txbxContent | .//w:drawing | .//w:pict | .//w:object', $p)->length) continue;
                 $text = $this->text($p); $upper = strtoupper(trim($text));
                 $table = $xp->query('ancestor::w:tbl', $p)->length > 0;
                 $firstText = $p->getElementsByTagNameNS(self::W, 't')->item(0)?->textContent ?? '';
@@ -232,6 +235,7 @@ class PaperFormatter
     {
         foreach (iterator_to_array($xp->query('/w:document/w:body/w:p[w:pPr/w:keepNext[@w:val="1"]]')) as $heading) {
             $next = $heading->nextSibling; $moveBreak = false;
+            if ($next instanceof DOMElement && $xp->query('.//w:drawing | .//w:pict | .//w:object', $next)->length) continue;
             while ($next instanceof DOMElement && $next->localName === 'p' && $this->text($next) === '') {
                 if ($xp->query('.//w:sectPr | .//w:drawing | .//w:pict | .//w:fldChar', $next)->length) break;
                 if ($xp->query('.//w:br[@w:type="page"] | ./w:pPr/w:pageBreakBefore[not(@w:val="0")]', $next)->length) $moveBreak = true;
