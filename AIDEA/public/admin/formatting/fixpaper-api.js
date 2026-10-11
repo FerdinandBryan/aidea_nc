@@ -48,6 +48,7 @@
     window._dvCheckAndFixPaper = async function () {
         var file = _dvLastFile, templateId = window._dvFixTemplateId;
         var revision = window._dvFixRevision;
+        window._dvAttentionResult = null;
         var parent = document.getElementById('docValidationBody');
         if (!parent || !file || templateId == null) return;
         var old = document.getElementById('dvGeminiReview');
@@ -74,6 +75,15 @@
             for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
             var fixed = new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
             fixed.formattingReport = data.report;
+            if (data.attention_document_base64) {
+                var annotated = atob(data.attention_document_base64);
+                var markedBytes = new Uint8Array(annotated.length);
+                for (var j = 0; j < annotated.length; j++) markedBytes[j] = annotated.charCodeAt(j);
+                window._dvAttentionResult = {revision:revision,blob:new Blob([markedBytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),issues:data.attention_issues || []};
+                document.querySelectorAll('[data-dv-attention]').forEach(function (button) {
+                    button.textContent = 'Preview Needs attention (' + (data.attention_issues || []).length + ')';
+                });
+            }
             cached = {file:file,key:String(templateId)+':'+String(revision),promise:Promise.resolve(fixed)};
             panel.textContent = '';
             var title = document.createElement('strong');
@@ -100,4 +110,53 @@
         } catch (error) { panel.textContent = 'Could not check and format this paper: ' + error.message; }
 
     }
-})();
+    window._dvPreviewAttention = async function () {
+        var old = document.getElementById('dvPrevOverlay');
+        if (old) old.remove();
+        var overlay = document.createElement('div');
+        overlay.id = 'dvPrevOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:16px;';
+        var box = document.createElement('div');
+        box.style.cssText = 'background:#111827;color:#e5e7eb;border-radius:12px;width:min(1000px,100%);max-height:92vh;overflow:auto;padding:16px;';
+        box.setAttribute('role','dialog'); box.setAttribute('aria-modal','true'); box.setAttribute('aria-label','Preview Needs attention');
+        var close = document.createElement('button');
+        close.type = 'button'; close.textContent = 'Close'; close.onclick = function(){overlay.remove();};
+        box.appendChild(close);
+        var title = document.createElement('h3'); title.textContent = 'Preview Needs attention'; box.appendChild(title);
+        var legend = document.createElement('p');
+        legend.textContent = 'Yellow: affected original text. Red: issue and required template setting. AI content findings are advisory.';
+        box.appendChild(legend);
+        overlay.appendChild(box); document.body.appendChild(overlay);
+        overlay.onclick = function(e){if(e.target===overlay)overlay.remove();};
+        var result = window._dvAttentionResult;
+        if (!result || result.revision !== window._dvFixRevision) {
+            legend.textContent = 'Run Check formatting and wait for the check to finish before opening this preview.';
+            return;
+        }
+        var list = document.createElement('ul');
+        result.issues.forEach(function(issue){
+            var item = document.createElement('li'); item.textContent = issue.message; list.appendChild(item);
+        });
+        box.appendChild(list);
+        if (!result.issues.length) {
+            var notice = document.createElement('p');
+            notice.textContent = 'No confirmed issues were found to mark. Unverifiable rules still require manual review.';
+            box.appendChild(notice);
+        }
+        var holder = document.createElement('div');
+        box.appendChild(holder);
+        try {
+            await window._dvLoadPreviewLib();
+            if (window._dvEnsurePagination) window._dvEnsurePagination();
+            await window.docx.renderAsync(result.blob,holder,null,{className:'docx',inWrapper:true,breakPages:true,ignoreLastRenderedPageBreak:false,renderComments:false});
+        } catch(error){holder.textContent='Could not display attention copy: '+error.message;}
+    };
+    var previousRedlineDownload = window._dvDownloadRedline;
+    window._dvDownloadRedline = async function(){
+        var result=window._dvAttentionResult;
+        if(result && result.revision===window._dvFixRevision){
+            _dvTriggerDownload(result.blob,_dvBaseName(_dvLastFile.name)+'_needs_attention.docx');
+            return;
+        }
+        if(previousRedlineDownload) return previousRedlineDownload();
+    };})();

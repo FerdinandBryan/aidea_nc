@@ -171,6 +171,13 @@ class PaperFormattingApiTest extends TestCase
         $upload = $this->paper(); $originalHash = hash_file('sha256', $upload->getRealPath());
         $response = $this->post('/api/papers/check-and-fix', ['file' => $upload, 'template_id' => '17'], ['Accept' => 'application/json']);
         $response->assertOk()->assertJsonPath('template', 'Active admin template')->assertJsonPath('report.settings.spacing', 2)->assertJsonPath('review.findings.0.status', 'manual');
+        $response->assertJsonStructure(['attention_document_base64', 'attention_issues']);
+        $attentionPath = tempnam(sys_get_temp_dir(), 'attention_api_test_'); $this->files[] = $attentionPath;
+        file_put_contents($attentionPath, base64_decode($response->json('attention_document_base64'), true));
+        $attentionZip = new ZipArchive;
+        $this->assertTrue($attentionZip->open($attentionPath));
+        $this->assertStringContainsString('w:document', $attentionZip->getFromName('word/document.xml'));
+        $attentionZip->close();
         $path = tempnam(sys_get_temp_dir(), 'combined_test_'); $this->files[] = $path;
         file_put_contents($path, base64_decode($response->json('document_base64'), true));
         $zip = new ZipArchive; $zip->open($path);

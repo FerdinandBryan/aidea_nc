@@ -2877,7 +2877,8 @@ async function _dvGenerateFixedPdf() {
             var b2 = document.createElement('button');
             b2.type = 'button'; b2.className = 'btn-modal-close';
             b2.textContent = 'Preview Needs attention (' + n + ')';
-            b2.onclick = window._dvPreviewAttention;
+            b2.setAttribute('data-dv-attention', '1');
+            b2.onclick = function () { window._dvPreviewAttention(); };
             row.appendChild(b1);
             row.appendChild(b2);
             /* DV_BUTTONS_TOP: move the button row to the top of the result */
@@ -3394,7 +3395,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=5';
+    e.src = base + 'fixpaper-api.js?v=6';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };

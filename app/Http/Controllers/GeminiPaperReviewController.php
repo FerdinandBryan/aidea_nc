@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\AdminFormattingTemplate;
 use App\Services\GeminiPaperReview;
 use App\Services\PaperFormatter;
+use App\Services\PaperAttentionMarker;
 use Illuminate\Http\Request;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
@@ -13,7 +14,7 @@ use InvalidArgumentException;
 
 class GeminiPaperReviewController extends Controller
 {
-    public function checkAndFix(Request $request, AdminFormattingTemplate $templates, GeminiPaperReview $reviewer, PaperFormatter $formatter)
+    public function checkAndFix(Request $request, AdminFormattingTemplate $templates, GeminiPaperReview $reviewer, PaperFormatter $formatter, PaperAttentionMarker $marker)
     {
         $data = $request->validate(['file' => 'required|file|mimes:docx|max:20480', 'template_id' => 'required|string|max:120']);
         $template = $templates->load($data['template_id']);
@@ -25,7 +26,9 @@ class GeminiPaperReviewController extends Controller
             $report = $formatter->format($path, $template['effective_rules']);
             $report['template'] = $template['name'] ?? 'Selected template';
             $report['template_revision'] = $template['revision'];
-            return response()->json($review + ['document_base64' => base64_encode(file_get_contents($path)), 'report' => $report])
+            $attention = $marker->mark($request->file('file')->getRealPath(), $report['settings'], $review['review']['findings']);
+            return response()->json($review + ['document_base64' => base64_encode(file_get_contents($path)), 'report' => $report,
+                'attention_document_base64' => $attention['document_base64'], 'attention_issues' => $attention['issues']])
                 ->header('Cache-Control', 'private, no-store');
         } catch (ConnectionException $e) {
             return response()->json(['message' => 'Gemini is unreachable or timed out. Try Check formatting again later.'], 503);

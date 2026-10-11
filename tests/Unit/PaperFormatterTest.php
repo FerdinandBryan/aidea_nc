@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Services\PaperFormatter;
+use App\Services\PaperAttentionMarker;
 use DOMDocument;
 use DOMXPath;
 use InvalidArgumentException;
@@ -228,5 +229,29 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('0', $xp->evaluate('string('.$date.'/w:pPr/w:keepNext/@w:val)'));
         $this->assertSame('960', $xp->evaluate('string(//w:p[w:r/w:t="Theoretical Framework"]/w:pPr/w:spacing/@w:after)'));
         $this->assertSame('page', $xp->evaluate('string(//w:p[w:r/w:t="CHAPTER 1"]/w:r[1]/w:br/@w:type)'));
+    }
+
+    public function test_attention_copy_has_yellow_and_red_marks_while_fixed_copy_corrects_spacing_and_margins(): void
+    {
+        $original = $this->paper('<w:p><w:pPr><w:spacing w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:t>Body text.</w:t></w:r></w:p><w:sectPr><w:pgMar w:left="1440" w:top="125" w:right="1440" w:bottom="1440"/></w:sectPr>');
+        $hash = hash_file('sha256', $original);
+        $formatter = new PaperFormatter;
+        $marked = (new PaperAttentionMarker)->mark($original, $formatter->settings($this->rules()));
+        $this->assertCount(3, $marked['issues']);
+        $this->assertSame($hash, hash_file('sha256', $original));
+        $attention = tempnam(sys_get_temp_dir(), 'marked_test_'); $this->files[] = $attention;
+        file_put_contents($attention, base64_decode($marked['document_base64'], true));
+        $xp = $this->xml($attention);
+        $this->assertSame('yellow', $xp->evaluate('string(//w:highlight/@w:val)'));
+        $this->assertSame('FF0000', $xp->evaluate('string(//w:color/@w:val)'));
+        $this->assertStringContainsString('template requires', $xp->evaluate('string(//w:p[2]//w:t)'));
+        $fixed = tempnam(sys_get_temp_dir(), 'fixed_test_'); $this->files[] = $fixed; copy($original, $fixed);
+        $formatter->format($fixed, $this->rules()); $xp = $this->xml($fixed);
+        $this->assertSame('480', $xp->evaluate('string(//w:spacing/@w:line)'));
+        $this->assertSame('2160', $xp->evaluate('string(//w:pgMar/@w:left)'));
+        $this->assertSame('1440', $xp->evaluate('string(//w:pgMar/@w:top)'));
+        $this->assertEquals(0, $xp->evaluate('count(//w:highlight)'));
+        $this->assertEquals(0, $xp->evaluate('count(//w:color[@w:val="FF0000"])'));
+        $this->assertSame('Body text.', $xp->evaluate('string(//w:t)'));
     }
 }

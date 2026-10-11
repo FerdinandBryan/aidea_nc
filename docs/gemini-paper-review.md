@@ -23,6 +23,14 @@ review plus `document_base64` and a formatter `report`. Formatting uses the
 server-saved admin rules; Gemini cannot silently override them. Preview and
 download share this returned file. The original remains unchanged.
 
+The combined response also includes `attention_document_base64` and
+`attention_issues`. Needs attention displays this annotated original: yellow
+highlights identify affected paragraphs and red notes explain the required
+setting. Explicit paragraph line spacing and section margins are compared with
+the selected template. Inherited or unverifiable settings are not treated as
+confirmed failures. AI content failures remain advisory. Fix paper displays the
+separate corrected copy without these annotations.
+
 The response includes an advisory summary and a finding for every checklist
 rule, with status, explanation, paragraph reference, and suggestion. Exact
 printed layout checks are marked manual. This endpoint does not rewrite or
