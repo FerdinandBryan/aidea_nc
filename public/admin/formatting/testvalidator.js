@@ -2646,16 +2646,16 @@ async function _dvGenerateFixedPdf() {
                     page.style.setProperty('display', i === pageIndex ? 'flex' : 'none', 'important');
                     page.setAttribute('aria-hidden', i === pageIndex ? 'false' : 'true');
                 });
-                // Fit the entire short-bond sheet, including the bottom date,
-                // inside the preview viewport without changing print dimensions.
+                // Fit the sheet to the modal width for readable text,
+                // with vertical scrolling and unchanged print dimensions.
                 var activePage = pages[pageIndex];
                 activePage.style.zoom = '1';
                 var sheetWidth = activePage.offsetWidth;
                 var sheetHeight = activePage.offsetHeight;
                 var availableWidth = Math.max(1, holder.clientWidth - 24);
-                var availableHeight = Math.max(200, window.innerHeight * 0.92 - 180);
+
                 if (sheetWidth > 0 && sheetHeight > 0) {
-                    activePage.style.zoom = String(Math.min(1, availableWidth / sheetWidth, availableHeight / sheetHeight));
+                    activePage.style.zoom = String(availableWidth / sheetWidth);
                 }
                 pageLabel.textContent = 'Page ' + (pageIndex + 1) + ' of ' + pages.length;
                 previous.disabled = pageIndex === 0;
