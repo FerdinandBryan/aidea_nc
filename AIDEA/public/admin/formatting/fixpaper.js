@@ -288,6 +288,56 @@
         var file = zip.file('word/document.xml');
         if (!file) throw new Error('Not a valid DOCX');
         var doc = new DOMParser().parseFromString(await file.async('string'), 'application/xml');
+        // Use an actual run-level page break, which docx-preview splits into
+        // pages, rather than relying solely on paragraph break properties.
+        var chapterPattern = /^CHAPTER\s*(?:[1-5]|I|II|III|IV|V|ONE|TWO|THREE|FOUR|FIVE)\s*[:.\-\u2013]?$/i;
+        Array.from(doc.getElementsByTagNameNS(W, 'p')).forEach(function (original) {
+            if (inTable(original)) return;
+            var paragraph = original;
+            var text = ptext(paragraph).replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+            if (!chapterPattern.test(text)) {
+                // Some Word files store the title/date and chapter heading in
+                // one paragraph, separated by line breaks. Separate the runs.
+                var marker = Array.from(paragraph.getElementsByTagNameNS(W, 't')).find(function (t) {
+                    return chapterPattern.test((t.textContent || '').trim());
+                });
+                if (!marker) return;
+                var run = marker;
+                while (run.parentNode && run.parentNode !== paragraph) run = run.parentNode;
+                if (run.parentNode !== paragraph || run.localName !== 'r') return;
+                var before = [];
+                for (var n = paragraph.firstChild; n && n !== run; n = n.nextSibling) {
+                    if (n.localName !== 'pPr') before.push(n);
+                }
+                if (before.length) {
+                    var split = doc.createElementNS(W, 'w:p');
+                    var props = kid(paragraph, 'pPr');
+                    if (props) split.appendChild(props.cloneNode(true));
+                    paragraph.parentNode.insertBefore(split, paragraph.nextSibling);
+                    for (var n = run; n;) {
+                        var next = n.nextSibling;
+                        split.appendChild(n);
+                        n = next;
+                    }
+                    paragraph = split;
+                }
+            }
+            var props = pPrOf(doc, paragraph);
+            var beforeBreak = kid(props, 'pageBreakBefore');
+            if (beforeBreak) props.removeChild(beforeBreak);
+            // Remove old breaks before the first visible text to avoid two pages.
+            var firstText = paragraph.getElementsByTagNameNS(W, 't')[0];
+            Array.from(paragraph.getElementsByTagNameNS(W, 'br')).forEach(function (br) {
+                if (br.getAttributeNS(W, 'type') === 'page' && firstText &&
+                    (br.compareDocumentPosition(firstText) & 4)) br.parentNode.removeChild(br);
+            });
+            Array.from(paragraph.getElementsByTagNameNS(W, 'lastRenderedPageBreak')).forEach(function (br) { br.parentNode.removeChild(br); });
+            var breakRun = doc.createElementNS(W, 'w:r');
+            var pageBreak = doc.createElementNS(W, 'w:br');
+            setA(pageBreak, 'type', 'page');
+            breakRun.appendChild(pageBreak);
+            paragraph.insertBefore(breakRun, props.nextSibling);
+        });
         var sections = Array.from(doc.getElementsByTagNameNS(W, 'sectPr'));
         if (!sections.length) {
             var body = doc.getElementsByTagNameNS(W, 'body')[0];
