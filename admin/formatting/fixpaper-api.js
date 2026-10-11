@@ -58,15 +58,9 @@
         var revision = window._dvFixRevision;
         window._dvAttentionResult = null;
         window._dvAttentionError = null;
-        var parent = document.getElementById('docValidationBody');
-        if (!parent || !file || templateId == null) return;
+        if (!file || templateId == null) return;
         var old = document.getElementById('dvGeminiReview');
         if (old) old.remove();
-        var panel = document.createElement('section');
-        panel.id = 'dvGeminiReview';
-        panel.style.cssText = 'padding:16px;margin:14px 0;border:1px solid #374151;border-radius:10px;';
-        panel.textContent = 'Checking the paper against the admin checklist and preparing its formatted copy...';
-        parent.insertBefore(panel, parent.firstChild);
 
         try {
             var form = new FormData();
@@ -94,29 +88,7 @@
                 });
             }
             cached = {file:file,key:String(templateId)+':'+String(revision),promise:Promise.resolve(fixed)};
-            panel.textContent = '';
-            var title = document.createElement('strong');
-            title.textContent = 'Checklist review — ' + data.template;
-            panel.appendChild(title);
-            var summary = document.createElement('p');
-            summary.textContent = data.review.summary;
-            panel.appendChild(summary);
-            var note = document.createElement('p');
-            note.textContent = 'The formatted copy is ready for preview and download. AI content findings are advisory.';
-            panel.appendChild(note);
-            (data.warnings || []).forEach(function (warning) {
-                var message = document.createElement('p'); message.textContent = warning; panel.appendChild(message);
-            });
-            var list = document.createElement('ul');
-            data.review.findings.forEach(function (finding) {
-                var item = document.createElement('li');
-                item.textContent = finding.status.toUpperCase() + ' — ' + finding.rule + ': ' +
-                    finding.explanation + (finding.paragraph ? ' (Paragraph ' + finding.paragraph + ')' : '') +
-                    (finding.suggestion ? ' Suggestion: ' + finding.suggestion : '');
-                list.appendChild(item);
-            });
-            panel.appendChild(list);
-        } catch (error) { if(window._dvFixRevision===revision)window._dvAttentionError=error.message; panel.textContent = 'Could not check and format this paper: ' + error.message; }
+        } catch (error) { if(window._dvFixRevision===revision)window._dvAttentionError=error.message; }
 
     }
     window._dvCheckAndFixPaper = function () {
