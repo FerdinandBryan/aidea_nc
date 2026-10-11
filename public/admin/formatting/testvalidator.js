@@ -2724,6 +2724,8 @@ async function _dvGenerateFixedPdf() {
                 var last = meaningful[meaningful.length - 1];
                 if (!last || last.tagName !== 'P') return;
                 var raw = last.textContent || '';
+                // A bold cover date is not a topic heading. Keep it on the cover.
+                if (/^(January|February|March|April|May|June|July|August|September|October|November|December)\b.*\d{4}\.?$/i.test(raw.trim())) return;
                 var match = topicEnd.exec(raw);
                 var allBold = Array.from(last.querySelectorAll('span')).filter(function (span) { return (span.textContent || '').trim(); });
                 var boldHeading = raw.trim().length < 140 && !/[.!?;:]$/.test(raw.trim()) &&
@@ -3385,7 +3387,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=9';
+    e.src = base + 'fixpaper-api.js?v=10';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };
