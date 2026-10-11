@@ -17,6 +17,12 @@ class PaperFormattingController extends Controller
             'file' => 'required|file|mimes:docx|max:20480',
             'template_id' => 'required|string|max:120',
         ]);
+        $missing = $formatter->missingExtensions();
+        if ($missing) {
+            return response()->json([
+                'message' => 'Paper formatting is temporarily unavailable: the server needs PHP extensions '.implode(', ', $missing).'. Please retry after the backend deployment finishes.',
+            ], 503);
+        }
         $row = DB::table('format_templates')->orderBy('id')->first();
         $templates = $row ? json_decode($row->data, true) : [];
         $template = collect(is_array($templates) ? $templates : [])->first(fn ($item) =>

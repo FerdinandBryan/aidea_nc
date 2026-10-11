@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\PaperFormatter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
@@ -62,5 +63,17 @@ class PaperFormattingApiTest extends TestCase
         $this->templates([['id' => 17, 'active' => false, 'rules' => [['type' => 'spacing', 'value' => 2]]]]);
         $this->post('/api/papers/fix', ['file' => $this->paper(), 'template_id' => '17'], ['Accept' => 'application/json'])
             ->assertUnprocessable()->assertJsonValidationErrors('template_id');
+    }
+
+    public function test_missing_zip_extension_returns_a_clear_service_error(): void
+    {
+        Sanctum::actingAs(new User(['name' => 'Student']));
+        $formatter = \Mockery::mock(PaperFormatter::class)->makePartial();
+        $formatter->shouldReceive('missingExtensions')->once()->andReturn(['zip']);
+        $this->app->instance(PaperFormatter::class, $formatter);
+        $this->post('/api/papers/fix', ['file' => $this->paper(), 'template_id' => '17'], ['Accept' => 'application/json'])
+            ->assertStatus(503)->assertJsonFragment([
+                'message' => 'Paper formatting is temporarily unavailable: the server needs PHP extensions zip. Please retry after the backend deployment finishes.',
+            ]);
     }
 }

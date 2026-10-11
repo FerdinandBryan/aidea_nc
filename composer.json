@@ -6,6 +6,9 @@
     "license": "MIT",
     "require": {
         "php": "^8.4",
+        "ext-dom": "*",
+        "ext-mbstring": "*",
+        "ext-zip": "*",
         "laravel/framework": "^11.0",
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^2.9",

@@ -13,6 +13,15 @@ class PaperFormatter
 {
     private const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
+    public function missingExtensions(): array
+    {
+        $missing = [];
+        if (!class_exists(ZipArchive::class)) $missing[] = 'zip';
+        if (!class_exists(DOMDocument::class)) $missing[] = 'dom';
+        if (!function_exists('mb_strlen')) $missing[] = 'mbstring';
+        return $missing;
+    }
+
     public function settings(array $rules): array
     {
         $cfg = ['font' => null, 'size' => null, 'spacing' => null, 'abstract' => null,
