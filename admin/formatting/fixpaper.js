@@ -282,14 +282,39 @@
         return await zip.generateAsync({ type: 'blob' });
     }
 
+    async function shortPaper(blob) {
+        if (!window.JSZip) await new Promise(function (resolve) { _validatorDeps.ensureJSZip(resolve); });
+        var zip = await JSZip.loadAsync(blob);
+        var file = zip.file('word/document.xml');
+        if (!file) throw new Error('Not a valid DOCX');
+        var doc = new DOMParser().parseFromString(await file.async('string'), 'application/xml');
+        var sections = Array.from(doc.getElementsByTagNameNS(W, 'sectPr'));
+        if (!sections.length) {
+            var body = doc.getElementsByTagNameNS(W, 'body')[0];
+            if (!body) throw new Error('The document has no body.');
+            var section = doc.createElementNS(W, 'w:sectPr');
+            body.appendChild(section);
+            sections.push(section);
+        }
+        sections.forEach(function (section) {
+            var size = ensure(doc, section, SECT, 'pgSz');
+            // Short bond / US Letter, in twentieths of a point (1440 per inch).
+            setA(size, 'w', 12240);
+            setA(size, 'h', 15840);
+            setA(size, 'orient', 'portrait');
+        });
+        zip.file('word/document.xml', new XMLSerializer().serializeToString(doc));
+        return zip.generateAsync({ type: 'blob' });
+    }
+
     function install() {
         var prev = _dvGenerateFixedDocx;
         _dvGenerateFixedDocx = async function (file, rules, profile) {
             var cfg = parseRules(rules);
             var checklist = (rules || []).some(function (r) { return r && (r.id === 'checklist-spacing' || r.id === 'checklist-margin'); });
-            if (!cfg || checklist) return prev.apply(this, arguments);
-            try { return await build(file, cfg); }
-            catch (e) { console.warn('[Validator] fixpaper failed, using old generator', e); return prev.apply(this, arguments); }
+            if (!cfg || checklist) return shortPaper(await prev.apply(this, arguments));
+            try { return await shortPaper(await build(file, cfg)); }
+            catch (e) { console.warn('[Validator] fixpaper failed, using old generator', e); return shortPaper(await prev.apply(this, arguments)); }
         };
         console.log('[Validator] fixpaper installed');
     }
