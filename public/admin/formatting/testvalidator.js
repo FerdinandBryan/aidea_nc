@@ -1140,7 +1140,7 @@ function _createValidationModal() {
     modal.id = 'docValidationModal';
     modal.className = 'modal-overlay';
     modal.innerHTML = `
-        <div class="modal-box" style="max-width:640px;">
+        <div class="modal-box" style="max-width:1100px;">
             <div class="modal-header">
                 <h2>Document Type & Format Check</h2>
                 <button class="modal-close" onclick="window._dvCloseModal('docValidationModal')">✕</button>
@@ -2467,7 +2467,9 @@ async function _dvGenerateFixedPdf() {
                 Array.from(art.children).forEach(function (ch) {
                     var r = ch.getBoundingClientRect(), cs = getComputedStyle(ch);
                     var visualBottom = r.bottom;
-                    ch.querySelectorAll('img,svg').forEach(function (graphic) { visualBottom = Math.max(visualBottom, graphic.getBoundingClientRect().bottom); });
+                    ch.querySelectorAll('img,svg').forEach(function (graphic) {
+                        visualBottom = Math.max(visualBottom, graphic.getBoundingClientRect().bottom);
+                    });
                     items.push({
                         art: ai,
                         leadHeight: 2 * (parseFloat(cs.lineHeight) || (parseFloat(cs.fontSize) || 16) * 1.2),
@@ -2892,6 +2894,15 @@ async function _dvGenerateFixedPdf() {
             b2.onclick = function () { window._dvPreviewAttention(); };
             row.appendChild(b1);
             row.appendChild(b2);
+            /* DV_BUTTONS_TOP: move the button row to the top of the result */
+            try {
+                var hostBody = document.getElementById('docValidationBody');
+                if (hostBody && row.getAttribute('data-dv-top') !== '1') {
+                    row.setAttribute('data-dv-top', '1');
+                    row.style.cssText += ';display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px;position:sticky;top:0;z-index:5;background:#12152a;padding:8px 0;';
+                    hostBody.insertBefore(row, hostBody.firstChild);
+                }
+            } catch (e) {}
         });
     }
 
@@ -3231,6 +3242,7 @@ async function _dvGenerateFixedPdf() {
         window._dvPreviewAttention = w;
     }
 })();
+
 /* DV_TEMPLATE_APPLY: apply the values written in the selected template's rules to the fixed paper */
 (function () {
     if (typeof _dvGenerateFixedDocx !== 'function') return;
@@ -3396,7 +3408,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=16';
+    e.src = base + 'fixpaper-api.js?v=17';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };

@@ -2466,6 +2466,10 @@ async function _dvGenerateFixedPdf() {
                 var artTop = art.getBoundingClientRect().top;
                 Array.from(art.children).forEach(function (ch) {
                     var r = ch.getBoundingClientRect(), cs = getComputedStyle(ch);
+                    var visualBottom = r.bottom;
+                    ch.querySelectorAll('img,svg').forEach(function (graphic) {
+                        visualBottom = Math.max(visualBottom, graphic.getBoundingClientRect().bottom);
+                    });
                     items.push({
                         art: ai,
                         leadHeight: 2 * (parseFloat(cs.lineHeight) || (parseFloat(cs.fontSize) || 16) * 1.2),
@@ -3404,7 +3408,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=16';
+    e.src = base + 'fixpaper-api.js?v=17';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };
