@@ -2668,6 +2668,50 @@ async function _dvGenerateFixedPdf() {
             // Show one rendered paper page at a time.
             var pages = Array.from(holder.querySelectorAll('.docx-wrapper > section.docx'));
             if (!pages.length) throw new Error('The document renderer did not produce any pages.');
+            // Final rendered-page safeguard: Word properties can be ignored by
+            // the renderer when headings are embedded in a longer paragraph.
+            var topicEnd = /(Theoretical Framework|Conceptual Framework|Statement of the Problem|Significance of the Study|Definition of Terms|Scope and Limitations(?: of the Study)?|Research Design|Method of Research|Research Instrument|Data Gathering Procedure|Data Analysis|Ethical Considerations|Summary of Findings|Conclusions|Recommendations|Introduction)\s*$/i;
+            pages.forEach(function (page, index) {
+                var article = page.querySelector('article');
+                var nextArticle = pages[index + 1] && pages[index + 1].querySelector('article');
+                if (!article || !nextArticle) return;
+                var meaningful = Array.from(article.children).filter(function (node) {
+                    return (node.textContent || '').trim() || node.querySelector('img,svg,table');
+                });
+                var last = meaningful[meaningful.length - 1];
+                if (!last || last.tagName !== 'P') return;
+                var raw = last.textContent || '';
+                var match = topicEnd.exec(raw);
+                var allBold = Array.from(last.querySelectorAll('span')).filter(function (span) { return (span.textContent || '').trim(); });
+                var boldHeading = raw.trim().length < 140 && !/[.!?;:]$/.test(raw.trim()) &&
+                    allBold.length > 0 && allBold.every(function (span) {
+                        var weight = getComputedStyle(span).fontWeight;
+                        return weight === 'bold' || Number(weight) >= 600;
+                    });
+                if (!match && !boldHeading) return;
+                var heading = last;
+                if (match && raw.slice(0, match.index).trim()) {
+                    // Split a heading stored after definitions in the same p.
+                    var walker = document.createTreeWalker(last, NodeFilter.SHOW_TEXT);
+                    var offset = match.index, textNode;
+                    while ((textNode = walker.nextNode())) {
+                        if (offset < textNode.textContent.length) break;
+                        offset -= textNode.textContent.length;
+                    }
+                    if (!textNode) return;
+                    var range = document.createRange();
+                    range.setStart(textNode, offset); range.setEnd(last, last.childNodes.length);
+                    heading = last.cloneNode(false);
+                    heading.appendChild(range.extractContents());
+                }
+                // Drop only empty spacers at the start of the destination page.
+                while (nextArticle.firstElementChild && !(nextArticle.firstElementChild.textContent || '').trim() &&
+                    !nextArticle.firstElementChild.querySelector('img,svg,table')) {
+                    nextArticle.firstElementChild.remove();
+                }
+                heading.style.marginTop = '0';
+                nextArticle.insertBefore(heading, nextArticle.firstChild);
+            });
             // Keep all page boxes in the CSS counter tree. display:none on
             // earlier pages makes visible lists start again at one.
             var wrapper = holder.querySelector('.docx-wrapper');
