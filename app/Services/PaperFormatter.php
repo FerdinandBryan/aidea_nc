@@ -84,7 +84,7 @@ class PaperFormatter
         return $cfg;
     }
 
-    public function format(string $path, array $rules): void
+    public function format(string $path, array $rules): array
     {
         $cfg = $this->settings($rules);
         $zip = new ZipArchive;
@@ -108,7 +108,7 @@ class PaperFormatter
             if (!$body instanceof DOMElement) throw new InvalidArgumentException('The Word document has no body.');
             foreach (iterator_to_array($xp->query('//w:lastRenderedPageBreak')) as $old) $old->parentNode->removeChild($old);
             $this->splitChapterParagraphs($doc, $xp);
-            $zone = 'front'; $title = [];
+            $zone = 'front'; $title = []; $paragraphs = 0;
             foreach (iterator_to_array($xp->query('//w:body//w:p')) as $p) {
                 $text = $this->text($p); $upper = strtoupper(trim($text));
                 $table = $xp->query('ancestor::w:tbl', $p)->length > 0;
@@ -119,6 +119,12 @@ class PaperFormatter
                 if ($zone === 'front' && !$table) $title[] = $p;
                 $pr = $this->ensure($p, 'pPr', true);
                 if (!$table) {
+                    $paragraphs++;
+                    $list = $xp->query('./w:numPr', $pr)->length > 0;
+                    if ($zone !== 'front' && !$heading && !preg_match('/\.{3,}/', $text)) {
+                        $this->cleanLineStarts($p);
+                        if ($list && !$cfg['alignment']) $this->attr($this->ensure($pr, 'jc'), 'val', 'left');
+                    }
                     $line = $zone === 'abstract' && !$heading ? ($cfg['abstract'] ?? $cfg['spacing']) : $cfg['spacing'];
                     if ($line !== null) {
                         $sp = $this->ensure($pr, 'spacing'); $this->attr($sp, 'line', round($line * 240)); $this->attr($sp, 'lineRule', 'auto');
@@ -133,13 +139,15 @@ class PaperFormatter
                         // than moving entire groups because of inherited styles.
                         $this->attr($this->ensure($pr, 'keepNext'), 'val', 0);
                         $this->attr($this->ensure($pr, 'keepLines'), 'val', 0);
-                        $ind = $this->ensure($pr, 'ind');
-                        foreach (['left', 'right', 'start', 'end'] as $key) $this->attr($ind, $key, 0);
-                        foreach (['leftChars', 'rightChars', 'startChars', 'endChars'] as $key) $ind->removeAttributeNS(self::W, $key);
+                        if (!$list) {
+                            $ind = $this->ensure($pr, 'ind');
+                            foreach (['left', 'right', 'start', 'end'] as $key) $this->attr($ind, $key, 0);
+                            foreach (['leftChars', 'rightChars', 'startChars', 'endChars'] as $key) $ind->removeAttributeNS(self::W, $key);
+                        }
                     }
                     if ($zone === 'front' && $this->isDate($text)) $this->centerTitleParagraph($p, $xp);
                     if (!$heading && $zone !== 'front' && $cfg['alignment']) $this->attr($this->ensure($pr, 'jc'), 'val', $cfg['alignment']);
-                    if (!$heading && $zone !== 'front' && $cfg['indentation'] !== null) {
+                    if (!$heading && !$list && $zone !== 'front' && $cfg['indentation'] !== null) {
                         $ind = $this->ensure($pr, 'ind'); $ind->removeAttributeNS(self::W, 'hanging'); $ind->removeAttributeNS(self::W, 'firstLineChars');
                         $this->attr($ind, 'firstLine', round($cfg['indentation'] * 1440));
                     }
@@ -171,7 +179,32 @@ class PaperFormatter
             }
             $this->layoutTitle($title, $cfg, $xp);
             $zip->addFromString('word/document.xml', $doc->saveXML());
+            $applied = []; $manual = []; $defaults = $this->settings([]);
+            foreach ($rules as $rule) {
+                $name = (string) ($rule['name'] ?? $rule['detail'] ?? 'Unnamed rule');
+                $single = $this->settings([$rule]);
+                if ($single !== $defaults || preg_match('/short bond|\bA4\b|8\.5.*11/i', (string) ($rule['detail'] ?? ''))) $applied[] = $name;
+                else $manual[] = $name;
+            }
+            return ['settings' => $cfg, 'paragraphs_processed' => $paragraphs,
+                'applied_rules' => $applied, 'manual_review_rules' => $manual,
+                'manual_review_required' => count($manual) > 0,
+                'note' => 'Formatting rules recognized in the selected template were applied throughout the document. Content criteria and unrecognized descriptions still require review.'];
         } finally { $zip->close(); }
+    }
+
+    private function cleanLineStarts(DOMElement $p): void
+    {
+        $afterBreak = false;
+        foreach (iterator_to_array($p->getElementsByTagNameNS(self::W, '*')) as $node) {
+            if ($node->localName === 'br' && $node->getAttributeNS(self::W, 'type') !== 'page') { $afterBreak = true; continue; }
+            if (!$afterBreak) continue;
+            if ($node->localName === 'tab') $node->parentNode->removeChild($node);
+            if ($node->localName === 't') {
+                $node->textContent = ltrim($node->textContent);
+                if ($node->textContent !== '') $afterBreak = false;
+            }
+        }
     }
 
     private function text(DOMElement $p): string

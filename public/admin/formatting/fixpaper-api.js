@@ -14,6 +14,7 @@
             var form = new FormData();
             form.append('file', new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }), file.name || 'paper.docx');
             form.append('template_id', String(templateId));
+            form.append('include_report', '1');
             var response = await fetch(endpoint, {
                 method: 'POST', headers: { Accept: 'application/json', Authorization: 'Bearer ' + token }, body: form
             });
@@ -22,7 +23,19 @@
                 var messages = error.errors ? Object.values(error.errors).flat().join(' ') : error.message;
                 throw new Error(messages || 'Paper formatting failed (HTTP ' + response.status + ').');
             }
-            var blob = await response.blob();
+            var blob;
+            if ((response.headers.get('Content-Type') || '').includes('application/json')) {
+                var result = await response.json();
+                if (!result.document_base64) throw new Error('The formatting API did not return a corrected document.');
+                var binary = atob(result.document_base64);
+                var data = new Uint8Array(binary.length);
+                for (var i = 0; i < binary.length; i++) data[i] = binary.charCodeAt(i);
+                blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+                blob.formattingReport = result.report;
+            } else {
+                // Allow the frontend to work while the backend update deploys.
+                blob = await response.blob();
+            }
             if (!blob.size) throw new Error('The formatting API returned an empty document.');
             return blob;
         })();

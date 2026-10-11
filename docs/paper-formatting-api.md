@@ -10,6 +10,13 @@ from `format_templates`; it does not accept client-supplied rules or document
 URLs. The original upload is unchanged. The temporary output is private and
 deleted after the response is streamed.
 
+Set `include_report=1` to receive JSON with `document_base64` and `report`.
+The report identifies the saved template, resolved settings, processed
+paragraph count, recognized formatting rules, and rules needing manual review.
+The preview displays this report and decodes the same file used for download.
+This reports recognized rule coverage, not a guarantee that every natural-language
+criterion or every rendered page has been independently verified.
+
 Supported rules include font, font size, line spacing, abstract spacing,
 margins, alignment, indentation, hanging reference indents, and the special
 References/Appendices headings. Explicit rule `type`/`value` settings take

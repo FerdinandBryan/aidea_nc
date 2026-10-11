@@ -76,4 +76,15 @@ class PaperFormattingApiTest extends TestCase
                 'message' => 'Paper formatting is temporarily unavailable: the server needs PHP extensions zip. Please retry after the backend deployment finishes.',
             ]);
     }
+
+    public function test_report_contains_the_selected_template_and_the_corrected_document(): void
+    {
+        Sanctum::actingAs(new User(['name' => 'Student']));
+        $this->templates([['id' => 17, 'name' => 'New template', 'active' => true, 'rules' => [['name' => 'Spacing', 'type' => 'spacing', 'value' => 1.5]]]]);
+        $response = $this->post('/api/papers/fix', ['file' => $this->paper(), 'template_id' => '17', 'include_report' => '1'], ['Accept' => 'application/json']);
+        $response->assertOk()->assertJsonPath('report.template', 'New template')->assertJsonPath('report.settings.spacing', 1.5)->assertJsonPath('report.paragraphs_processed', 2);
+        $decoded = base64_decode($response->json('document_base64'), true);
+        $this->assertIsString($decoded);
+        $this->assertSame('PK', substr($decoded, 0, 2));
+    }
 }

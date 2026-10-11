@@ -16,6 +16,7 @@ class PaperFormattingController extends Controller
         $data = $request->validate([
             'file' => 'required|file|mimes:docx|max:20480',
             'template_id' => 'required|string|max:120',
+            'include_report' => 'sometimes|boolean',
         ]);
         $missing = $formatter->missingExtensions();
         if ($missing) {
@@ -38,7 +39,14 @@ class PaperFormattingController extends Controller
         if ($path === false) throw new \RuntimeException('Could not create the paper processing file.');
         try {
             if (!copy($request->file('file')->getRealPath(), $path)) throw new \RuntimeException('Could not copy the uploaded paper.');
-            $formatter->format($path, $template['rules']);
+            $report = $formatter->format($path, $template['rules']);
+            if ($request->boolean('include_report')) {
+                $report['template'] = $template['name'] ?? 'Selected template';
+                $report['template_id'] = $data['template_id'];
+                $document = base64_encode(file_get_contents($path));
+                @unlink($path);
+                return response()->json(['document_base64' => $document, 'report' => $report])->header('Cache-Control', 'private, no-store');
+            }
             $name = preg_replace('/[^a-zA-Z0-9_.-]/', '_', pathinfo($request->file('file')->getClientOriginalName(), PATHINFO_FILENAME));
             return response()->download($path, ($name ?: 'paper').'_fixed.docx', [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

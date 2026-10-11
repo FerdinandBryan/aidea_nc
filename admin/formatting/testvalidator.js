@@ -2618,6 +2618,25 @@ async function _dvGenerateFixedPdf() {
             var bar = document.createElement('div');
             bar.style.cssText = 'margin-bottom:10px;';
             bar.innerHTML = '<button type="button" class="btn-modal-close" onclick="window._dvDownloadFixed()">Download this fixed copy</button>';
+            if (blob.formattingReport) {
+                var report = blob.formattingReport;
+                var summary = document.createElement('details');
+                var title = document.createElement('summary');
+                title.textContent = 'Template: ' + report.template + ' — ' + report.paragraphs_processed + ' paragraphs processed';
+                summary.appendChild(title);
+                var settings = report.settings || {};
+                var info = document.createElement('p');
+                var margins = settings.margins || {};
+                info.textContent = 'Font: ' + (settings.font || 'preserved') + '; size: ' + (settings.size || 'preserved') +
+                    '; line spacing: ' + (settings.spacing || 'preserved') + '; abstract: ' + (settings.abstract || 'same as body') +
+                    '; margins (inches): ' + Object.keys(margins).map(function (side) { return side + ' ' + margins[side]; }).join(', ');
+                summary.appendChild(info);
+                var manual = document.createElement('p');
+                var remaining = report.manual_review_rules || [];
+                manual.textContent = remaining.length ? 'Rules needing manual review: ' + remaining.join('; ') : 'All listed template rules have recognized formatting settings.';
+                summary.appendChild(manual);
+                bar.appendChild(summary);
+            }
             var holder = document.createElement('div');
             holder.style.cssText = 'background:#6b7280;color:#000;border-radius:6px;overflow:auto;';
             body.appendChild(bar);
@@ -3267,7 +3286,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=1';
+    e.src = base + 'fixpaper-api.js?v=2';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };

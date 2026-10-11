@@ -160,4 +160,37 @@ class PaperFormatterTest extends TestCase
         $this->assertEquals(0, $xp->evaluate('count(//w:lastRenderedPageBreak)'));
         $this->assertSame('2160', $xp->evaluate('string(//w:pgMar/@w:left)'));
     }
+
+    public function test_lettered_list_continuations_clear_padding_but_keep_numbering_indents(): void
+    {
+        $file = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="1"/><w:numId w:val="7"/></w:numPr><w:ind w:left="720" w:hanging="360"/><w:jc w:val="center"/></w:pPr><w:r><w:t>How can students submit payment requirements</w:t><w:br/><w:tab/><w:t xml:space="preserve">   receipts for service availing?</w:t></w:r></w:p>');
+        (new PaperFormatter)->format($file, $this->rules()); $xp = $this->xml($file);
+        $p = '//w:p[w:pPr/w:numPr]';
+        $this->assertSame('left', $xp->evaluate('string('.$p.'/w:pPr/w:jc/@w:val)'));
+        $this->assertSame('720', $xp->evaluate('string('.$p.'/w:pPr/w:ind/@w:left)'));
+        $this->assertSame('360', $xp->evaluate('string('.$p.'/w:pPr/w:ind/@w:hanging)'));
+        $this->assertSame('7', $xp->evaluate('string('.$p.'/w:pPr/w:numPr/w:numId/@w:val)'));
+        $this->assertSame('receipts for service availing?', $xp->evaluate('string('.$p.'/w:r/w:t[2])'));
+        $this->assertEquals(0, $xp->evaluate('count('.$p.'//w:tab)'));
+        $this->assertSame('480', $xp->evaluate('string('.$p.'/w:pPr/w:spacing/@w:line)'));
+    }
+
+    public function test_different_templates_apply_their_own_values_to_every_body_paragraph(): void
+    {
+        foreach ([['Arial', 10, 1.5, 2], ['Times New Roman', 12, 2, 1.5]] as [$font, $size, $spacing, $left]) {
+            $body = '<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p>';
+            for ($i = 0; $i < 30; $i++) $body .= '<w:p><w:r><w:t>Paragraph '.$i.'</w:t></w:r></w:p>';
+            $file = $this->paper($body);
+            $rules = [['type' => 'font', 'value' => $font], ['type' => 'size', 'value' => $size], ['type' => 'spacing', 'value' => $spacing], ['type' => 'margin', 'value' => ['left' => $left, 'right' => 1, 'top' => 1, 'bottom' => 1]], ['name' => 'Citation accuracy', 'detail' => 'All sources must be correctly cited.']];
+            $report = (new PaperFormatter)->format($file, $rules); $xp = $this->xml($file);
+            $this->assertEquals(31, $report['paragraphs_processed']);
+            $this->assertSame(['Citation accuracy'], $report['manual_review_rules']);
+            $this->assertSame((string) ($left * 1440), $xp->evaluate('string(//w:pgMar/@w:left)'));
+            foreach ($xp->query('//w:p[w:r/w:t]') as $p) {
+                $this->assertSame($font, $xp->evaluate('string(.//w:rFonts/@w:ascii)', $p));
+                $this->assertSame((string) ($size * 2), $xp->evaluate('string(.//w:sz/@w:val)', $p));
+                $this->assertSame((string) ($spacing * 240), $xp->evaluate('string(./w:pPr/w:spacing/@w:line)', $p));
+            }
+        }
+    }
 }
