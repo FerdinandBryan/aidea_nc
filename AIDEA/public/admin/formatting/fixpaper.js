@@ -49,7 +49,7 @@
     }
 
     function parseRules(rules) {
-        var cfg = { body: null, abs: null, top: null, bottom: null, left: null, right: null, font: null, size: null, hanging: false, heads: {} };
+        var cfg = { body: null, abs: null, top: null, bottom: null, left: null, right: null, font: null, size: null, alignment: null, indentation: null, hanging: false, heads: {} };
         (rules || []).forEach(function (r) {
             var d = String((r && (r.detail || r.name)) || ''), m;
             var hw = /\bword\s+(REFERENCES|APPENDICES)\b/i.exec(d);
@@ -80,9 +80,39 @@
             }
             if ((m = /font (?:style|name|family)\b.*?\bis\s+([A-Za-z][A-Za-z ]*?)\s*\.?\s*$/i.exec(d))) cfg.font = m[1];
             if ((m = /font size\b.*?\bis\s+(\d+(?:\.\d+)?)/i.exec(d))) cfg.size = parseFloat(m[1]);
+            // Admin rules can contain prose or explicit type/value settings.
+            if (!/\b(heading|title|word|table|figure|abstract|references|appendices)\b/i.test(d)) {
+                var a = /\b(justified|justify|left[- ]aligned|right[- ]aligned|cent(?:er|re)(?:ed|d)?[- ]aligned)\b/i.exec(d);
+                if (a) cfg.alignment = /^just/i.test(a[1]) ? 'both' : /^left/i.test(a[1]) ? 'left' : /^right/i.test(a[1]) ? 'right' : 'center';
+                if ((m = /(?:first[- ]line\s+indent(?:ation)?|indent(?:ation)?)\s*(?:of|:|=|is)?\s*(\d+(?:\.\d+)?)\s*(?:inch|in\b|")/i.exec(d))) cfg.indentation = parseFloat(m[1]);
+            }
+            if ((m = /\b(Times New Roman|Arial|Calibri|Cambria|Georgia|Verdana)\b/i.exec(d))) cfg.font = m[1];
+            if ((m = /\b(\d+(?:\.\d+)?)\s*(?:pt|point)\b/i.exec(d))) cfg.size = parseFloat(m[1]);
+            if ((m = /\b(\d+(?:\.\d+)?)[- ]inch\s+margins?\b/i.exec(d))) {
+                ['top', 'bottom', 'left', 'right'].forEach(function (side) { cfg[side] = parseFloat(m[1]); });
+            }
+            if ((m = /font size\s*[:=]?\s*(\d+(?:\.\d+)?)/i.exec(d))) cfg.size = parseFloat(m[1]);
             if (/hanging inden/i.test(d)) cfg.hanging = true;
         });
-        var any = cfg.body !== null || cfg.abs !== null || cfg.left !== null || cfg.right !== null || cfg.top !== null ||
+        // Explicit values take precedence over descriptive text.
+        (rules || []).forEach(function (r) {
+            if (!r || r.value == null) return;
+            var type = String(r.type || '').toLowerCase(), value = Number(r.value);
+            if (type === 'spacing' && Number.isFinite(value) && value > 0) cfg.body = value;
+            if (type === 'indentation' && Number.isFinite(value) && value >= 0) cfg.indentation = value;
+            if (type === 'alignment') {
+                var a = String(r.value).toLowerCase().trim();
+                if (a === 'justify' || a === 'justified') a = 'both';
+                if (['both', 'left', 'right', 'center'].indexOf(a) !== -1) cfg.alignment = a;
+            }
+            if (type === 'margin') {
+                ['top', 'bottom', 'left', 'right'].forEach(function (side) {
+                    var v = typeof r.value === 'object' ? r.value[side] : r.value;
+                    if (v != null && Number.isFinite(Number(v)) && Number(v) >= 0) cfg[side] = Number(v);
+                });
+            }
+        });
+        var any = cfg.alignment !== null || cfg.indentation !== null || cfg.body !== null || cfg.abs !== null || cfg.left !== null || cfg.right !== null || cfg.top !== null ||
             cfg.bottom !== null || cfg.font || cfg.size !== null || cfg.hanging || Object.keys(cfg.heads).length;
         return any ? cfg : null;
     }
@@ -138,6 +168,16 @@
                     setA(sp, 'line', Math.round(line * 240));
                     setA(sp, 'lineRule', 'auto');
                     stats.spaced++;
+                }
+                // Keep front matter, section headings, lists and table layout intact.
+                if (!kind && (zone === 'body' || zone === 'abstract' || zone === 'references')) {
+                    if (cfg.alignment !== null) setA(ensure(doc, pPrOf(doc, p), PPR, 'jc'), 'val', cfg.alignment);
+                    if (cfg.indentation !== null && zone !== 'references') {
+                        var bodyIndent = ensure(doc, pPrOf(doc, p), PPR, 'ind');
+                        bodyIndent.removeAttributeNS(W, 'hanging');
+                        bodyIndent.removeAttributeNS(W, 'firstLineChars');
+                        setA(bodyIndent, 'firstLine', Math.round(cfg.indentation * 1440));
+                    }
                 }
                 if (zone === 'front' && MONTH.test(t)) {
                     var pPr = pPrOf(doc, p);
