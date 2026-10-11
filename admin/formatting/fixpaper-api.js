@@ -120,7 +120,12 @@
         .dv-attention .attention-yellow{background:#fef08a;color:#713f12;padding:4px 8px;border-radius:6px}
         .dv-attention .attention-red{background:#450a0a;color:#fecaca;padding:4px 8px;border-radius:6px}
         .dv-attention .attention-issues{list-style:none;padding:0;margin:12px 0;display:grid;gap:10px}
-        .dv-attention .attention-issues li{padding:12px;background:#1e293b;border:1px solid #334155;border-radius:9px}
+        .dv-attention .attention-issues li{padding:0}
+        .dv-attention .attention-card{width:100%;text-align:left;white-space:normal;line-height:1.6;padding:12px;color:#fca5a5}
+        .dv-attention .attention-card[aria-pressed=true]{border-color:#facc15;background:#293548}
+        .dv-attention .attention-card:disabled{cursor:default;opacity:.8}
+        .dv-attention .attention-target{outline:2px solid #facc15;outline-offset:4px;text-decoration:underline;text-decoration-color:#eab308;text-decoration-thickness:2px}
+        .dv-attention .attention-margin-target{box-shadow:inset 0 0 0 3px #facc15!important}
         .dv-attention .attention-label{display:block;color:#fbbf24;font-weight:600;font-size:12px;margin-bottom:5px}
         .dv-attention .attention-paper{overflow:auto;min-width:0;padding:20px;background:#64748b}
         .dv-attention .attention-status{padding:18px;background:#1e293b;border-radius:10px;color:#e2e8f0;font-size:14px}
@@ -153,7 +158,7 @@
         if (!result || result.revision !== window._dvFixRevision) {
             var waiting=document.createElement('div');waiting.className='attention-paper';
             var progress=document.createElement('div');progress.className='attention-status';progress.setAttribute('role','status');
-            progress.textContent='Preparing marked paper. This preview will open automatically when the check finishes?';waiting.appendChild(progress);layout.appendChild(waiting);
+            progress.textContent='Preparing marked paper. This preview will open automatically when the check finishes...';waiting.appendChild(progress);layout.appendChild(waiting);
             var requestedRevision=window._dvFixRevision;
             await window._dvCheckAndFixPaper();
             if(!overlay.isConnected)return;
@@ -164,10 +169,15 @@
         }
         var count=document.createElement('strong');count.textContent=result.issues.length+' issues detected';sidebar.appendChild(count);
         var list = document.createElement('ul');list.className='attention-issues';
+        var cards=[];
         result.issues.forEach(function(issue){
             var item = document.createElement('li');
-            var label=document.createElement('span');label.className='attention-label';label.textContent=(issue.type==='content'?'AI content review':issue.type==='margin'?'Margin':'Spacing')+(issue.paragraph?' ? Paragraph '+issue.paragraph:'');item.appendChild(label);
-            var message=document.createElement('span');message.textContent=issue.message;item.appendChild(message);list.appendChild(item);
+            var card=document.createElement('button');card.type='button';card.className='attention-card';card.disabled=true;card.setAttribute('aria-pressed','false');
+            var label=document.createElement('span');label.className='attention-label';
+            var category=issue.type==='content'?'Wording / checklist':issue.type==='margin'?'Margin':'Spacing';
+            label.textContent=category+(issue.paragraph?' - Paragraph '+issue.paragraph:' - No exact location');card.appendChild(label);
+            var message=document.createElement('span');message.textContent=issue.message;card.appendChild(message);item.appendChild(card);list.appendChild(item);
+            cards.push({button:card,label:label,issue:issue,category:category});
         });
         sidebar.appendChild(list);
         if (!result.issues.length) {
@@ -177,7 +187,7 @@
         }
         var download=document.createElement('button');download.type='button';download.textContent='Download marked copy';download.onclick=function(){_dvTriggerDownload(result.blob,_dvBaseName(_dvLastFile.name)+'_needs_attention.docx');};sidebar.appendChild(download);
         var holder = document.createElement('div');holder.className='attention-paper';layout.appendChild(holder);
-        var status=document.createElement('div');status.className='attention-status';status.setAttribute('role','status');status.textContent='Loading marked paper?';holder.appendChild(status);
+        var status=document.createElement('div');status.className='attention-status';status.setAttribute('role','status');status.textContent='Loading marked paper...';holder.appendChild(status);
         var paper=document.createElement('div');holder.appendChild(paper);
         try {
             await window._dvLoadPreviewLib();
@@ -185,6 +195,24 @@
             if(!overlay.isConnected)return;
             await window.docx.renderAsync(result.blob,paper,null,{className:'docx',inWrapper:true,breakPages:true,ignoreLastRenderedPageBreak:false,renderComments:false});
             status.remove();
+            var sheets=Array.from(paper.querySelectorAll('section.docx'));
+            cards.forEach(function(entry){
+                var anchor=entry.issue.anchor && paper.querySelector('[id="'+entry.issue.anchor+'"]');
+                var target=anchor && anchor.closest('p');var page=target && target.closest('section.docx');
+                if(!target || !page){entry.label.textContent=entry.category+' - No exact location';return;}
+                var pageNumber=sheets.indexOf(page)+1;
+                entry.label.textContent=entry.category+' - Page '+pageNumber;
+                entry.button.disabled=false;
+                entry.button.setAttribute('aria-label',entry.category+' issue on page '+pageNumber+': '+entry.issue.message);
+                entry.button.onclick=function(){
+                    paper.querySelectorAll('.attention-target,.attention-margin-target').forEach(function(node){node.classList.remove('attention-target','attention-margin-target');});
+                    cards.forEach(function(other){other.button.setAttribute('aria-pressed','false');});
+                    entry.button.setAttribute('aria-pressed','true');target.classList.add('attention-target');
+                    if(entry.issue.type==='margin')page.classList.add('attention-margin-target');
+                    var destination=entry.issue.type==='margin'?page:target;
+                    holder.scrollTo({top:Math.max(0,holder.scrollTop+destination.getBoundingClientRect().top-holder.getBoundingClientRect().top-24),behavior:'smooth'});
+                };
+            });
             function fitPaper(){paper.querySelectorAll('section.docx').forEach(function(page){page.style.zoom='1';var width=page.offsetWidth;var computed=getComputedStyle(holder);var available=holder.clientWidth-parseFloat(computed.paddingLeft)-parseFloat(computed.paddingRight);if(width>available&&available>0)page.style.zoom=String(available/width);});}
             if(overlay.isConnected){fitPaper();observer=new ResizeObserver(fitPaper);observer.observe(holder);}
         } catch(error){status.textContent='Could not display attention copy: '+error.message;}

@@ -25,8 +25,12 @@ download share this returned file. The original remains unchanged.
 
 The combined response also includes `attention_document_base64` and
 `attention_issues`. Needs attention displays this annotated original: yellow
-highlights identify affected paragraphs and red notes explain the required
-setting. Explicit paragraph line spacing and section margins are compared with
+highlights identify affected paragraphs and red suggestions appear in the left
+sidebar cards. Bookmarks connect located cards to their rendered page without
+adding inline notes or changing the paper's text. Clicking a located card
+scrolls to the issue and adds a yellow outline; margin cards also mark the page
+boundary. Findings without an exact location do not offer a page jump.
+Explicit paragraph line spacing and section margins are compared with
 the selected template. Inherited or unverifiable settings are not treated as
 confirmed failures. AI content failures remain advisory. Fix paper displays the
 separate corrected copy without these annotations.

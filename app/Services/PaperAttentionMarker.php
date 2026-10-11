@@ -45,9 +45,14 @@ class PaperAttentionMarker
                     }
                 }
             }
-            $firstText = null;
-            foreach ($paragraphs as $index => $p) if (trim($xp->evaluate('string(.//w:t)', $p)) !== '') { $firstText = $index; break; }
+            $sectionStart = 0;
             foreach ($xp->query('//w:sectPr') as $sectionIndex => $section) {
+                $sectionEnd = count($paragraphs) - 1;
+                $owner = $section->parentNode?->parentNode;
+                if ($owner instanceof DOMElement && $owner->localName === 'p') $sectionEnd = array_search($owner, $paragraphs, true);
+                $sectionFirst = null;
+                for ($i = $sectionStart; $i <= $sectionEnd; $i++) if ($this->paragraphText($paragraphs[$i]) !== '') { $sectionFirst = $i; break; }
+                $sectionStart = $sectionEnd + 1;
                 $margin = $xp->query('./w:pgMar', $section)->item(0);
                 if (!$margin) continue;
                 foreach ($settings['margins'] as $side => $target) {
@@ -55,8 +60,8 @@ class PaperAttentionMarker
                     $actual = (float) $margin->getAttributeNS(self::W, $side) / 1440;
                     if (abs($actual - $target) <= .01) continue;
                     $message = 'Section '.($sectionIndex + 1).' '.$side.' margin is '.round($actual, 2).' inches; template requires '.$target.' inches.';
-                    if ($firstText !== null) $notes[$firstText][] = $message;
-                    $issues[] = ['paragraph' => ($firstText ?? -1) + 1, 'type' => 'margin', 'message' => $message];
+                    if ($sectionFirst !== null) $notes[$sectionFirst][] = $message;
+                    $issues[] = ['paragraph' => ($sectionFirst ?? -1) + 1, 'type' => 'margin', 'message' => $message];
                 }
             }
             foreach ($findings as $finding) {
@@ -64,7 +69,8 @@ class PaperAttentionMarker
                 $index = (int) ($finding['paragraph'] ?? 0) - 1;
                 $message = 'AI review (advisory): '.($finding['rule'] ?? 'Checklist rule').': '.$finding['explanation'];
                 if ($index >= 0 && isset($paragraphs[$index])) $notes[$index][] = $message;
-                elseif ($firstText !== null) $notes[$firstText][] = $message.' No exact paragraph was identified.';
+                else $message .= ' No exact paragraph was identified.';
+                if (!empty($finding['suggestion'])) $message .= ' Suggestion: '.$finding['suggestion'];
                 $issues[] = ['paragraph' => max(0, $index + 1), 'type' => 'content', 'message' => $message];
             }
             foreach ($notes as $index => $messages) {
@@ -73,16 +79,30 @@ class PaperAttentionMarker
                     $pr = $this->child($run, 'rPr', true);
                     $highlight = $this->child($pr, 'highlight'); $highlight->setAttributeNS(self::W, 'w:val', 'yellow');
                 }
-                $note = $doc->createElementNS(self::W, 'w:p');
-                $run = $note->appendChild($doc->createElementNS(self::W, 'w:r'));
-                $pr = $run->appendChild($doc->createElementNS(self::W, 'w:rPr'));
-                $color = $pr->appendChild($doc->createElementNS(self::W, 'w:color')); $color->setAttributeNS(self::W, 'w:val', 'FF0000');
-                $run->appendChild($doc->createElementNS(self::W, 'w:t'))->textContent = 'Needs attention: '.implode(' ', array_unique($messages));
-                $p->parentNode->insertBefore($note, $p->nextSibling);
             }
+            // Bookmarks preserve exact locations without inserting text or shifting pages.
+            $nextId = 0;
+            foreach ($xp->query('//w:bookmarkStart') as $bookmark) $nextId = max($nextId, (int) $bookmark->getAttributeNS(self::W, 'id') + 1);
+            $prefix = 'dvIssue_'.bin2hex(random_bytes(4)).'_'; $anchors = [];
+            foreach (array_keys($notes) as $index) {
+                $p = $paragraphs[$index]; $anchor = $prefix.($index + 1); $anchors[$index + 1] = $anchor;
+                $start = $doc->createElementNS(self::W, 'w:bookmarkStart');
+                $start->setAttributeNS(self::W, 'w:id', (string) $nextId); $start->setAttributeNS(self::W, 'w:name', $anchor);
+                $pr = $xp->query('./w:pPr', $p)->item(0);
+                $p->insertBefore($start, $pr ? $pr->nextSibling : $p->firstChild);
+                $end = $p->appendChild($doc->createElementNS(self::W, 'w:bookmarkEnd')); $end->setAttributeNS(self::W, 'w:id', (string) $nextId++);
+            }
+            foreach ($issues as &$issue) $issue['anchor'] = $anchors[$issue['paragraph']] ?? null;
+            unset($issue);
             $zip->addFromString('word/document.xml', $doc->saveXML()); $zip->close(); $opened = false;
             return ['document_base64' => base64_encode(file_get_contents($path)), 'issues' => $issues];
         } finally { if ($opened) $zip->close(); @unlink($path); }
+    }
+
+    private function paragraphText(DOMElement $p): string
+    {
+        $text = ''; foreach ($p->getElementsByTagNameNS(self::W, 't') as $t) $text .= $t->textContent;
+        return trim($text);
     }
 
     private function child(DOMElement $parent, string $name, bool $first = false): DOMElement
