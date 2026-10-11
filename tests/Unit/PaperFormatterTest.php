@@ -136,6 +136,19 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('480', $xp->evaluate('string('.$date.'/w:pPr/w:spacing/@w:line)'));
     }
 
+    public function test_cover_date_stays_with_title_without_degree_statement_or_by_label(): void
+    {
+        $file = $this->paper('<w:p><w:r><w:t>Research title</w:t></w:r></w:p><w:p><w:r><w:t>Researcher name</w:t></w:r></w:p><w:p><w:r><w:br w:type="page"/></w:r></w:p><w:p><w:pPr><w:pageBreakBefore/><w:keepNext/><w:spacing w:before="9000"/></w:pPr><w:r><w:br w:type="page"/><w:t>April 2026</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p>');
+        (new PaperFormatter)->format($file, $this->rules()); $xp = $this->xml($file);
+        $date = '//w:p[w:r/w:t="April 2026"]';
+        $this->assertEquals(0, $xp->evaluate('count('.$date.'//w:br[@w:type="page"])'));
+        $this->assertSame('0', $xp->evaluate('string('.$date.'/w:pPr/w:pageBreakBefore/@w:val)'));
+        $this->assertSame('0', $xp->evaluate('string('.$date.'/w:pPr/w:keepNext/@w:val)'));
+        $this->assertSame('1', $xp->evaluate('string(//w:p[w:r/w:t="Researcher name"]/w:pPr/w:keepNext/@w:val)'));
+        $this->assertEquals(1, $xp->evaluate('count(//w:p[w:r/w:t="CHAPTER 1"]//w:br[@w:type="page"])'));
+        $this->assertEquals(1, $xp->evaluate('count(//w:br[@w:type="page"])'));
+    }
+
     public function test_reference_title_layout_separates_thesis_statement_and_authors(): void
     {
         $body = '';

@@ -327,7 +327,9 @@ class PaperFormatter
             if (preg_match('/^by$/i', $text)) $by = $p;
             if ($this->isDate($text)) { $date = $p; break; }
         }
-        if (!$partial || !$by || !$date) return;
+        // A cover can omit the degree statement or the standalone "by" label.
+        // Its date still belongs with the preceding cover content.
+        if (!$date) return;
         $datePr = $this->ensure($date, 'pPr', true);
         $this->attr($this->ensure($datePr, 'keepNext'), 'val', 0);
         $this->attr($this->ensure($datePr, 'pageBreakBefore'), 'val', 0);

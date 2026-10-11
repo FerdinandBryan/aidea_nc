@@ -2645,7 +2645,7 @@ async function _dvGenerateFixedPdf() {
             if (datePattern.test(text)) { date = p; break; }
             if (text) return;
         }
-        if (!date || !Array.from(first.children).some(function (p) { return /^by$/i.test((p.textContent || '').trim()); })) return;
+        if (!date || Array.from(first.children).some(function (p) { return /^CHAPTER\s/i.test((p.textContent || '').trim()); })) return;
         while (first.lastElementChild && !(first.lastElementChild.textContent || '').trim() &&
             !first.lastElementChild.querySelector('img,svg,table')) first.lastElementChild.remove();
         first.appendChild(date);
