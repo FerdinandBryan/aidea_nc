@@ -321,14 +321,18 @@ class PaperFormatter
             if (!$title) continue;
             $target = $p; $replacement = 'Appendix '.$letter.' - '.$title;
             // Preserve the common two-line layout: appendix label, then its title.
-            if (preg_match('/^APPENDIX\s+[A-Z]$/i', $this->text($p))) {
+            { // Also replace a separate old title when the label already has a title.
                 $next = $p->nextSibling;
                 while ($next instanceof DOMElement && $next->localName === 'p' && $this->text($next) === '' && !$xp->query('.//w:drawing | .//w:pict | .//w:sectPr', $next)->length) $next = $next->nextSibling;
                 if ($next instanceof DOMElement && $next->localName === 'p' && mb_strlen($this->text($next)) <= 180 &&
                     !$xp->query('.//w:drawing | .//w:pict | .//w:object', $next)->length && !$this->isAppendixHeader($next, $xp)) {
                     $after = $next->nextSibling;
                     while ($after instanceof DOMElement && $after->localName === 'p' && $this->text($after) === '' && !$xp->query('.//w:drawing | .//w:pict | .//w:sectPr', $after)->length) $after = $after->nextSibling;
-                    if ($after instanceof DOMElement && $xp->query('.//w:drawing | .//w:pict | .//w:object', $after)->length) { $target = $next; $replacement = $title; }
+                    if ($after instanceof DOMElement && $xp->query('.//w:drawing | .//w:pict | .//w:object', $after)->length) {
+                        $labelTexts = $p->getElementsByTagNameNS(self::W, 't');
+                        foreach ($labelTexts as $index => $text) $text->textContent = $index === 0 ? 'Appendix '.$letter : '';
+                        $target = $next; $replacement = $title;
+                    }
                 }
             }
             $texts = $target->getElementsByTagNameNS(self::W, 't');

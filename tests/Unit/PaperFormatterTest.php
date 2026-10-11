@@ -432,4 +432,24 @@ class PaperFormatterTest extends TestCase
         $this->assertEquals(1, $xp->evaluate('count(//w:drawing)'));
     }
 
+    public function test_old_separate_appendix_title_is_replaced_instead_of_adding_another_title(): void
+    {
+        foreach (['Appendix D - Certificate of Validation', 'Appendix D - Wrong title'] as $label) {
+            $file = $this->paper('<w:p><w:r><w:t>'.$label.'</w:t></w:r></w:p><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Research Ethics </w:t></w:r><w:r><w:t>Clearance</w:t></w:r></w:p><w:p><w:r><w:drawing/></w:r></w:p>');
+            $rules = [['detail' => 'Appendix D - Certificate of Validation: scanned and signed validation form.']];
+            $formatter = new PaperFormatter;
+            $attention = (new PaperAttentionMarker)->mark($file, $formatter->settings($rules));
+            $this->assertSame('appendix-title', $attention['issues'][0]['type']);
+            $this->assertSame(2, $attention['issues'][0]['paragraph']);
+            $formatter->format($file, $rules); $xp = $this->xml($file);
+            $this->assertSame('Appendix D', $xp->evaluate('string(/w:document/w:body/w:p[1]//w:t)'));
+            $this->assertSame('Certificate of Validation', $xp->evaluate('string(/w:document/w:body/w:p[2]//w:t)'));
+            $this->assertStringNotContainsString('Research Ethics', $xp->evaluate('string(/w:document/w:body)'));
+            $this->assertEquals(3, $xp->evaluate('count(/w:document/w:body/w:p)'));
+            $this->assertEquals(1, $xp->evaluate('count(//w:drawing)'));
+            $formatter->format($file, $rules); $xp = $this->xml($file);
+            $this->assertSame('Certificate of Validation', $xp->evaluate('string(/w:document/w:body/w:p[2]//w:t)'));
+        }
+    }
+
 }
