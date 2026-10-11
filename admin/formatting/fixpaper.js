@@ -282,6 +282,70 @@
         return await zip.generateAsync({ type: 'blob' });
     }
 
+    async function spreadTitlePage(zip, doc) {
+        var body = doc.getElementsByTagNameNS(W, 'body')[0];
+        if (!body) return;
+        var title = [], date = null;
+        for (var node = body.firstChild; node; node = node.nextSibling) {
+            if (node.nodeType !== 1) continue;
+            if (node.localName !== 'p') return;
+            var text = ptext(node);
+            if (/^(CHAPTER|ABSTRACT|APPROVAL SHEET|ACKNOWLEDGEMENT|TABLE OF CONTENTS)\b/i.test(text)) break;
+            title.push(node);
+            if (MONTH.test(text)) { date = node; break; }
+        }
+        if (!date || title.length < 2 || !window._dvLoadPreviewLib) return;
+        var visible = title.filter(function (p) { return !!ptext(p); });
+        var partial = visible.find(function (p) { return /in partial fulfi[l]?lment/i.test(ptext(p)); });
+        var by = visible.find(function (p) { return /^by\s*$/i.test(ptext(p)); });
+        if (!partial || !by) return;
+        await window._dvLoadPreviewLib();
+        // Replace blank spacer paragraphs with measured gaps between groups.
+        title.forEach(function (p) {
+            if (!ptext(p) && !p.getElementsByTagNameNS(W, 'drawing').length &&
+                !p.getElementsByTagNameNS(W, 'pict').length && !p.getElementsByTagNameNS(W, 'sectPr').length) p.parentNode.removeChild(p);
+        });
+        visible.forEach(function (p) {
+            var props = pPrOf(doc, p), spacing = ensure(doc, props, PPR, 'spacing');
+            setA(spacing, 'before', 0); setA(spacing, 'after', 0);
+            spacing.removeAttributeNS(W, 'beforeAutospacing');
+            spacing.removeAttributeNS(W, 'afterAutospacing');
+            setA(ensure(doc, props, PPR, 'jc'), 'val', 'center');
+        });
+        var section = doc.getElementsByTagNameNS(W, 'sectPr')[0];
+        var margins = section && kid(section, 'pgMar');
+        function margin(side) {
+            var value = margins && margins.getAttributeNS(W, side);
+            return value == null ? 1440 : Number(value);
+        }
+        var usable = (15840 - margin('top') - margin('bottom')) / 15;
+        var box = document.createElement('div');
+        box.style.cssText = 'position:absolute;left:-10000px;top:0;width:856px;visibility:hidden;';
+        document.body.appendChild(box);
+        try {
+            zip.file('word/document.xml', new XMLSerializer().serializeToString(doc));
+            await window.docx.renderAsync(await zip.generateAsync({ type: 'blob' }), box, null, {
+                className: 'dvTitleMeasure', inWrapper: false, breakPages: false,
+                ignoreLastRenderedPageBreak: true, ignoreHeight: true,
+                renderHeaders: false, renderFooters: false, __dvMeasure: true
+            });
+            if (document.fonts && document.fonts.ready) await document.fonts.ready;
+            var article = box.querySelector('section.dvTitleMeasure > article');
+            if (!article || article.children.length < visible.length) return;
+            var height = 0;
+            Array.from(article.children).slice(0, visible.length).forEach(function (p) {
+                var style = getComputedStyle(p);
+                height += p.getBoundingClientRect().height +
+                    (parseFloat(style.marginTop) || 0) + (parseFloat(style.marginBottom) || 0);
+            });
+            // Fill the printable height without changing font or line spacing.
+            var extra = Math.max(0, usable * 0.90 - height);
+            [[partial, 0.45], [by, 0.35], [date, 0.20]].forEach(function (group) {
+                setA(ensure(doc, pPrOf(doc, group[0]), PPR, 'spacing'), 'before', Math.round(extra * group[1] * 15));
+            });
+        } finally { box.remove(); }
+    }
+
     async function shortPaper(blob) {
         if (!window.JSZip) await new Promise(function (resolve) { _validatorDeps.ensureJSZip(resolve); });
         var zip = await JSZip.loadAsync(blob);
@@ -353,6 +417,8 @@
             setA(size, 'h', 15840);
             setA(size, 'orient', 'portrait');
         });
+        zip.file('word/document.xml', new XMLSerializer().serializeToString(doc));
+        await spreadTitlePage(zip, doc);
         zip.file('word/document.xml', new XMLSerializer().serializeToString(doc));
         return zip.generateAsync({ type: 'blob' });
     }

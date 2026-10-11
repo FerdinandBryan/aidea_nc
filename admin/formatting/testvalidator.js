@@ -2533,6 +2533,7 @@ async function _dvGenerateFixedPdf() {
         }
         return next();
     }
+    window._dvLoadPreviewLib = loadPreviewLib;
     /* DV_PAGE_VIEW: show the document as separate pages */
     (function () {
         if (document.getElementById('dvPageViewCss')) return;
@@ -3228,6 +3229,6 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper.js?v=6';
+    e.src = base + 'fixpaper.js?v=7';
     document.head.appendChild(e);
 })();
