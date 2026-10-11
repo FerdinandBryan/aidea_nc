@@ -13,6 +13,7 @@ class PaperFormatter
 {
     private const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
+
     public function missingExtensions(): array
     {
         $missing = [];
@@ -65,6 +66,14 @@ class PaperFormatter
             $value = $rule['value'];
             if (in_array($type, ['spacing', 'indentation', 'size'], true) && is_numeric($value)) $cfg[$type] = (float) $value;
             if ($type === 'font' && is_string($value)) $cfg['font'] = $value;
+            if ($type === 'abstract-spacing' && is_numeric($value)) $cfg['abstract'] = (float) $value;
+            if ($type === 'paper') {
+                $paper = strtolower(trim((string) $value));
+                if (in_array($paper, ['letter', 'short', 'short bond'], true)) { $cfg['width'] = 12240; $cfg['height'] = 15840; }
+                elseif ($paper === 'a4') { $cfg['width'] = 11906; $cfg['height'] = 16838; }
+                elseif ($paper === 'legal') { $cfg['width'] = 12240; $cfg['height'] = 20160; }
+                else throw new InvalidArgumentException('The admin template paper size must be letter, a4, or legal.');
+            }
             if ($type === 'alignment') {
                 $value = strtolower(trim((string) $value));
                 if (in_array($value, ['justify', 'justified'], true)) $value = 'both';
@@ -76,6 +85,7 @@ class PaperFormatter
             }
         }
         if (($cfg['spacing'] !== null && ($cfg['spacing'] <= 0 || $cfg['spacing'] > 5)) ||
+            ($cfg['abstract'] !== null && ($cfg['abstract'] <= 0 || $cfg['abstract'] > 5)) ||
             ($cfg['size'] !== null && ($cfg['size'] < 1 || $cfg['size'] > 100)) ||
             ($cfg['indentation'] !== null && ($cfg['indentation'] < 0 || $cfg['indentation'] > 5))) throw new InvalidArgumentException('The template has invalid formatting values.');
         foreach ($cfg['margins'] as $margin) if ($margin < 0 || $margin > 4) throw new InvalidArgumentException('The template has invalid margins.');
@@ -87,6 +97,7 @@ class PaperFormatter
     public function format(string $path, array $rules): array
     {
         $cfg = $this->settings($rules);
+
         $zip = new ZipArchive;
         if ($zip->open($path) !== true) throw new InvalidArgumentException('Upload a valid Word (.docx) document.');
         try {

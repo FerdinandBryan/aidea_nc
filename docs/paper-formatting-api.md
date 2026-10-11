@@ -1,5 +1,31 @@
 # Paper formatting API
 
+`GET /api/format-templates/{templateId}/formatting` returns the active admin
+template's effective settings and revision, using Sanctum authentication.
+It rejects missing, inactive or malformed templates rather than selecting a
+different template. Formatting uses this same resolver for every request.
+
+Templates saved through the existing admin-only `PUT /api/format-templates`
+may include an optional `formatting` object with exact settings:
+
+```json
+{
+  "font": "Times New Roman",
+  "font_size": 12,
+  "line_spacing": 2,
+  "abstract_spacing": 1,
+  "paper_size": "letter",
+  "margins": {"left": 1.5, "right": 1, "top": 1, "bottom": 1},
+  "alignment": "justified",
+  "first_line_indent": 0.5
+}
+```
+
+These server-saved values override prose checklist descriptions. The current
+admin editor still edits written rules; exact settings can be saved through
+the authenticated admin API. Supported paper sizes are `letter`, `a4`, and
+`legal`; margins and indents are in inches. Paper uploads do not supply rules.
+
 `POST /api/papers/fix` requires a Sanctum bearer token and multipart form data:
 
 - `file`: Word `.docx`, up to 20 MB.

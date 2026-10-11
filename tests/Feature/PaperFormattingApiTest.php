@@ -87,4 +87,32 @@ class PaperFormattingApiTest extends TestCase
         $this->assertIsString($decoded);
         $this->assertSame('PK', substr($decoded, 0, 2));
     }
+
+    public function test_saved_explicit_admin_settings_override_checklist_prose(): void
+    {
+        Sanctum::actingAs(new User(['name' => 'Student']));
+        $this->templates([['id' => 17, 'name' => 'Admin A4', 'active' => true,
+            'rules' => [['detail' => 'Times New Roman 12pt, double-spaced, short bond paper.']],
+            'formatting' => ['font' => 'Arial', 'font_size' => 10, 'line_spacing' => 1.5,
+                'abstract_spacing' => 1, 'paper_size' => 'a4', 'alignment' => 'left',
+                'margins' => ['left' => 2, 'right' => 1, 'top' => 1, 'bottom' => 1]]]]);
+        $this->getJson('/api/format-templates/17/formatting')->assertOk()
+            ->assertJsonPath('settings.font', 'Arial')->assertJsonPath('settings.size', 10)
+            ->assertJsonPath('settings.spacing', 1.5)->assertJsonPath('settings.width', 11906)
+            ->assertJsonPath('settings.margins.left', 2)->assertJsonStructure(['revision']);
+    }
+
+    public function test_missing_admin_template_is_rejected_instead_of_using_defaults(): void
+    {
+        Sanctum::actingAs(new User(['name' => 'Student']));
+        $this->templates([]);
+        $this->getJson('/api/format-templates/17/formatting')->assertUnprocessable()->assertJsonValidationErrors('template_id');
+    }
+
+    public function test_invalid_admin_setting_is_reported_before_formatting(): void
+    {
+        Sanctum::actingAs(new User(['name' => 'Student']));
+        $this->templates([['id' => 17, 'active' => true, 'rules' => [], 'formatting' => ['line_spacing' => 'unknown']]]);
+        $this->getJson('/api/format-templates/17/formatting')->assertUnprocessable()->assertJsonValidationErrors('template_id');
+    }
 }

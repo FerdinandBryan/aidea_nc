@@ -207,6 +207,8 @@ require __DIR__ . '/profile.php';
 // Format templates shared between admin and students (stored as one JSON list)
 Route::post('/papers/fix', [\App\Http\Controllers\PaperFormattingController::class, 'store'])
     ->middleware(['auth:sanctum', 'throttle:10,1']);
+Route::get('/format-templates/{templateId}/formatting', [\App\Http\Controllers\PaperFormattingController::class, 'show'])
+    ->middleware('auth:sanctum');
 
 \Illuminate\Support\Facades\Route::get('/format-templates', function () {
     $row = \Illuminate\Support\Facades\DB::table('format_templates')->orderBy('id')->first();
