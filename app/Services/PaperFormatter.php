@@ -239,6 +239,7 @@ class PaperFormatter
             $this->attachFigureCaptions($xp);
             $this->layoutTitle($title, $cfg, $xp);
             $this->removeBlankPageBreaks($xp);
+            $this->attachAppendixAttachments($xp, $cfg);
             $zip->addFromString('word/document.xml', $doc->saveXML());
             $applied = []; $manual = []; $defaults = $this->settings([]);
             foreach ($rules as $rule) {
@@ -301,6 +302,56 @@ class PaperFormatter
                 }
             }
             if ($moveBreak) $this->pageBreak($heading, $xp);
+        }
+    }
+
+    private function attachAppendixAttachments(DOMXPath $xp, array $cfg): void
+    {
+        foreach ($xp->query('/w:document/w:body/w:p') as $heading) {
+            if (!$this->isAppendixHeader($heading, $xp)) continue;
+            $chain = [$heading]; $next = $heading->nextSibling; $attachment = null;
+            while ($next instanceof DOMElement && $next->localName === 'p' && count($chain) < 8) {
+                if ($this->isAppendixHeader($next, $xp) || $this->isChapter($this->text($next)) || $xp->query('.//w:sectPr', $next)->length) break;
+                if ($xp->query('.//w:drawing | .//w:pict | .//w:object', $next)->length) { $attachment = $next; break; }
+                if (mb_strlen($this->text($next)) > 180) break;
+                $chain[] = $next; $next = $next->nextSibling;
+            }
+            if (!$attachment) continue;
+            $reserved = 240; // A small separation between the label and attachment.
+            foreach ($chain as $index => $p) {
+                $pr = $this->ensure($p, 'pPr', true);
+                if ($index > 0) {
+                    foreach (iterator_to_array($xp->query('./w:pageBreakBefore', $pr)) as $break) $break->parentNode->removeChild($break);
+                    foreach (iterator_to_array($xp->query('.//w:br[@w:type="page"]', $p)) as $break) $break->parentNode->removeChild($break);
+                }
+                if ($this->text($p) === '' && !$xp->query('.//w:bookmarkStart | .//w:bookmarkEnd | .//w:fldChar', $p)->length) { $p->parentNode->removeChild($p); continue; }
+                $this->attr($this->ensure($pr, 'keepNext'), 'val', 1);
+                $line = $xp->evaluate('string(./w:spacing/@w:line)', $pr);
+                $reserved += ($cfg['size'] ?? 12) * 20 * ($line !== '' ? (float) $line / 240 : ($cfg['spacing'] ?? 1)) * 1.2;
+                $reserved += (float) $xp->evaluate('string(./w:spacing/@w:before)', $pr) + (float) $xp->evaluate('string(./w:spacing/@w:after)', $pr);
+            }
+            $pr = $this->ensure($attachment, 'pPr', true);
+            foreach (iterator_to_array($xp->query('./w:pageBreakBefore', $pr)) as $break) $break->parentNode->removeChild($break);
+            foreach (iterator_to_array($xp->query('./w:r/w:br[@w:type="page"]', $attachment)) as $break) $break->parentNode->removeChild($break);
+            $section = $xp->query('.//w:sectPr | following::w:sectPr[1]', $heading)->item(0);
+            $margin = function (string $side) use ($xp, $section): float {
+                $value = $xp->evaluate('string(./w:pgMar/@w:'.$side.')', $section);
+                return $value !== '' ? (float) $value : 1440;
+            };
+            $maxWidth = ($cfg['width'] - $margin('left') - $margin('right')) * 635;
+            $maxHeight = max(1, $cfg['height'] - $margin('top') - $margin('bottom') - $reserved) * 635;
+            foreach ($xp->query('.//w:drawing', $attachment) as $drawing) {
+                if (!$xp->query('.//*[local-name()="pic" and namespace-uri()="http://schemas.openxmlformats.org/drawingml/2006/picture"]', $drawing)->length) continue;
+                $extent = $xp->query('.//*[local-name()="extent" and namespace-uri()="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"]', $drawing)->item(0);
+                if (!$extent) continue;
+                $width = (float) $extent->getAttribute('cx'); $height = (float) $extent->getAttribute('cy');
+                if ($width <= 0 || $height <= 0) continue;
+                $scale = min(1, $maxWidth / $width, $maxHeight / $height);
+                if ($scale >= 1) continue;
+                foreach ($xp->query('.//*[local-name()="extent" and namespace-uri()="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"] | .//*[local-name()="pic"]//*[local-name()="xfrm"]/*[local-name()="ext"]', $drawing) as $size) {
+                    $size->setAttribute('cx', (string) round($width * $scale)); $size->setAttribute('cy', (string) round($height * $scale));
+                }
+            }
         }
     }
 

@@ -387,4 +387,19 @@ class PaperFormatterTest extends TestCase
         }
     }
 
+    public function test_appendix_label_and_letter_attachment_share_page_without_changing_image_ratio(): void
+    {
+        $file = $this->paper('<w:p><w:r><w:t>APPENDICES</w:t></w:r></w:p><w:p><w:r><w:t>Appendix A</w:t></w:r></w:p><w:p><w:r><w:br w:type="page"/></w:r></w:p><w:p><w:pPr><w:pageBreakBefore/></w:pPr><w:r><w:t>Letter of request to conduct study</w:t></w:r></w:p><w:p><w:pPr><w:pageBreakBefore/></w:pPr><w:r><w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="5943600" cy="8229600"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:spPr><a:xfrm><a:ext cx="5943600" cy="8229600"/></a:xfrm></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>');
+        (new PaperFormatter)->format($file, $this->rules()); $xp = $this->xml($file);
+        $this->assertEquals(1, $xp->evaluate('count(//w:p[w:r/w:t="Appendix A"]//w:br[@w:type="page"])'));
+        $this->assertEquals(0, $xp->evaluate('count(//w:p[w:r/w:t="Letter of request to conduct study"]/w:pPr/w:pageBreakBefore)'));
+        $this->assertEquals(0, $xp->evaluate('count(//w:p[w:r/w:drawing]/w:pPr/w:pageBreakBefore)'));
+        $this->assertEquals(0, $xp->evaluate('count(//w:p[w:r/w:t="Letter of request to conduct study"]//w:br[@w:type="page"])'));
+        $this->assertSame('1', $xp->evaluate('string(//w:p[w:r/w:t="Letter of request to conduct study"]/w:pPr/w:keepNext/@w:val)'));
+        $width = (float) $xp->evaluate('string(//*[local-name()="extent"]/@cx)');
+        $height = (float) $xp->evaluate('string(//*[local-name()="extent"]/@cy)');
+        $this->assertLessThan(8229600, $height);
+        $this->assertEqualsWithDelta(5943600 / 8229600, $width / $height, .00001);
+    }
+
 }
