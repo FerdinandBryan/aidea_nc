@@ -146,6 +146,30 @@
                 }
             }
 
+            // For a title page followed directly by Chapter 1, use one break
+            // before the chapter instead of retaining breaks inside the title.
+            if (kind === 'chapter' && /^(1|I)$/i.test(key) && zone === 'front') {
+                var titleBody = p.parentNode;
+                var chapterPr = pPrOf(doc, p);
+                if (titleBody.localName === 'body' && titleBody.namespaceURI === W) {
+                    for (var title = titleBody.firstChild; title && title !== p; title = title.nextSibling) {
+                        if (title.nodeType !== 1 || title.localName !== 'p') continue;
+                        var tp = kid(title, 'pPr');
+                        var oldBreak = tp && kid(tp, 'pageBreakBefore');
+                        if (oldBreak) tp.removeChild(oldBreak);
+                        Array.from(title.getElementsByTagNameNS(W, 'br')).forEach(function (br) {
+                            if (br.getAttributeNS(W, 'type') === 'page') br.parentNode.removeChild(br);
+                        });
+                        Array.from(title.getElementsByTagNameNS(W, 'lastRenderedPageBreak')).forEach(function (br) { br.parentNode.removeChild(br); });
+                    }
+                }
+                // A break after the heading must not substitute for a break before it.
+                setA(ensure(doc, chapterPr, PPR, 'pageBreakBefore'), 'val', 1);
+                var chapterSpacing = ensure(doc, chapterPr, PPR, 'spacing');
+                setA(chapterSpacing, 'before', 0);
+                chapterSpacing.removeAttributeNS(W, 'beforeAutospacing');
+            }
+
             if (kind) {
                 if (seenText && !hasPageBreak(p)) {
                     ensure(doc, pPrOf(doc, p), PPR, 'pageBreakBefore');
