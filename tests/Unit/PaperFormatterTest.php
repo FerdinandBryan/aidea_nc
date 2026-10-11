@@ -343,7 +343,7 @@ class PaperFormatterTest extends TestCase
         $this->assertEquals(0, $xp->evaluate('count(//w:p[w:r/w:t="Appendix B - Questionnaire"]//w:br[@w:type="page"])'));
         $this->assertEquals(1, $xp->evaluate('count(//w:p[w:r/w:t="APPENDICES"]//w:br[@w:type="page"])'));
         $this->assertSame('0', $xp->evaluate('string(//w:p[w:r/w:t="APPENDICES"]/w:pPr/w:keepNext/@w:val)'));
-        $this->assertSame('0', $xp->evaluate('string(//w:p[w:r/w:t="APPENDIX A"]/w:pPr/w:keepNext/@w:val)'));
+        $this->assertSame('1', $xp->evaluate('string(//w:p[w:r/w:t="APPENDIX A"]/w:pPr/w:keepNext/@w:val)'));
         $this->assertSame('480', $xp->evaluate('string(//w:p[w:r/w:t="Letter content."]/w:pPr/w:spacing/@w:line)'));
         $this->assertSame('Letter content.', $xp->evaluate('string(//w:p[w:r/w:t="Letter content."]//w:t)'));
     }
@@ -362,6 +362,17 @@ class PaperFormatterTest extends TestCase
             $this->assertSame('0', $xp->evaluate('string('.$divider.'/w:pPr/w:ind/@w:left)'));
             $this->assertSame((string) ($sizeRule['value'] * 2), $xp->evaluate('string(//w:p[w:r/w:t="Appendix A"]/w:r/w:rPr/w:sz/@w:val)'));
         }
+    }
+
+    public function test_blank_page_breaks_are_collapsed_without_losing_text_or_graphics(): void
+    {
+        $file = $this->paper('<w:p><w:r><w:br w:type="page"/></w:r></w:p><w:p><w:r><w:t>First page text</w:t></w:r></w:p><w:p><w:r><w:br w:type="page"/></w:r></w:p><w:p><w:r><w:br w:type="page"/></w:r></w:p><w:p><w:r><w:t>Appendix A - Letter</w:t></w:r></w:p><w:p><w:r><w:drawing/></w:r></w:p><w:p><w:r><w:br w:type="page"/></w:r></w:p><w:sectPr><w:type w:val="oddPage"/></w:sectPr>');
+        (new PaperFormatter)->format($file, $this->rules()); $xp = $this->xml($file);
+        $this->assertEquals(1, $xp->evaluate('count(//w:br[@w:type="page"])'));
+        $this->assertSame('First page text', $xp->evaluate('string(/w:document/w:body/w:p[1]//w:t)'));
+        $this->assertEquals(1, $xp->evaluate('count(//w:drawing)'));
+        $this->assertSame('nextPage', $xp->evaluate('string(//w:sectPr/w:type/@w:val)'));
+        $this->assertSame('1', $xp->evaluate('string(//w:p[w:r/w:t="Appendix A - Letter"]/w:pPr/w:keepNext/@w:val)'));
     }
 
 }

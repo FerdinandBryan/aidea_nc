@@ -151,7 +151,8 @@ class PaperFormatter
                 $table = $xp->query('ancestor::w:tbl', $p)->length > 0;
                 $firstText = $p->getElementsByTagNameNS(self::W, 't')->item(0)?->textContent ?? '';
                 $chapter = !$table && ($this->isChapter($text) || $this->isChapter($firstText));
-                $heading = $chapter || in_array($upper, ['ABSTRACT', 'APPROVAL SHEET', 'ACKNOWLEDGEMENT', 'ACKNOWLEDGEMENTS', 'TABLE OF CONTENTS', 'LIST OF TABLES', 'LIST OF FIGURES', 'LIST OF APPENDICES', 'REFERENCES', 'APPENDICES'], true);
+                $appendixHeader = !$table && $this->isAppendixHeader($p, $xp);
+                $heading = $chapter || $appendixHeader || in_array($upper, ['ABSTRACT', 'APPROVAL SHEET', 'ACKNOWLEDGEMENT', 'ACKNOWLEDGEMENTS', 'TABLE OF CONTENTS', 'LIST OF TABLES', 'LIST OF FIGURES', 'LIST OF APPENDICES', 'REFERENCES', 'APPENDICES'], true);
                 if ($heading) $zone = $upper === 'ABSTRACT' ? 'abstract' : ($upper === 'REFERENCES' ? 'references' : 'body');
                 if ($zone === 'front' && !$table) $title[] = $p;
                 $pr = $this->ensure($p, 'pPr', true);
@@ -228,6 +229,7 @@ class PaperFormatter
             $this->isolateAppendicesDivider($xp, $cfg);
             $this->attachFigureCaptions($xp);
             $this->layoutTitle($title, $cfg, $xp);
+            $this->removeBlankPageBreaks($xp);
             $zip->addFromString('word/document.xml', $doc->saveXML());
             $applied = []; $manual = []; $defaults = $this->settings([]);
             foreach ($rules as $rule) {
@@ -291,6 +293,37 @@ class PaperFormatter
             }
             if ($moveBreak) $this->pageBreak($heading, $xp);
         }
+    }
+
+    private function isAppendixHeader(DOMElement $p, DOMXPath $xp): bool
+    {
+        if ($xp->query('.//w:tab', $p)->length || preg_match('/^TOC/i', $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $p))) return false;
+        $text = $this->text($p);
+        return mb_strlen($text) < 180 && !preg_match('/\.{3,}/', $text) && preg_match('/^APPENDIX\s+[A-Z](?:\s*[-:.]\s*[^!?]+)?$/i', $text);
+    }
+
+    private function removeBlankPageBreaks(DOMXPath $xp): void
+    {
+        foreach (iterator_to_array($xp->query('/w:document/w:body/w:p')) as $p) {
+            if ($this->text($p) !== '' || $xp->query('.//w:drawing | .//w:pict | .//w:object | .//w:sectPr | .//w:fldChar', $p)->length) continue;
+            if (!$xp->query('.//w:br[@w:type="page"] | ./w:pPr/w:pageBreakBefore[not(@w:val="0")]', $p)->length) continue;
+            $next = $p->nextSibling;
+            while ($next instanceof DOMElement && $next->localName === 'p' && $this->text($next) === '' && !$xp->query('.//w:drawing | .//w:pict | .//w:object | .//w:sectPr', $next)->length) $next = $next->nextSibling;
+            if ($next instanceof DOMElement && $next->localName === 'p') {
+                $this->pageBreak($next, $xp);
+                $p->parentNode->removeChild($p);
+            } elseif (!$next || ($next instanceof DOMElement && $next->localName === 'sectPr')) $p->parentNode->removeChild($p);
+        }
+        $first = $xp->query('/w:document/w:body/*[self::w:p or self::w:tbl]')->item(0);
+        if ($first instanceof DOMElement && $first->localName === 'p') {
+            foreach (iterator_to_array($xp->query('./w:pPr/w:pageBreakBefore', $first)) as $break) $break->parentNode->removeChild($break);
+            foreach (iterator_to_array($xp->query('.//w:br[@w:type="page"] | .//w:t | .//w:drawing | .//w:pict | .//w:object', $first)) as $node) {
+                if ($node->localName === 't' && trim($node->textContent) === '') continue;
+                if ($node->localName !== 'br') break;
+                $node->parentNode->removeChild($node);
+            }
+        }
+        foreach ($xp->query('//w:sectPr/w:type[@w:val="oddPage" or @w:val="evenPage"]') as $type) $this->attr($type, 'val', 'nextPage');
     }
 
     private function isolateAppendicesDivider(DOMXPath $xp, array $cfg): void

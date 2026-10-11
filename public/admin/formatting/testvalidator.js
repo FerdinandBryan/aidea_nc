@@ -2726,6 +2726,10 @@ async function _dvGenerateFixedPdf() {
             var _dvPrevPg = window._dvPaginateOn; window._dvPaginateOn = true;
             try { await window.docx.renderAsync(blob, holder, null, { className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: false, renderHeaders: true, renderFooters: true }); }
             finally { window._dvPaginateOn = _dvPrevPg; }
+            holder.querySelectorAll('.docx-wrapper > section.docx').forEach(function (page) {
+                var article=page.querySelector('article');
+                if(article && !(article.textContent || '').trim() && !article.querySelector('img,svg,table,math,canvas,object'))page.remove();
+            });
             if (window._dvFitFigureCaptions) window._dvFitFigureCaptions(holder);
             keepCoverDateOnFirstPage(holder);
             // Show one rendered paper page at a time.
@@ -3409,7 +3413,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=18';
+    e.src = base + 'fixpaper-api.js?v=19';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };
