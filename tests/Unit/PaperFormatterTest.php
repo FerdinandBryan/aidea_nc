@@ -215,4 +215,18 @@ class PaperFormatterTest extends TestCase
         $this->assertEquals(0, $xp->evaluate('count(//w:p[w:r/w:t="Following framework explanation."]/w:pPr/w:pageBreakBefore)'));
         $this->assertEquals(4, $xp->evaluate('count(/w:document/w:body/w:p)'));
     }
+
+    public function test_cover_date_has_no_old_page_break_and_topic_gets_two_line_gap(): void
+    {
+        $body = '';
+        foreach (['THESIS TITLE', 'A Thesis', 'In Partial Fulfillment of the Requirements', 'by', 'AUTHOR'] as $text) $body .= '<w:p><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
+        $body .= '<w:p><w:pPr><w:pageBreakBefore/></w:pPr><w:r><w:br w:type="page"/><w:t>April 2026</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Theoretical Framework</w:t></w:r></w:p><w:p><w:r><w:t>Explanation.</w:t></w:r></w:p>';
+        $file = $this->paper($body); (new PaperFormatter)->format($file, $this->rules()); $xp = $this->xml($file);
+        $date = '//w:p[w:r/w:t="April 2026"]';
+        $this->assertEquals(0, $xp->evaluate('count('.$date.'//w:br[@w:type="page"])'));
+        $this->assertSame('0', $xp->evaluate('string('.$date.'/w:pPr/w:pageBreakBefore/@w:val)'));
+        $this->assertSame('0', $xp->evaluate('string('.$date.'/w:pPr/w:keepNext/@w:val)'));
+        $this->assertSame('960', $xp->evaluate('string(//w:p[w:r/w:t="Theoretical Framework"]/w:pPr/w:spacing/@w:after)'));
+        $this->assertSame('page', $xp->evaluate('string(//w:p[w:r/w:t="CHAPTER 1"]/w:r[1]/w:br/@w:type)'));
+    }
 }

@@ -159,6 +159,10 @@ class PaperFormatter
                 if ($topicHeading) {
                     $this->attr($this->ensure($pr, 'keepNext'), 'val', 1);
                     $this->attr($this->ensure($pr, 'keepLines'), 'val', 1);
+                    if (!$chapter) {
+                        $gap = ($cfg['size'] ?? 12) * 20 * ($cfg['spacing'] ?? 1) * 2;
+                        $this->attr($this->ensure($pr, 'spacing'), 'after', round($gap));
+                    }
                 }
                 if ($chapter) $this->pageBreak($p, $xp);
                 $special = $cfg['headings'][$upper] ?? [];
@@ -314,14 +318,20 @@ class PaperFormatter
         }
         if (!$partial || !$by || !$date) return;
         $datePr = $this->ensure($date, 'pPr', true);
-        foreach (iterator_to_array($xp->query('./w:keepNext | ./w:pageBreakBefore', $datePr)) as $old) $old->parentNode->removeChild($old);
+        $this->attr($this->ensure($datePr, 'keepNext'), 'val', 0);
+        $this->attr($this->ensure($datePr, 'pageBreakBefore'), 'val', 0);
         $width = $cfg['width'] - (($cfg['margins']['left'] ?? 1) + ($cfg['margins']['right'] ?? 1)) * 1440;
         $height = $cfg['height'] - (($cfg['margins']['top'] ?? 1) + ($cfg['margins']['bottom'] ?? 1)) * 1440;
         $used = 0;
         foreach ($visible as $p) {
-            $sp = $this->ensure($this->ensure($p, 'pPr', true), 'spacing');
+            $pr = $this->ensure($p, 'pPr', true);
+            $sp = $this->ensure($pr, 'spacing');
             $this->attr($sp, 'before', 0); $this->attr($sp, 'after', 0);
-            $sp->removeAttributeNS(self::W, 'beforeAutospacing'); $sp->removeAttributeNS(self::W, 'afterAutospacing');
+            foreach (['beforeLines', 'afterLines', 'beforeAutospacing', 'afterAutospacing'] as $key) $this->attr($sp, $key, 0);
+            $this->attr($this->ensure($pr, 'pageBreakBefore'), 'val', 0);
+            $this->attr($this->ensure($pr, 'keepNext'), 'val', $p === $date ? 0 : 1);
+            $this->attr($this->ensure($pr, 'keepLines'), 'val', 1);
+            foreach (iterator_to_array($xp->query('.//w:br[@w:type="page"]', $p)) as $br) $br->parentNode->removeChild($br);
             $this->centerTitleParagraph($p, $xp);
             $lineCount = max(1, ceil(mb_strlen($this->text($p)) * ($cfg['size'] ?? 12) * 10 / $width));
             $lineCount += $xp->query('.//w:br[not(@w:type="page")]', $p)->length;
@@ -331,7 +341,9 @@ class PaperFormatter
             if ($this->text($p) === '' && !$xp->query('.//w:drawing | .//w:pict | .//w:sectPr', $p)->length) $p->parentNode?->removeChild($p);
             if ($p === $date) break;
         }
-        $extra = max(0, $height * .92 - $used);
+        // Leave room for font-metric differences between Word and the preview;
+        // the date must not overflow the cover because of decorative gaps.
+        $extra = max(0, $height * .85 - $used);
         $thesis = null; $firstAuthor = null;
         foreach ($visible as $index => $p) {
             if (preg_match('/^A Thesis$/i', $this->text($p))) $thesis = $p;

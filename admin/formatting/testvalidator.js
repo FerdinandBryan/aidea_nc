@@ -2391,7 +2391,8 @@ async function _dvGenerateFixedPdf() {
     function forcedBefore(el) {
         if (el.localName !== 'p') return false;
         var pPr = kid(el, 'pPr');
-        if (pPr && kid(pPr, 'pageBreakBefore')) return true;
+        var before = pPr && kid(pPr, 'pageBreakBefore');
+        if (before && !/^(0|false|off)$/i.test(wAttr(before, 'val') || '1')) return true;
         var br = Array.from(el.getElementsByTagNameNS(W, 'br')).filter(function (b) { return wAttr(b, 'type') === 'page'; })[0];
         var t = el.getElementsByTagNameNS(W, 't')[0];
         return !!(br && (!t || (br.compareDocumentPosition(t) & 4)));
