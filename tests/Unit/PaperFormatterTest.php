@@ -405,4 +405,31 @@ class PaperFormatterTest extends TestCase
         $this->assertEqualsWithDelta(5943600 / 8229600, $width / $height, .00001);
     }
 
+    public function test_appendix_titles_follow_selected_template_without_changing_contents_entries_or_content(): void
+    {
+        foreach (['Permission Letter', 'Institution Approval'] as $expected) {
+            $rules = array_merge($this->rules(), [['detail' => 'Appendix A - '.$expected.': signed attachment.']]);
+            $file = $this->paper('<w:p><w:pPr><w:pStyle w:val="TOC1"/></w:pPr><w:r><w:t>Appendix A - Old title</w:t></w:r></w:p><w:p><w:r><w:t>APPENDICES</w:t></w:r></w:p><w:p><w:r><w:t>Appendix A - Wrong heading</w:t></w:r></w:p><w:p><w:r><w:t>Original attachment content.</w:t></w:r></w:p>');
+            $formatter = new PaperFormatter;
+            $attention = (new PaperAttentionMarker)->mark($file, $formatter->settings($rules));
+            $this->assertSame('appendix-title', $attention['issues'][0]['type']);
+            $this->assertNotEmpty($attention['issues'][0]['anchor']);
+            $formatter->format($file, $rules); $xp = $this->xml($file);
+            $this->assertEquals(1, $xp->evaluate('count(//w:p[w:r/w:t="Appendix A - '.$expected.'"])'));
+            $this->assertSame('Original attachment content.', $xp->evaluate('string(//w:p[w:r/w:t="Original attachment content."]//w:t)'));
+            $this->assertSame('Appendix A - Old title', $xp->evaluate('string(//w:p[w:pPr/w:pStyle[@w:val="TOC1"]]//w:t)'));
+        }
+        $cfg = (new PaperFormatter)->settings([['detail' => 'Appendix G - Statistical Analysis: certificate.'], ['detail' => 'Appendix G - Qualitative Analysis: alternative certificate.']]);
+        $this->assertNull($cfg['appendix_titles']['G']);
+    }
+
+    public function test_separate_appendix_title_line_is_corrected_using_admin_rule(): void
+    {
+        $file = $this->paper('<w:p><w:r><w:t>Appendix A</w:t></w:r></w:p><w:p><w:r><w:t>Old letter title</w:t></w:r></w:p><w:p><w:r><w:drawing/></w:r></w:p>');
+        (new PaperFormatter)->format($file, [['detail' => 'Appendix A - Permission/Approval Letter: scanned and signed attachment.']]); $xp = $this->xml($file);
+        $this->assertSame('Appendix A', $xp->evaluate('string(/w:document/w:body/w:p[1]//w:t)'));
+        $this->assertSame('Permission/Approval Letter', $xp->evaluate('string(/w:document/w:body/w:p[2]//w:t)'));
+        $this->assertEquals(1, $xp->evaluate('count(//w:drawing)'));
+    }
+
 }

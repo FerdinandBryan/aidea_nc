@@ -76,6 +76,23 @@ class PaperAttentionMarker
                 if (!empty($finding['suggestion'])) $message .= ' Suggestion: '.$finding['suggestion'];
                 $issues[] = ['paragraph' => max(0, $index + 1), 'type' => 'content', 'message' => $message];
             }
+            foreach ($paragraphs as $index => $p) {
+                $text = $this->paragraphText($p);
+                if ($xp->query('ancestor::w:tbl | .//w:tab', $p)->length || preg_match('/^TOC/i', $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $p))) continue;
+                if (!preg_match('/^Appendix\s+([A-Z])(?:\s*[-:.]\s*(.+))?$/i', $text, $m)) continue;
+                $expected = $settings['appendix_titles'][strtoupper($m[1])] ?? null;
+                if (!$expected) continue;
+                $actual = trim($m[2] ?? '');
+                if ($actual === '') {
+                    $next = $p->nextSibling;
+                    while ($next instanceof DOMElement && $next->localName === 'p' && $this->paragraphText($next) === '' && !$xp->query('.//w:drawing | .//w:pict | .//w:sectPr', $next)->length) $next = $next->nextSibling;
+                    if ($next instanceof DOMElement && $next->localName === 'p') $actual = $this->paragraphText($next);
+                }
+                if (mb_strtolower(trim($actual)) === mb_strtolower(trim($expected))) continue;
+                $message = 'Appendix '.strtoupper($m[1]).' title should be "'.$expected.'" according to the selected admin template.';
+                $notes[$index][] = $message;
+                $issues[] = ['paragraph' => $index + 1, 'type' => 'appendix-title', 'message' => $message];
+            }
             foreach ($notes as $index => $messages) {
                 $p = $paragraphs[$index];
                 foreach (iterator_to_array($xp->query('.//w:r[w:t]', $p)) as $run) {

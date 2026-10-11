@@ -27,9 +27,15 @@ class PaperFormatter
     {
         $cfg = ['font' => null, 'size' => null, 'spacing' => null, 'abstract' => null,
             'alignment' => null, 'indentation' => null, 'hanging' => false,
-            'margins' => [], 'width' => 12240, 'height' => 15840, 'headings' => [], 'cv' => [], 'heading_gap_lines' => 0];
+            'margins' => [], 'width' => 12240, 'height' => 15840, 'headings' => [], 'cv' => [], 'heading_gap_lines' => 0, 'appendix_titles' => []];
         foreach ($rules as $rule) {
             if (!is_array($rule)) throw new InvalidArgumentException('The template contains an invalid rule.');
+            $description = (string) ($rule['detail'] ?? $rule['name'] ?? '');
+            if (preg_match('/\bAppendix\s+([A-Z])\s*[-–—.]\s*([^:\r\n]+)(?::|$)/iu', $description, $m)) {
+                $letter = strtoupper($m[1]); $title = trim($m[2]);
+                if (!array_key_exists($letter, $cfg['appendix_titles'])) $cfg['appendix_titles'][$letter] = $title;
+                elseif ($cfg['appendix_titles'][$letter] !== $title) $cfg['appendix_titles'][$letter] = null;
+            }
             $text = preg_replace('/[^\x00-\x7F]+/', ' ', (string) ($rule['detail'] ?? $rule['name'] ?? ''));
             if (preg_match('/(?:after\s+(?:each\s+|every\s+)?(?:heading|header|title)|(?:heading|header|title).*?before\s+(?:the\s+)?(?:explanation|definition|text))/i', $text) &&
                 preg_match('/\b(two|one|\d+(?:\.\d+)?)\s+(?:blank\s+)?lines?\b/i', $text, $m)) {
@@ -137,6 +143,7 @@ class PaperFormatter
             if (!$body instanceof DOMElement) throw new InvalidArgumentException('The Word document has no body.');
             foreach (iterator_to_array($xp->query('//w:lastRenderedPageBreak')) as $old) $old->parentNode->removeChild($old);
             $this->splitChapterParagraphs($doc, $xp);
+            $this->alignAppendixTitles($xp, $cfg);
             $zone = 'front'; $title = []; $paragraphs = 0; $cv = false; $appendices = false; $cvAuthors = 0;
             foreach (iterator_to_array($xp->query('//w:body//w:p')) as $p) {
                 $cvText = $this->text($p);
@@ -249,6 +256,7 @@ class PaperFormatter
                 else $manual[] = $name;
             }
             if ($cv && ($cfg['cv']['one_page'] ?? false)) $manual[] = 'Curriculum Vitae: verify that each author fits within the template page limit; content is not removed to force a fit.';
+            foreach ($cfg['appendix_titles'] as $letter => $title) if ($title === null) $manual[] = 'Appendix '.$letter.': the template defines multiple titles; choose the applicable title manually.';
             return ['settings' => $cfg, 'paragraphs_processed' => $paragraphs,
                 'applied_rules' => $applied, 'manual_review_rules' => $manual,
                 'manual_review_required' => count($manual) > 0,
@@ -305,6 +313,29 @@ class PaperFormatter
         }
     }
 
+    private function alignAppendixTitles(DOMXPath $xp, array $cfg): void
+    {
+        foreach ($xp->query('/w:document/w:body/w:p') as $p) {
+            if (!$this->isAppendixHeader($p, $xp) || !preg_match('/^APPENDIX\s+([A-Z])\b/i', $this->text($p), $m)) continue;
+            $letter = strtoupper($m[1]); $title = $cfg['appendix_titles'][$letter] ?? null;
+            if (!$title) continue;
+            $target = $p; $replacement = 'Appendix '.$letter.' - '.$title;
+            // Preserve the common two-line layout: appendix label, then its title.
+            if (preg_match('/^APPENDIX\s+[A-Z]$/i', $this->text($p))) {
+                $next = $p->nextSibling;
+                while ($next instanceof DOMElement && $next->localName === 'p' && $this->text($next) === '' && !$xp->query('.//w:drawing | .//w:pict | .//w:sectPr', $next)->length) $next = $next->nextSibling;
+                if ($next instanceof DOMElement && $next->localName === 'p' && mb_strlen($this->text($next)) <= 180 &&
+                    !$xp->query('.//w:drawing | .//w:pict | .//w:object', $next)->length && !$this->isAppendixHeader($next, $xp)) {
+                    $after = $next->nextSibling;
+                    while ($after instanceof DOMElement && $after->localName === 'p' && $this->text($after) === '' && !$xp->query('.//w:drawing | .//w:pict | .//w:sectPr', $after)->length) $after = $after->nextSibling;
+                    if ($after instanceof DOMElement && $xp->query('.//w:drawing | .//w:pict | .//w:object', $after)->length) { $target = $next; $replacement = $title; }
+                }
+            }
+            $texts = $target->getElementsByTagNameNS(self::W, 't');
+            foreach ($texts as $index => $text) $text->textContent = $index === 0 ? $replacement : '';
+        }
+    }
+
     private function attachAppendixAttachments(DOMXPath $xp, array $cfg): void
     {
         foreach ($xp->query('/w:document/w:body/w:p') as $heading) {
@@ -347,7 +378,6 @@ class PaperFormatter
                 return $value !== '' ? (float) $value : 1440;
             };
             $maxWidth = ($cfg['width'] - $margin('left') - $margin('right')) * 635;
-            // Reserve a baseline and a little renderer tolerance for the inline picture.
             $maxHeight = max(1, $cfg['height'] - $margin('top') - $margin('bottom') - $reserved - 240) * 635 * .97;
             foreach ($xp->query('.//w:drawing', $attachment) as $drawing) {
                 if (!$xp->query('.//*[local-name()="pic" and namespace-uri()="http://schemas.openxmlformats.org/drawingml/2006/picture"]', $drawing)->length) continue;

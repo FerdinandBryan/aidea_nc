@@ -177,7 +177,7 @@
             var card=document.createElement('button');card.type='button';card.className='attention-card';card.disabled=true;card.setAttribute('aria-pressed','false');
             var label=document.createElement('span');label.className='attention-label';
             var objectLabels={figure:'Figure detected',table:'Word table detected',image:'Image - figure unconfirmed',caption:'Caption - object unconfirmed'};
-            var category=objectLabels[issue.type] || (issue.type==='content'?'Wording / checklist':issue.type==='margin'?'Margin':'Spacing');
+            var category=objectLabels[issue.type] || (issue.type==='appendix-title'?'Appendix title':issue.type==='content'?'Wording / checklist':issue.type==='margin'?'Margin':'Spacing');
             if(objectLabels[issue.type])card.classList.add('attention-object');
             label.textContent=category+(issue.paragraph?' - Paragraph '+issue.paragraph:' - No exact location');card.appendChild(label);
             var message=document.createElement('span');message.textContent=issue.message;card.appendChild(message);item.appendChild(card);list.appendChild(item);
