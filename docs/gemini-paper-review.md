@@ -9,14 +9,19 @@ refresh the Laravel configuration cache after setting the variable.
 server. Its free-tier availability and limits depend on the Google project;
 the app does not switch models or enable paid billing automatically.
 
-Use the **AI checklist review (Gemini)** button after Check formatting. This is
-an explicit, separate action because the paper text and selected admin checklist
-are sent to Google. Free-tier data handling is described in
+**Check formatting** now performs the Gemini review and creates the formatted
+copy in one action. The separate Gemini button has been removed. This action
+sends paper text and the selected admin checklist to Google. Free-tier data handling is described in
 [Google's pricing and data-use information](https://ai.google.dev/gemini-api/docs/pricing).
 
 `POST /api/papers/ai-check` requires a Sanctum bearer token and multipart fields
 `file` (DOCX, up to 20 MB) and `template_id`. The server loads the active saved
 template through the same resolver as the formatting API. Client rules are ignored.
+
+`POST /api/papers/check-and-fix` accepts the same fields and returns the advisory
+review plus `document_base64` and a formatter `report`. Formatting uses the
+server-saved admin rules; Gemini cannot silently override them. Preview and
+download share this returned file. The original remains unchanged.
 
 The response includes an advisory summary and a finding for every checklist
 rule, with status, explanation, paragraph reference, and suggestion. Exact
@@ -24,7 +29,9 @@ printed layout checks are marked manual. This endpoint does not rewrite or
 auto-submit the paper and does not change the deterministic formatter's rules.
 Inputs are limited to 500,000 encoded bytes; larger papers are rejected rather
 than silently truncated. Missing keys, timeouts, quota errors, incomplete reviews,
-invalid JSON and invalid paragraph references are reported explicitly.
+invalid JSON are reported explicitly. Missing checklist findings and unverified
+paragraph references are marked manual, with warnings, rather than discarding
+all valid findings. A partial review is never presented as complete compliance.
 
 The integration uses Google's [Interactions REST API](https://ai.google.dev/gemini-api/docs/text-generation)
 and [structured JSON output](https://ai.google.dev/gemini-api/docs/structured-output),

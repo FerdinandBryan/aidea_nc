@@ -207,6 +207,8 @@ require __DIR__ . '/profile.php';
 // Format templates shared between admin and students (stored as one JSON list)
 Route::post('/papers/ai-check', [\App\Http\Controllers\GeminiPaperReviewController::class, 'store'])
     ->middleware(['auth:sanctum', 'throttle:3,1']);
+Route::post('/papers/check-and-fix', [\App\Http\Controllers\GeminiPaperReviewController::class, 'checkAndFix'])
+    ->middleware(['auth:sanctum', 'throttle:3,1']);
 Route::post('/papers/fix', [\App\Http\Controllers\PaperFormattingController::class, 'store'])
     ->middleware(['auth:sanctum', 'throttle:10,1']);
 Route::get('/format-templates/{templateId}/formatting', [\App\Http\Controllers\PaperFormattingController::class, 'show'])

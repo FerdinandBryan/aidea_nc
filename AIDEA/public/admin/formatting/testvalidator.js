@@ -1653,6 +1653,10 @@ async function _dvRunFileCheck(fileObj, actionLabel, onValidCallback, meta, temp
     _dvLastFlatViolations = _dvComputeFlatViolations(rules, formattingProfile);
 
     _renderValidationResult(result, onValidCallback, actionLabel, formattingProfile, rules, rulesSource);
+    if (/\.docx$/i.test(fileObj.name || '')) {
+        if (window._dvFixApiReady) await window._dvFixApiReady;
+        if (window._dvCheckAndFixPaper) await window._dvCheckAndFixPaper();
+    }
 }
 
 window._dvRunCallback = function (callbackStr) {
@@ -1953,7 +1957,7 @@ document.addEventListener('DOMContentLoaded', () => {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=4';
+    e.src = base + 'fixpaper-api.js?v=5';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };

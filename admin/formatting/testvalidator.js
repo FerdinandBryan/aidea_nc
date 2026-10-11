@@ -1663,6 +1663,10 @@ async function _dvRunFileCheck(fileObj, actionLabel, onValidCallback, meta, temp
     _dvLastFlatViolations = _dvComputeFlatViolations(rules, formattingProfile);
 
     _renderValidationResult(result, onValidCallback, actionLabel, formattingProfile, rules, rulesSource);
+    if (/\.docx$/i.test(fileObj.name || '')) {
+        if (window._dvFixApiReady) await window._dvFixApiReady;
+        if (window._dvCheckAndFixPaper) await window._dvCheckAndFixPaper();
+    }
 }
 
 window._dvRunCallback = function (callbackStr) {
@@ -2671,7 +2675,7 @@ async function _dvGenerateFixedPdf() {
             await new Promise(function (r) { _validatorDeps.ensureJSZip(r); });
             await loadPreviewLib(); if (window._dvEnsurePagination) window._dvEnsurePagination();
             if (window._dvFixApiReady) await window._dvFixApiReady;
-            if (window._dvInvalidateFixedCopy) window._dvInvalidateFixedCopy();
+
             var blob = await _dvGenerateFixedDocx(_dvLastFile, _dvLastRules, _dvLastFormattingProfile);
             body.innerHTML = '';
             var bar = document.createElement('div');
@@ -3390,7 +3394,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=4';
+    e.src = base + 'fixpaper-api.js?v=5';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };

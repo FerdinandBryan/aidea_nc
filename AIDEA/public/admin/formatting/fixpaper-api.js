@@ -45,7 +45,7 @@
         catch (error) { if (cached && cached.promise === promise) cached = null; throw error; }
     };
 
-    async function checkWithGemini(button) {
+    window._dvCheckAndFixPaper = async function () {
         var file = _dvLastFile, templateId = window._dvFixTemplateId;
         var revision = window._dvFixRevision;
         var parent = document.getElementById('docValidationBody');
@@ -55,29 +55,39 @@
         var panel = document.createElement('section');
         panel.id = 'dvGeminiReview';
         panel.style.cssText = 'padding:16px;margin:14px 0;border:1px solid #374151;border-radius:10px;';
-        panel.textContent = 'Gemini is reviewing this paper against the selected admin checklist...';
+        panel.textContent = 'Checking the paper against the admin checklist and preparing its formatted copy...';
         parent.insertBefore(panel, parent.firstChild);
-        button.disabled = true;
+
         try {
             var form = new FormData();
             form.append('file', new Blob([await _resolveArrayBuffer(file)], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), file.name || 'paper.docx');
             form.append('template_id', String(templateId));
-            var response = await fetch('https://aideanc-production.up.railway.app/api/papers/ai-check', {
+            var response = await fetch('https://aideanc-production.up.railway.app/api/papers/check-and-fix', {
                 method:'POST', headers:{Accept:'application/json',Authorization:'Bearer '+localStorage.getItem('auth_token')}, body:form
             });
             var data = await response.json();
             if (!response.ok) throw new Error(data.message || 'Gemini review failed.');
             if (window._dvFixRevision !== revision) return;
+            if (!data.document_base64) throw new Error('The server did not return a formatted paper.');
+            var binary = atob(data.document_base64);
+            var bytes = new Uint8Array(binary.length);
+            for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            var fixed = new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+            fixed.formattingReport = data.report;
+            cached = {file:file,key:String(templateId)+':'+String(revision),promise:Promise.resolve(fixed)};
             panel.textContent = '';
             var title = document.createElement('strong');
-            title.textContent = 'Gemini review — ' + data.template;
+            title.textContent = 'Checklist review — ' + data.template;
             panel.appendChild(title);
             var summary = document.createElement('p');
             summary.textContent = data.review.summary;
             panel.appendChild(summary);
             var note = document.createElement('p');
-            note.textContent = 'AI findings are advisory. Exact page layout still needs the formatter and visual review.';
+            note.textContent = 'The formatted copy is ready for preview and download. AI content findings are advisory.';
             panel.appendChild(note);
+            (data.warnings || []).forEach(function (warning) {
+                var message = document.createElement('p'); message.textContent = warning; panel.appendChild(message);
+            });
             var list = document.createElement('ul');
             data.review.findings.forEach(function (finding) {
                 var item = document.createElement('li');
@@ -87,20 +97,7 @@
                 list.appendChild(item);
             });
             panel.appendChild(list);
-        } catch (error) { panel.textContent = 'Could not complete Gemini review: ' + error.message; }
-        finally { button.disabled = false; }
+        } catch (error) { panel.textContent = 'Could not check and format this paper: ' + error.message; }
+
     }
-    function addGeminiButtons() {
-        document.querySelectorAll('.dv-download-row').forEach(function (row) {
-            if (row.querySelector('[data-dv-gemini]')) return;
-            var button = document.createElement('button');
-            button.type = 'button'; button.className = 'btn-modal-close';
-            button.setAttribute('data-dv-gemini', '1');
-            button.textContent = 'AI checklist review (Gemini)';
-            button.title = 'Sends this paper and the selected admin checklist to Google Gemini for an advisory review.';
-            button.onclick = function () { checkWithGemini(button); };
-            row.appendChild(button);
-        });
-    }
-    addGeminiButtons();
-    new MutationObserver(addGeminiButtons).observe(document.body, {childList:true,subtree:true});})();
+})();

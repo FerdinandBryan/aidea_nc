@@ -29,13 +29,15 @@ class GeminiPaperReview
                 if (trim($text) !== '') $paragraphs[] = ['paragraph' => $index + 1, 'text' => trim($text)];
             }
         } finally { $zip->close(); }
+        $checklist = [];
+        foreach ($template['effective_rules'] as $index => $rule) $checklist[] = ['rule_index' => $index, 'rule' => $rule];
         $input = json_encode(['template' => $template['name'] ?? 'Selected admin template',
-            'checklist' => $template['effective_rules'], 'paper' => $paragraphs], JSON_UNESCAPED_UNICODE);
+            'checklist' => $checklist, 'paper' => $paragraphs], JSON_UNESCAPED_UNICODE);
         if (strlen($input) > 500000) throw ValidationException::withMessages(['file' => 'The paper and checklist exceed the AI review size limit.']);
         $schema = ['type' => 'object', 'properties' => [
             'summary' => ['type' => 'string'],
             'findings' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
-                'rule_index' => ['type' => 'integer'],
+                'rule_index' => ['type' => 'integer', 'enum' => array_keys($template['effective_rules'])],
                 'status' => ['type' => 'string', 'enum' => ['pass', 'fail', 'manual']],
                 'explanation' => ['type' => 'string'],
                 'paragraph' => ['type' => 'integer'],
@@ -63,13 +65,19 @@ class GeminiPaperReview
             'findings.*.paragraph' => 'required|integer|min:0',
         ]);
         if ($validator->fails()) throw new RuntimeException('Gemini returned an invalid review. Please retry.', 502);
-        $seen = [];
+        $seen = []; $warnings = [];
         $locations = array_column($paragraphs, 'paragraph');
         foreach ($result['findings'] as &$finding) {
             $index = $finding['rule_index'];
-            if (!isset($template['effective_rules'][$index]) || isset($seen[$index])) throw new RuntimeException('Gemini returned an inconsistent checklist review. Please retry.', 502);
-            $seen[$index] = true;
-            if ($finding['paragraph'] !== 0 && !in_array($finding['paragraph'], $locations, true)) throw new RuntimeException('Gemini returned an invalid paragraph reference. Please retry.', 502);
+            if (!isset($template['effective_rules'][$index]) || isset($seen[$index])) {
+                $warnings[] = 'Gemini returned a duplicate or unknown rule reference; that entry was excluded.';
+                continue;
+            }
+            if ($finding['paragraph'] !== 0 && !in_array($finding['paragraph'], $locations, true)) {
+                $finding['paragraph'] = 0;
+                $finding['status'] = 'manual';
+                $warnings[] = 'A finding had an unverified paragraph reference and was marked for manual review.';
+            }
             $rule = $template['effective_rules'][$index];
             if (in_array(strtolower((string) ($rule['type'] ?? '')), ['font', 'size', 'spacing', 'abstract-spacing', 'margin', 'alignment', 'indentation', 'paper'], true) ||
                 preg_match('/\b(font|margins?|pagination|line spacing|double.spac|single.spac|short bond|paper size)\b/i', (string) ($rule['detail'] ?? ''))) {
@@ -77,10 +85,18 @@ class GeminiPaperReview
                 $finding['explanation'] = 'Printed layout cannot be verified from extracted text. Use the formatter and rendered preview for this rule.';
             }
             $finding['rule'] = $template['effective_rules'][$index]['name'] ?? $template['effective_rules'][$index]['detail'] ?? 'Rule '.($index + 1);
+            $seen[$index] = $finding;
         }
         unset($finding);
-        if (count($seen) !== count($template['effective_rules'])) throw new RuntimeException('Gemini did not review every checklist rule. Please retry.', 502);
+        foreach ($template['effective_rules'] as $index => $rule) if (!isset($seen[$index])) {
+            $seen[$index] = ['rule_index' => $index, 'rule' => $rule['name'] ?? $rule['detail'] ?? 'Rule '.($index + 1),
+                'status' => 'manual', 'paragraph' => 0, 'explanation' => 'Gemini did not return a finding for this rule.',
+                'suggestion' => 'Review this rule manually or run the AI check again.'];
+            $warnings[] = 'Some checklist rules were not reviewed by Gemini and are explicitly marked manual.';
+        }
+        ksort($seen); $result['findings'] = array_values($seen);
         return ['provider' => 'Gemini', 'model' => config('services.gemini.model'), 'template' => $template['name'] ?? 'Selected template',
-            'template_revision' => $template['revision'], 'advisory' => true, 'review' => $result];
+            'template_revision' => $template['revision'], 'advisory' => true,
+            'partial' => count($warnings) > 0, 'warnings' => array_values(array_unique($warnings)), 'review' => $result];
     }
 }

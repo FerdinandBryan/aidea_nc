@@ -154,4 +154,27 @@ class PaperFormattingApiTest extends TestCase
         Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['output_text' => 'not JSON'])]);
         $this->post('/api/papers/ai-check', ['file' => $this->paper(), 'template_id' => '17'], ['Accept' => 'application/json'])->assertStatus(502);
     }
+
+    public function test_partial_gemini_review_keeps_valid_findings_and_marks_missing_rules_manual(): void
+    {
+        Sanctum::actingAs(new User(['name' => 'Student'])); config(['services.gemini.key' => 'test-server-key']);
+        $this->templates([['id' => 17, 'active' => true, 'rules' => [['name' => 'Title', 'detail' => 'Required title.'], ['name' => 'Abstract', 'detail' => 'Required abstract.']]]]);
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['output_text' => json_encode(['summary' => 'Partial review.', 'findings' => [['rule_index' => 0, 'status' => 'pass', 'explanation' => 'Title exists.', 'paragraph' => 1, 'suggestion' => '']]])])]);
+        $this->post('/api/papers/ai-check', ['file' => $this->paper(), 'template_id' => '17'], ['Accept' => 'application/json'])->assertOk()->assertJsonPath('partial', true)->assertJsonPath('review.findings.0.status', 'pass')->assertJsonPath('review.findings.1.status', 'manual')->assertJsonPath('review.findings.1.rule', 'Abstract');
+    }
+
+    public function test_combined_check_returns_review_and_paper_formatted_by_the_admin_template(): void
+    {
+        Sanctum::actingAs(new User(['name' => 'Student'])); config(['services.gemini.key' => 'test-server-key']);
+        $this->templates([['id' => 17, 'name' => 'Active admin template', 'active' => true, 'rules' => [['name' => 'Spacing', 'type' => 'spacing', 'value' => 2]]]]);
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['output_text' => json_encode(['summary' => 'Use the formatter for spacing.', 'findings' => [['rule_index' => 0, 'status' => 'manual', 'explanation' => 'Spacing needs layout verification.', 'paragraph' => 0, 'suggestion' => 'Apply template spacing.']]])])]);
+        $upload = $this->paper(); $originalHash = hash_file('sha256', $upload->getRealPath());
+        $response = $this->post('/api/papers/check-and-fix', ['file' => $upload, 'template_id' => '17'], ['Accept' => 'application/json']);
+        $response->assertOk()->assertJsonPath('template', 'Active admin template')->assertJsonPath('report.settings.spacing', 2)->assertJsonPath('review.findings.0.status', 'manual');
+        $path = tempnam(sys_get_temp_dir(), 'combined_test_'); $this->files[] = $path;
+        file_put_contents($path, base64_decode($response->json('document_base64'), true));
+        $zip = new ZipArchive; $zip->open($path);
+        $this->assertStringContainsString('w:line="480"', $zip->getFromName('word/document.xml')); $zip->close();
+        $this->assertSame($originalHash, hash_file('sha256', $upload->getRealPath()));
+    }
 }
