@@ -8,7 +8,14 @@
         if (templateId == null || templateId === '') throw new Error('Choose an admin template and run Check formatting first.');
         var token = localStorage.getItem('auth_token');
         if (!token) throw new Error('Sign in again to fix your paper.');
-        var key = String(templateId) + ':' + String(window._dvFixRevision || 0);
+        var revision=window._dvFixRevision;
+        var key = String(templateId) + ':' + String(revision || 0);
+        // Use the corrected document paired with the current attention review.
+        if(pendingCheck && pendingCheck.revision===revision)await pendingCheck.promise;
+        if(window._dvFixRevision!==revision || window._dvFixTemplateId!==templateId || _dvLastFile!==file)throw new Error('The paper or template changed. Open the latest preview again.');
+        if(window._dvAttentionResult && window._dvAttentionResult.revision===revision && (!cached || cached.file!==file || cached.key!==key)) {
+            throw new Error('The corrected copy for this checklist review is unavailable. Run Check formatting again.');
+        }
         if (cached && cached.file === file && cached.key === key) return cached.promise;
         var promise = (async function () {
             var bytes = await _resolveArrayBuffer(file);
