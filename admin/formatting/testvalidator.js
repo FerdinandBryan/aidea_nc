@@ -2449,6 +2449,7 @@ async function _dvGenerateFixedPdf() {
                     var r = ch.getBoundingClientRect(), cs = getComputedStyle(ch);
                     items.push({
                         art: ai,
+                        leadHeight: 2 * (parseFloat(cs.lineHeight) || (parseFloat(cs.fontSize) || 16) * 1.2),
                         top: r.top - artTop - (parseFloat(cs.marginTop) || 0),
                         bottom: r.bottom - artTop + (parseFloat(cs.marginBottom) || 0)
                     });
@@ -2459,12 +2460,28 @@ async function _dvGenerateFixedPdf() {
                 return blob;
             }
 
+            function keepWithNext(k) {
+                if (k.localName !== 'p') return false;
+                var pr = kid(k, 'pPr'), keep = pr && kid(pr, 'keepNext');
+                return !!keep && !/^(0|false|off)$/i.test(wAttr(keep, 'val') || '1');
+            }
+            function requiredBottom(index) {
+                var bottom = items[index].bottom, j = index;
+                while (keepWithNext(kids[j]) && j + 1 < kids.length) {
+                    var next = items[j + 1];
+                    if (next.art !== items[index].art || forcedAfter(kids[j]) || forcedBefore(kids[j + 1])) break;
+                    j++;
+                    bottom = keepWithNext(kids[j]) ? next.bottom :
+                        Math.min(next.bottom, next.top + next.leadHeight);
+                }
+                return bottom;
+            }
             var pageTop = null, curArt = -1, forceNext = false, breaks = 0;
             kids.forEach(function (k, i) {
                 var it = items[i], mark = false;
                 if (it.art !== curArt) { curArt = it.art; pageTop = it.top; forceNext = false; }
                 else if (forceNext || forcedBefore(k)) { pageTop = it.top; forceNext = false; }
-                else if (it.bottom - pageTop > contentH + 1 && it.top > pageTop + 1) { mark = true; pageTop = it.top; }
+                else if (requiredBottom(i) - pageTop > contentH + 1 && it.top > pageTop + 1) { mark = true; pageTop = it.top; }
                 if (forcedAfter(k)) forceNext = true;
                 if (mark) {
                     var p = k.localName === 'p' ? k : k.getElementsByTagNameNS(W, 'p')[0];

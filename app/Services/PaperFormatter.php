@@ -118,6 +118,7 @@ class PaperFormatter
                 if ($heading) $zone = $upper === 'ABSTRACT' ? 'abstract' : ($upper === 'REFERENCES' ? 'references' : 'body');
                 if ($zone === 'front' && !$table) $title[] = $p;
                 $pr = $this->ensure($p, 'pPr', true);
+                $topicHeading = !$table && ($heading || ($zone !== 'front' && $this->isTopicHeading($p, $xp)));
                 if (!$table) {
                     $paragraphs++;
                     $list = $xp->query('./w:numPr', $pr)->length > 0;
@@ -154,6 +155,10 @@ class PaperFormatter
                     if ($cfg['hanging'] && $zone === 'references' && !$heading) {
                         $ind = $this->ensure($pr, 'ind'); $ind->removeAttributeNS(self::W, 'firstLine'); $this->attr($ind, 'left', 720); $this->attr($ind, 'hanging', 720);
                     }
+                }
+                if ($topicHeading) {
+                    $this->attr($this->ensure($pr, 'keepNext'), 'val', 1);
+                    $this->attr($this->ensure($pr, 'keepLines'), 'val', 1);
                 }
                 if ($chapter) $this->pageBreak($p, $xp);
                 $special = $cfg['headings'][$upper] ?? [];
@@ -211,6 +216,24 @@ class PaperFormatter
     {
         $text = ''; foreach ($p->getElementsByTagNameNS(self::W, 't') as $t) $text .= $t->textContent;
         return trim(preg_replace('/[\x{200B}-\x{200D}\x{FEFF}]/u', '', $text));
+    }
+
+    private function isTopicHeading(DOMElement $p, DOMXPath $xp): bool
+    {
+        $text = $this->text($p);
+        if ($text === '' || mb_strlen($text) > 140 || preg_match('/\.{3,}/', $text) || $xp->query('./w:pPr/w:numPr', $p)->length) return false;
+        $style = $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $p);
+        $outline = $xp->query('./w:pPr/w:outlineLvl', $p)->item(0);
+        if (preg_match('/^Heading[ _-]?\d+$/i', $style) || ($outline && (int) $outline->getAttributeNS(self::W, 'val') < 9)) return true;
+        if (preg_match('/^(Introduction|Statement of the Problem|Theoretical Framework|Conceptual Framework|Hypothes(?:is|es)|Scope and (?:Limitations|Delimitations)(?: of the Study)?|Significance of the Study|Definition of Terms|Research Design|Method of Research|Population.*Sampling.*|Research Instrument|Data Gathering Procedure|Data Analysis|Ethical Considerations|Summary of Findings|Conclusions|Recommendations|Synthesis.*)$/i', $text)) return true;
+        if (preg_match('/[.!?;:]$/', $text)) return false;
+        $runs = $xp->query('.//w:r[w:t[normalize-space(.) != ""]]', $p);
+        if (!$runs->length) return false;
+        foreach ($runs as $run) {
+            $bold = $xp->query('./w:rPr/w:b', $run)->item(0);
+            if (!$bold || in_array($bold->getAttributeNS(self::W, 'val'), ['0', 'false', 'off'], true)) return false;
+        }
+        return true;
     }
 
     private function isChapter(string $text): bool

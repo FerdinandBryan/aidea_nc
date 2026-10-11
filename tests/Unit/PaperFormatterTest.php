@@ -193,4 +193,15 @@ class PaperFormatterTest extends TestCase
             }
         }
     }
+
+    public function test_topic_headings_keep_with_following_text_but_body_does_not(): void
+    {
+        $file = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Statement of the Problem</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>New Template Topic</w:t></w:r></w:p><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Custom Topic</w:t></w:r></w:p><w:p><w:r><w:t>Regular body paragraph.</w:t></w:r></w:p>');
+        (new PaperFormatter)->format($file, $this->rules()); $xp = $this->xml($file);
+        foreach (['Statement of the Problem', 'New Template Topic', 'Custom Topic'] as $text) {
+            $this->assertSame('1', $xp->evaluate('string(//w:p[w:r/w:t="'.$text.'"]/w:pPr/w:keepNext/@w:val)'));
+            $this->assertSame('1', $xp->evaluate('string(//w:p[w:r/w:t="'.$text.'"]/w:pPr/w:keepLines/@w:val)'));
+        }
+        $this->assertSame('0', $xp->evaluate('string(//w:p[w:r/w:t="Regular body paragraph."]/w:pPr/w:keepNext/@w:val)'));
+    }
 }
