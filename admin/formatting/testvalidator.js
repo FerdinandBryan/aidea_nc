@@ -2465,13 +2465,17 @@ async function _dvGenerateFixedPdf() {
                 var pr = kid(k, 'pPr'), keep = pr && kid(pr, 'keepNext');
                 return !!keep && !/^(0|false|off)$/i.test(wAttr(keep, 'val') || '1');
             }
+            function blankParagraph(k) {
+                return k.localName === 'p' && !Array.from(k.getElementsByTagNameNS(W, 't')).some(function (t) { return (t.textContent || '').trim(); }) &&
+                    !k.getElementsByTagNameNS(W, 'drawing').length;
+            }
             function requiredBottom(index) {
                 var bottom = items[index].bottom, j = index;
-                while (keepWithNext(kids[j]) && j + 1 < kids.length) {
+                while ((keepWithNext(kids[j]) || (j > index && blankParagraph(kids[j]))) && j + 1 < kids.length) {
                     var next = items[j + 1];
                     if (next.art !== items[index].art || forcedAfter(kids[j]) || forcedBefore(kids[j + 1])) break;
                     j++;
-                    bottom = keepWithNext(kids[j]) ? next.bottom :
+                    bottom = (keepWithNext(kids[j]) || blankParagraph(kids[j])) ? next.bottom :
                         Math.min(next.bottom, next.top + next.leadHeight);
                 }
                 return bottom;

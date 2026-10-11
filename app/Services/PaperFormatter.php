@@ -182,6 +182,7 @@ class PaperFormatter
                 $margins = $this->ensure($section, 'pgMar');
                 foreach ($cfg['margins'] as $side => $inch) $this->attr($margins, $side, round($inch * 1440));
             }
+            $this->attachHeadingText($xp);
             $this->layoutTitle($title, $cfg, $xp);
             $zip->addFromString('word/document.xml', $doc->saveXML());
             $applied = []; $manual = []; $defaults = $this->settings([]);
@@ -209,6 +210,40 @@ class PaperFormatter
                 $node->textContent = ltrim($node->textContent);
                 if ($node->textContent !== '') $afterBreak = false;
             }
+        }
+    }
+
+    private function attachHeadingText(DOMXPath $xp): void
+    {
+        foreach (iterator_to_array($xp->query('/w:document/w:body/w:p[w:pPr/w:keepNext[@w:val="1"]]')) as $heading) {
+            $next = $heading->nextSibling; $moveBreak = false;
+            while ($next instanceof DOMElement && $next->localName === 'p' && $this->text($next) === '') {
+                if ($xp->query('.//w:sectPr | .//w:drawing | .//w:pict | .//w:fldChar', $next)->length) break;
+                if ($xp->query('.//w:br[@w:type="page"] | ./w:pPr/w:pageBreakBefore[not(@w:val="0")]', $next)->length) $moveBreak = true;
+                $following = $next->nextSibling; $next->parentNode->removeChild($next); $next = $following;
+            }
+            if (!$next instanceof DOMElement || $next->localName !== 'p' || $this->text($next) === '') continue;
+            if ($this->isChapter($this->text($next)) || $this->isTopicHeading($next, $xp)) continue;
+            foreach (iterator_to_array($xp->query('./w:pPr/w:pageBreakBefore', $next)) as $br) {
+                if (!in_array($br->getAttributeNS(self::W, 'val'), ['0', 'false', 'off'], true)) $moveBreak = true;
+                $br->parentNode->removeChild($br);
+            }
+            // A page break before the first body word belongs before its heading.
+            foreach (iterator_to_array($xp->query('.//w:br | .//w:t', $next)) as $node) {
+                if ($node->localName === 't' && trim($node->textContent) !== '') break;
+                if ($node->localName === 'br' && $node->getAttributeNS(self::W, 'type') === 'page') {
+                    $moveBreak = true; $node->parentNode->removeChild($node);
+                }
+            }
+            // Also relocate a trailing break typed after the heading itself.
+            $seenText = false;
+            foreach (iterator_to_array($xp->query('.//w:br | .//w:t', $heading)) as $node) {
+                if ($node->localName === 't' && trim($node->textContent) !== '') $seenText = true;
+                if ($seenText && $node->localName === 'br' && $node->getAttributeNS(self::W, 'type') === 'page') {
+                    $moveBreak = true; $node->parentNode->removeChild($node);
+                }
+            }
+            if ($moveBreak) $this->pageBreak($heading, $xp);
         }
     }
 

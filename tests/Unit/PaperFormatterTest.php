@@ -204,4 +204,15 @@ class PaperFormatterTest extends TestCase
         }
         $this->assertSame('0', $xp->evaluate('string(//w:p[w:r/w:t="Regular body paragraph."]/w:pPr/w:keepNext/@w:val)'));
     }
+
+    public function test_heading_moves_with_text_across_blank_spacers_and_existing_page_break(): void
+    {
+        $file = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Previous body text.</w:t></w:r></w:p><w:p><w:r><w:t>Theoretical Framework</w:t></w:r></w:p><w:p><w:r><w:t> </w:t></w:r></w:p><w:p><w:r><w:br w:type="page"/></w:r></w:p><w:p><w:pPr><w:pageBreakBefore/></w:pPr><w:r><w:t>Following framework explanation.</w:t></w:r></w:p>');
+        (new PaperFormatter)->format($file, $this->rules()); $xp = $this->xml($file);
+        $heading = '//w:p[w:r/w:t="Theoretical Framework"]';
+        $this->assertSame('page', $xp->evaluate('string('.$heading.'/w:r[1]/w:br/@w:type)'));
+        $this->assertSame('Following framework explanation.', $xp->evaluate('string('.$heading.'/following-sibling::w:p[1]/w:r/w:t)'));
+        $this->assertEquals(0, $xp->evaluate('count(//w:p[w:r/w:t="Following framework explanation."]/w:pPr/w:pageBreakBefore)'));
+        $this->assertEquals(4, $xp->evaluate('count(/w:document/w:body/w:p)'));
+    }
 }
