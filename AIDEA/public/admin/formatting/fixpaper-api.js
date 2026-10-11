@@ -45,10 +45,12 @@
         catch (error) { if (cached && cached.promise === promise) cached = null; throw error; }
     };
 
-    window._dvCheckAndFixPaper = async function () {
+    var pendingCheck = null;
+    async function checkAndFixPaper() {
         var file = _dvLastFile, templateId = window._dvFixTemplateId;
         var revision = window._dvFixRevision;
         window._dvAttentionResult = null;
+        window._dvAttentionError = null;
         var parent = document.getElementById('docValidationBody');
         if (!parent || !file || templateId == null) return;
         var old = document.getElementById('dvGeminiReview');
@@ -107,9 +109,18 @@
                 list.appendChild(item);
             });
             panel.appendChild(list);
-        } catch (error) { panel.textContent = 'Could not check and format this paper: ' + error.message; }
+        } catch (error) { if(window._dvFixRevision===revision)window._dvAttentionError=error.message; panel.textContent = 'Could not check and format this paper: ' + error.message; }
 
     }
+    window._dvCheckAndFixPaper = function () {
+        var revision=window._dvFixRevision;
+        if(pendingCheck && pendingCheck.revision===revision)return pendingCheck.promise;
+        if(window._dvAttentionResult && window._dvAttentionResult.revision===revision)return Promise.resolve();
+        var promise=checkAndFixPaper();
+        var task={revision:revision,promise:promise};pendingCheck=task;
+        promise.finally(function(){if(pendingCheck===task)pendingCheck=null;});
+        return promise;
+    };
     window._dvPreviewAttention = async function () {
         var old = document.getElementById('dvPrevOverlay');
         if (old) { if (old.dismiss) old.dismiss(); else old.remove(); }
@@ -161,8 +172,16 @@
         overlay.onclick = function(e){if(e.target===overlay)dismiss();}; document.addEventListener('keydown',onKey);close.focus();
         var result = window._dvAttentionResult;
         if (!result || result.revision !== window._dvFixRevision) {
-            legend.textContent = 'Run Check formatting and wait for the check to finish before opening this preview.';
-            return;
+            var waiting=document.createElement('div');waiting.className='attention-paper';
+            var progress=document.createElement('div');progress.className='attention-status';progress.setAttribute('role','status');
+            progress.textContent='Preparing marked paper. This preview will open automatically when the check finishes?';waiting.appendChild(progress);layout.appendChild(waiting);
+            var requestedRevision=window._dvFixRevision;
+            await window._dvCheckAndFixPaper();
+            if(!overlay.isConnected)return;
+            result=window._dvAttentionResult;
+            if(requestedRevision!==window._dvFixRevision){progress.textContent='The paper or template changed. Open the preview for the latest check.';return;}
+            if(!result || result.revision!==requestedRevision){progress.textContent=window._dvAttentionError ? 'Could not prepare the preview: '+window._dvAttentionError : 'Choose a paper and admin template, then run Check formatting.';return;}
+            waiting.remove();
         }
         var count=document.createElement('strong');count.textContent=result.issues.length+' issues detected';sidebar.appendChild(count);
         var list = document.createElement('ul');list.className='attention-issues';
