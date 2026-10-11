@@ -2406,6 +2406,19 @@ async function _dvGenerateFixedPdf() {
         return Array.from(el.getElementsByTagNameNS(W, 'br')).some(function (b) { return wAttr(b, 'type') === 'page'; });
     }
 
+    window._dvFitFigureCaptions = function (root) {
+        root.querySelectorAll('section.docx > article > p').forEach(function (caption) {
+                if (!/^Figure\s*\d+(?:\.\d+)*\s*[.:-]/i.test((caption.textContent || '').trim())) return;
+                var figure = caption.previousElementSibling;
+                if (!figure) return;
+                var graphics = Array.from(figure.querySelectorAll('img,svg'));
+                if (!graphics.length) return;
+                var bottom = Math.max.apply(null, graphics.map(function (graphic) { return graphic.getBoundingClientRect().bottom; }));
+                var overlap = bottom - caption.getBoundingClientRect().top;
+                if (overlap > 0) caption.style.marginTop = ((parseFloat(getComputedStyle(caption).marginTop) || 0) + overlap + 4) + 'px';
+            });
+    };
+
     async function paginate(blob, orig) {
         await new Promise(function (r) { _validatorDeps.ensureJSZip(r); });
         var zip = await JSZip.loadAsync(blob);
@@ -2447,6 +2460,7 @@ async function _dvGenerateFixedPdf() {
             });
             if (document.fonts && document.fonts.ready) await document.fonts.ready;
 
+            window._dvFitFigureCaptions(box);
             var items = [];
             Array.from(box.querySelectorAll('section.docx > article')).forEach(function (art, ai) {
                 var artTop = art.getBoundingClientRect().top;
@@ -2480,7 +2494,8 @@ async function _dvGenerateFixedPdf() {
                     var next = items[j + 1];
                     if (next.art !== items[index].art || forcedAfter(kids[j]) || forcedBefore(kids[j + 1])) break;
                     j++;
-                    bottom = (keepWithNext(kids[j]) || blankParagraph(kids[j])) ? next.bottom :
+                    var captionText = Array.from(kids[j].getElementsByTagNameNS(W, 't')).map(function (t) { return t.textContent; }).join('').trim();
+                    bottom = (keepWithNext(kids[j]) || blankParagraph(kids[j]) || /^Figure\s*\d+(?:\.\d+)*\s*[.:-]/i.test(captionText)) ? next.bottom :
                         Math.min(next.bottom, next.top + next.leadHeight);
                 }
                 return bottom;
@@ -2707,6 +2722,7 @@ async function _dvGenerateFixedPdf() {
             var _dvPrevPg = window._dvPaginateOn; window._dvPaginateOn = true;
             try { await window.docx.renderAsync(blob, holder, null, { className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: false, renderHeaders: true, renderFooters: true }); }
             finally { window._dvPaginateOn = _dvPrevPg; }
+            if (window._dvFitFigureCaptions) window._dvFitFigureCaptions(holder);
             keepCoverDateOnFirstPage(holder);
             // Show one rendered paper page at a time.
             var pages = Array.from(holder.querySelectorAll('.docx-wrapper > section.docx'));
@@ -2722,7 +2738,7 @@ async function _dvGenerateFixedPdf() {
                     return (node.textContent || '').trim() || node.querySelector('img,svg,table');
                 });
                 var last = meaningful[meaningful.length - 1];
-                if (!last || last.tagName !== 'P' || last.querySelector('img,svg,table')) return;
+                if (!last || last.tagName !== 'P' || last.querySelector('img,svg,table') || /^Figure\s*\d+(?:\.\d+)*\s*[.:-]/i.test((last.textContent || '').trim())) return;
                 var raw = last.textContent || '';
                 // A bold cover date is not a topic heading. Keep it on the cover.
                 if (/^(January|February|March|April|May|June|July|August|September|October|November|December)\b.*\d{4}\.?$/i.test(raw.trim())) return;
@@ -3397,7 +3413,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=14';
+    e.src = base + 'fixpaper-api.js?v=15';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };

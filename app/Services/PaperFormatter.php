@@ -201,6 +201,7 @@ class PaperFormatter
                 foreach ($cfg['margins'] as $side => $inch) $this->attr($margins, $side, round($inch * 1440));
             }
             $this->attachHeadingText($xp);
+            $this->attachFigureCaptions($xp);
             $this->layoutTitle($title, $cfg, $xp);
             $zip->addFromString('word/document.xml', $doc->saveXML());
             $applied = []; $manual = []; $defaults = $this->settings([]);
@@ -263,6 +264,30 @@ class PaperFormatter
                 }
             }
             if ($moveBreak) $this->pageBreak($heading, $xp);
+        }
+    }
+
+    private function attachFigureCaptions(DOMXPath $xp): void
+    {
+        foreach ($xp->query('/w:document/w:body/w:p') as $caption) {
+            if (!preg_match('/^Figure\s*\d+(?:\.\d+)*\s*[.:-]/i', $this->text($caption))) continue;
+            $figure = $caption->previousSibling; $spacers = [];
+            while ($figure instanceof DOMElement && $figure->localName === 'p' && $this->text($figure) === '' &&
+                !$xp->query('.//w:drawing | .//w:pict | .//w:object | .//w:sectPr', $figure)->length) {
+                $spacers[] = $figure; $figure = $figure->previousSibling;
+            }
+            if (!$figure instanceof DOMElement || !$xp->query('.//w:drawing | .//w:pict | .//w:object', $figure)->length) continue;
+            foreach ($spacers as $spacer) $spacer->parentNode->removeChild($spacer);
+            $this->attr($this->ensure($this->ensure($figure, 'pPr', true), 'keepNext'), 'val', 1);
+            $pr = $this->ensure($caption, 'pPr', true);
+            $this->attr($this->ensure($pr, 'keepLines'), 'val', 1);
+            $this->attr($this->ensure($pr, 'keepNext'), 'val', 0);
+            $this->attr($this->ensure($pr, 'pageBreakBefore'), 'val', 0);
+            $ind = $this->ensure($pr, 'ind');
+            foreach (['firstLine', 'hanging', 'left', 'right', 'start', 'end'] as $key) $this->attr($ind, $key, 0);
+            foreach (['firstLineChars', 'hangingChars', 'leftChars', 'rightChars'] as $key) $ind->removeAttributeNS(self::W, $key);
+            $this->attr($this->ensure($pr, 'spacing'), 'before', 0);
+            foreach (iterator_to_array($xp->query('.//w:br[@w:type="page"]', $caption)) as $br) $br->parentNode->removeChild($br);
         }
     }
 

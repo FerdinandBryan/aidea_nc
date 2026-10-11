@@ -297,11 +297,22 @@ class PaperFormatterTest extends TestCase
     {
         $figure = '<w:p><w:pPr><w:spacing w:line="240" w:before="900"/><w:ind w:left="720"/></w:pPr><w:r><w:rPr><w:sz w:val="18"/></w:rPr><w:pict><w:txbxContent><w:p><w:pPr><w:spacing w:line="200" w:lineRule="exact"/><w:ind w:left="120"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial"/><w:sz w:val="18"/></w:rPr><w:t>Independent Variable</w:t></w:r></w:p></w:txbxContent></w:pict></w:r></w:p>';
         $file = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p>'.$figure.'<w:p><w:r><w:t>Figure 2. Conceptual paradigm</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:line="240"/></w:pPr><w:r><w:t>Explanation.</w:t></w:r></w:p>');
-        $before = $this->xml($file)->query('//w:p[w:r/w:pict]')->item(0)->C14N();
+        $before = $this->xml($file)->query('//w:pict')->item(0)->C14N();
         (new PaperFormatter)->format($file, $this->rules()); $xp = $this->xml($file);
-        $this->assertSame($before, $xp->query('//w:p[w:r/w:pict]')->item(0)->C14N());
+        $this->assertSame($before, $xp->query('//w:pict')->item(0)->C14N());
         $this->assertSame('480', $xp->evaluate('string(//w:p[w:r/w:t="Explanation."]/w:pPr/w:spacing/@w:line)'));
         $this->assertSame('Figure 2. Conceptual paradigm', $xp->evaluate('string(//w:p[w:r/w:t="Figure 2. Conceptual paradigm"]//w:t)'));
+    }
+
+    public function test_figure_caption_is_adjacent_and_kept_with_its_drawing(): void
+    {
+        $file = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:drawing/></w:r></w:p><w:p/><w:p><w:pPr><w:pageBreakBefore/><w:ind w:firstLine="720"/></w:pPr><w:r><w:t>Figure 2. Conceptual framework</w:t></w:r></w:p><w:p><w:r><w:t>Figure 2 shows the relationships.</w:t></w:r></w:p>');
+        (new PaperFormatter)->format($file, $this->rules()); $xp = $this->xml($file);
+        $this->assertEquals(1, $xp->evaluate('count(//w:p[w:r/w:drawing]/following-sibling::*[1][w:r/w:t="Figure 2. Conceptual framework"])'));
+        $this->assertSame('1', $xp->evaluate('string(//w:p[w:r/w:drawing]/w:pPr/w:keepNext/@w:val)'));
+        $this->assertSame('1', $xp->evaluate('string(//w:p[w:r/w:t="Figure 2. Conceptual framework"]/w:pPr/w:keepLines/@w:val)'));
+        $this->assertSame('0', $xp->evaluate('string(//w:p[w:r/w:t="Figure 2. Conceptual framework"]/w:pPr/w:ind/@w:firstLine)'));
+        $this->assertSame('0', $xp->evaluate('string(//w:p[w:r/w:t="Figure 2. Conceptual framework"]/w:pPr/w:pageBreakBefore/@w:val)'));
     }
 
 }
