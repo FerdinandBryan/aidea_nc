@@ -130,7 +130,7 @@
         Array.from(doc.getElementsByTagNameNS(W, 'p')).forEach(function (p) {
             var t = ptext(p), up = t.toUpperCase().replace(/\s+/g, ' ');
             var tbl = inTable(p), kind = null, key = null, big = null;
-            var tocLine = p.getElementsByTagNameNS(W, 'tab').length > 0 || /\.{3,}/.test(t);
+            var tocLine = /\.{3,}/.test(t) || (p.getElementsByTagNameNS(W, 'tab').length > 0 && !CHAPTER.test(up) && /\s(?:\d+|[ivxlc]+)\s*$/i.test(t));
 
             if (!tbl && t && t.length <= 60 && !tocLine) {
                 var cm = CHAPTER.exec(up);
@@ -172,7 +172,7 @@
 
             if (kind) {
                 if (seenText && !hasPageBreak(p)) {
-                    ensure(doc, pPrOf(doc, p), PPR, 'pageBreakBefore');
+                    setA(ensure(doc, pPrOf(doc, p), PPR, 'pageBreakBefore'), 'val', 1);
                     stats.breaks++;
                 }
                 zone = (kind === 'abstract') ? 'abstract' : (kind === 'approval') ? 'skip' : (kind === 'ack') ? 'body' :
@@ -294,6 +294,7 @@
         console.log('[Validator] fixpaper installed');
     }
 
+    if (typeof _dvGenerateFixedDocx === 'function') { install(); return; }
     var tries = 0, t = setInterval(function () {
         if (typeof _dvGenerateFixedDocx === 'function') { clearInterval(t); install(); }
         else if (++tries > 200) clearInterval(t);

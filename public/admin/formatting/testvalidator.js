@@ -3187,6 +3187,6 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper.js?v=1';
+    e.src = base + 'fixpaper.js?v=4';
     document.head.appendChild(e);
 })();
