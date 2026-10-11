@@ -147,7 +147,7 @@
             }
 
             if (kind) {
-                if (seenText && !hasPageBreak(p) && !hasPageBreak(prevP)) {
+                if (seenText && !hasPageBreak(p)) {
                     ensure(doc, pPrOf(doc, p), PPR, 'pageBreakBefore');
                     stats.breaks++;
                 }
@@ -155,6 +155,27 @@
                        (kind === 'lists') ? 'lists' : (kind === 'chapter') ? 'body' : kind;
             }
             if (t) seenText = true;
+
+            // Blank title-page paragraphs also occupy space; do not leave them
+            // double-spaced while only the visible title text is single-spaced.
+            if (!tbl && zone === 'front') {
+                var titlePr = pPrOf(doc, p);
+                var titleSpacing = ensure(doc, titlePr, PPR, 'spacing');
+                setA(titleSpacing, 'line', 240);
+                setA(titleSpacing, 'lineRule', 'auto');
+                setA(titleSpacing, 'before', 0);
+                setA(titleSpacing, 'after', 0);
+                titleSpacing.removeAttributeNS(W, 'beforeAutospacing');
+                titleSpacing.removeAttributeNS(W, 'afterAutospacing');
+                if (MONTH.test(t)) {
+                    var dateBreak = kid(titlePr, 'pageBreakBefore');
+                    if (dateBreak) titlePr.removeChild(dateBreak);
+                    // Keep the date attached to the preceding title-page paragraph.
+                    if (prevP && !inTable(prevP)) {
+                        setA(ensure(doc, pPrOf(doc, prevP), PPR, 'keepNext'), 'val', 1);
+                    }
+                }
+            }
 
             if (!tbl && t) {
                 var line = null;
