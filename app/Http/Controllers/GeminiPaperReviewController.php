@@ -28,7 +28,7 @@ class GeminiPaperReviewController extends Controller
             $report['template_revision'] = $template['revision'];
             $attention = $marker->mark($request->file('file')->getRealPath(), $report['settings'], $review['review']['findings']);
             return response()->json($review + ['document_base64' => base64_encode(file_get_contents($path)), 'report' => $report,
-                'attention_document_base64' => $attention['document_base64'], 'attention_issues' => $attention['issues']])
+                'attention_document_base64' => $attention['document_base64'], 'attention_issues' => $attention['issues'], 'attention_objects' => $attention['objects']])
                 ->header('Cache-Control', 'private, no-store');
         } catch (ConnectionException $e) {
             return response()->json(['message' => 'Gemini is unreachable or timed out. Try Check formatting again later.'], 503);

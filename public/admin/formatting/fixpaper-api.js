@@ -82,7 +82,7 @@
                 var annotated = atob(data.attention_document_base64);
                 var markedBytes = new Uint8Array(annotated.length);
                 for (var j = 0; j < annotated.length; j++) markedBytes[j] = annotated.charCodeAt(j);
-                window._dvAttentionResult = {revision:revision,blob:new Blob([markedBytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),issues:data.attention_issues || []};
+                window._dvAttentionResult = {revision:revision,blob:new Blob([markedBytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),issues:data.attention_issues || [],objects:data.attention_objects || []};
                 document.querySelectorAll('[data-dv-attention]').forEach(function (button) {
                     button.textContent = 'Preview Needs attention (' + (data.attention_issues || []).length + ')';
                 });
@@ -122,6 +122,7 @@
         .dv-attention .attention-issues{list-style:none;padding:0;margin:12px 0;display:grid;gap:10px}
         .dv-attention .attention-issues li{padding:0}
         .dv-attention .attention-card{width:100%;text-align:left;white-space:normal;line-height:1.6;padding:12px;color:#fca5a5}
+        .dv-attention .attention-object{color:#cbd5e1}
         .dv-attention .attention-card[aria-pressed=true]{border-color:#facc15;background:#293548}
         .dv-attention .attention-card:disabled{cursor:default;opacity:.8}
         .dv-attention .attention-target{outline:2px solid #facc15;outline-offset:4px;text-decoration:underline;text-decoration-color:#eab308;text-decoration-thickness:2px}
@@ -170,15 +171,19 @@
         var count=document.createElement('strong');count.textContent=result.issues.length+' issues detected';sidebar.appendChild(count);
         var list = document.createElement('ul');list.className='attention-issues';
         var cards=[];
-        result.issues.forEach(function(issue){
+        var entries=result.issues.concat(result.objects || []);
+        entries.forEach(function(issue){
             var item = document.createElement('li');
             var card=document.createElement('button');card.type='button';card.className='attention-card';card.disabled=true;card.setAttribute('aria-pressed','false');
             var label=document.createElement('span');label.className='attention-label';
-            var category=issue.type==='content'?'Wording / checklist':issue.type==='margin'?'Margin':'Spacing';
+            var objectLabels={figure:'Figure detected',table:'Word table detected',image:'Image - figure unconfirmed',caption:'Caption - object unconfirmed'};
+            var category=objectLabels[issue.type] || (issue.type==='content'?'Wording / checklist':issue.type==='margin'?'Margin':'Spacing');
+            if(objectLabels[issue.type])card.classList.add('attention-object');
             label.textContent=category+(issue.paragraph?' - Paragraph '+issue.paragraph:' - No exact location');card.appendChild(label);
             var message=document.createElement('span');message.textContent=issue.message;card.appendChild(message);item.appendChild(card);list.appendChild(item);
             cards.push({button:card,label:label,issue:issue,category:category});
         });
+        if((result.objects || []).length){var inventory=document.createElement('p');inventory.textContent=result.objects.length+' figure / table detections (review classifications below)';sidebar.appendChild(inventory);}
         sidebar.appendChild(list);
         if (!result.issues.length) {
             var notice = document.createElement('p');

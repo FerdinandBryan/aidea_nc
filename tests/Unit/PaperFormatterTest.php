@@ -281,4 +281,16 @@ class PaperFormatterTest extends TestCase
         $this->assertStringContainsString('Add your abstract.', $marked['issues'][2]['message']);
     }
 
+    public function test_attention_detects_figures_tables_images_and_unmatched_captions(): void
+    {
+        $file = $this->paper('<w:p><w:r><w:t>Figure 1. System diagram</w:t></w:r></w:p><w:p><w:r><w:drawing/></w:r></w:p><w:p><w:r><w:t>Body text</w:t></w:r></w:p><w:p><w:r><w:pict/></w:r></w:p><w:p><w:r><w:t>Other body text</w:t></w:r></w:p><w:p><w:r><w:t>Table 1. Results</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>Data</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:r><w:t>Table 2. Missing object</w:t></w:r></w:p>');
+        $marked = (new PaperAttentionMarker)->mark($file, (new PaperFormatter)->settings([]));
+        $this->assertSame(['figure', 'image', 'table', 'caption'], array_column($marked['objects'], 'type'));
+        $this->assertStringContainsString('System diagram', $marked['objects'][0]['message']);
+        $this->assertStringContainsString('not confirmed', $marked['objects'][1]['message']);
+        $this->assertStringContainsString('Table 1. Results', $marked['objects'][2]['message']);
+        foreach ($marked['objects'] as $object) $this->assertNotEmpty($object['anchor']);
+        $this->assertCount(0, $marked['issues']);
+    }
+
 }

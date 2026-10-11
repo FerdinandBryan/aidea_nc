@@ -80,6 +80,8 @@ class PaperAttentionMarker
                     $highlight = $this->child($pr, 'highlight'); $highlight->setAttributeNS(self::W, 'w:val', 'yellow');
                 }
             }
+            $objects = $this->detectObjects($xp, $paragraphs);
+            foreach ($objects as $object) $notes[$object['paragraph'] - 1] ??= [];
             // Bookmarks preserve exact locations without inserting text or shifting pages.
             $nextId = 0;
             foreach ($xp->query('//w:bookmarkStart') as $bookmark) $nextId = max($nextId, (int) $bookmark->getAttributeNS(self::W, 'id') + 1);
@@ -94,9 +96,48 @@ class PaperAttentionMarker
             }
             foreach ($issues as &$issue) $issue['anchor'] = $anchors[$issue['paragraph']] ?? null;
             unset($issue);
+            foreach ($objects as &$object) $object['anchor'] = $anchors[$object['paragraph']] ?? null;
+            unset($object);
             $zip->addFromString('word/document.xml', $doc->saveXML()); $zip->close(); $opened = false;
-            return ['document_base64' => base64_encode(file_get_contents($path)), 'issues' => $issues];
+            return ['document_base64' => base64_encode(file_get_contents($path)), 'issues' => $issues, 'objects' => $objects];
         } finally { if ($opened) $zip->close(); @unlink($path); }
+    }
+
+    private function detectObjects(DOMXPath $xp, array $paragraphs): array
+    {
+        $objects = []; $matched = [];
+        $caption = function (DOMElement $node, string $kind): ?DOMElement {
+            if ($node->localName === 'p' && preg_match('/^'.$kind.'\s+\d+(?:[.:-]|\s|$)/i', $this->paragraphText($node))) return $node;
+            foreach (['previousSibling', 'nextSibling'] as $direction) {
+                $other = $node->$direction; $steps = 0;
+                while ($other && $steps++ < 12) {
+                    if ($other instanceof DOMElement) {
+                        if ($other->localName !== 'p') break;
+                        $text = $this->paragraphText($other);
+                        if ($text !== '') { if (preg_match('/^'.$kind.'\s+\d+(?:[.:-]|\s|$)/i', $text)) return $other; break; }
+                    }
+                    $other = $other->$direction;
+                }
+            }
+            return null;
+        };
+        foreach ($xp->query('//w:body//w:tbl | //w:body//w:p[w:r/w:drawing or w:r/w:pict]') as $node) {
+            $table = $node->localName === 'tbl';
+            $p = $table ? $xp->query('.//w:p', $node)->item(0) : $node;
+            if (!$p) continue;
+            $label = $caption($node, $table ? 'Table' : 'Figure');
+            if ($label) $matched[array_search($label, $paragraphs, true)] = true;
+            $type = $table ? 'table' : ($label ? 'figure' : 'image');
+            $message = $table ? 'Word table detected.' : ($label ? 'Graphic with a nearby figure caption detected.' : 'Image or drawing detected; its use as a research figure is not confirmed. It may be a logo or decorative image.');
+            $message .= $label ? ' Caption: '.$this->paragraphText($label) : ' No nearby '.($table ? 'table' : 'figure').' caption was identified. Review against the admin checklist.';
+            $objects[] = ['paragraph' => array_search($p, $paragraphs, true) + 1, 'type' => $type, 'message' => $message];
+        }
+        foreach ($paragraphs as $index => $p) {
+            if (isset($matched[$index]) || $xp->query('ancestor::w:tbl', $p)->length) continue;
+            if (!preg_match('/^(Figure|Table)\s+\d+(?:[.:-]|\s|$)/i', $this->paragraphText($p), $match)) continue;
+            $objects[] = ['paragraph' => $index + 1, 'type' => 'caption', 'message' => $match[1].' caption detected, but no adjacent '.(strtolower($match[1]) === 'table' ? 'Word table' : 'graphic').' was matched. Confirm whether the object is present or stored as an image. Caption: '.$this->paragraphText($p)];
+        }
+        return $objects;
     }
 
     private function paragraphText(DOMElement $p): string
