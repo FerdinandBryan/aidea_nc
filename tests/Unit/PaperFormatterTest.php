@@ -230,7 +230,7 @@ class PaperFormatterTest extends TestCase
         $this->assertEquals(4, $xp->evaluate('count(/w:document/w:body/w:p)'));
     }
 
-    public function test_cover_date_has_no_old_page_break_and_topic_gets_two_line_gap(): void
+    public function test_cover_date_has_no_old_page_break_and_topic_has_no_unrequested_gap(): void
     {
         $body = '';
         foreach (['THESIS TITLE', 'A Thesis', 'In Partial Fulfillment of the Requirements', 'by', 'AUTHOR'] as $text) $body .= '<w:p><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
@@ -240,7 +240,7 @@ class PaperFormatterTest extends TestCase
         $this->assertEquals(0, $xp->evaluate('count('.$date.'//w:br[@w:type="page"])'));
         $this->assertSame('0', $xp->evaluate('string('.$date.'/w:pPr/w:pageBreakBefore/@w:val)'));
         $this->assertSame('0', $xp->evaluate('string('.$date.'/w:pPr/w:keepNext/@w:val)'));
-        $this->assertSame('960', $xp->evaluate('string(//w:p[w:r/w:t="Theoretical Framework"]/w:pPr/w:spacing/@w:after)'));
+        $this->assertSame('0', $xp->evaluate('string(//w:p[w:r/w:t="Theoretical Framework"]/w:pPr/w:spacing/@w:after)'));
         $this->assertSame('page', $xp->evaluate('string(//w:p[w:r/w:t="CHAPTER 1"]/w:r[1]/w:br/@w:type)'));
     }
 
@@ -373,6 +373,18 @@ class PaperFormatterTest extends TestCase
         $this->assertEquals(1, $xp->evaluate('count(//w:drawing)'));
         $this->assertSame('nextPage', $xp->evaluate('string(//w:sectPr/w:type/@w:val)'));
         $this->assertSame('1', $xp->evaluate('string(//w:p[w:r/w:t="Appendix A - Letter"]/w:pPr/w:keepNext/@w:val)'));
+    }
+
+    public function test_unused_body_spacers_are_removed_but_template_heading_gap_is_respected(): void
+    {
+        foreach ([[], [['detail' => 'Leave two blank lines after every heading.']]] as $extra) {
+            $file = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Introduction</w:t></w:r></w:p><w:p/><w:p/><w:p><w:r><w:t>Explanation.</w:t></w:r></w:p><w:p><w:r><w:drawing/></w:r></w:p>');
+            (new PaperFormatter)->format($file, array_merge($this->rules(), $extra)); $xp = $this->xml($file);
+            $this->assertEquals(4, $xp->evaluate('count(/w:document/w:body/w:p)'));
+            $this->assertSame($extra ? '960' : '0', $xp->evaluate('string(//w:p[w:r/w:t="Introduction"]/w:pPr/w:spacing/@w:after)'));
+            $this->assertSame('480', $xp->evaluate('string(//w:p[w:r/w:t="Explanation."]/w:pPr/w:spacing/@w:line)'));
+            $this->assertEquals(1, $xp->evaluate('count(//w:drawing)'));
+        }
     }
 
 }

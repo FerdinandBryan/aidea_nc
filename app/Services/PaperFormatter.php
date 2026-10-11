@@ -27,10 +27,15 @@ class PaperFormatter
     {
         $cfg = ['font' => null, 'size' => null, 'spacing' => null, 'abstract' => null,
             'alignment' => null, 'indentation' => null, 'hanging' => false,
-            'margins' => [], 'width' => 12240, 'height' => 15840, 'headings' => [], 'cv' => []];
+            'margins' => [], 'width' => 12240, 'height' => 15840, 'headings' => [], 'cv' => [], 'heading_gap_lines' => 0];
         foreach ($rules as $rule) {
             if (!is_array($rule)) throw new InvalidArgumentException('The template contains an invalid rule.');
             $text = preg_replace('/[^\x00-\x7F]+/', ' ', (string) ($rule['detail'] ?? $rule['name'] ?? ''));
+            if (preg_match('/(?:after\s+(?:each\s+|every\s+)?(?:heading|header|title)|(?:heading|header|title).*?before\s+(?:the\s+)?(?:explanation|definition|text))/i', $text) &&
+                preg_match('/\b(two|one|\d+(?:\.\d+)?)\s+(?:blank\s+)?lines?\b/i', $text, $m)) {
+                $cfg['heading_gap_lines'] = strtolower($m[1]) === 'two' ? 2 : (strtolower($m[1]) === 'one' ? 1 : (float) $m[1]);
+                continue;
+            }
             if (preg_match('/curriculum\s+vitae|\bCV\b/i', $text)) {
                 if (preg_match('/\b(\d+(?:\.\d+)?)\s*(?:by|x)\s*(\d+(?:\.\d+)?)\s*(?:inch|in\b)/i', $text, $m)) {
                     $cfg['cv']['photo_width'] = (float) $m[1]; $cfg['cv']['photo_height'] = (float) $m[2];
@@ -100,6 +105,7 @@ class PaperFormatter
             ($cfg['size'] !== null && ($cfg['size'] < 1 || $cfg['size'] > 100)) ||
             ($cfg['indentation'] !== null && ($cfg['indentation'] < 0 || $cfg['indentation'] > 5))) throw new InvalidArgumentException('The template has invalid formatting values.');
         foreach ($cfg['margins'] as $margin) if ($margin < 0 || $margin > 4) throw new InvalidArgumentException('The template has invalid margins.');
+        if ($cfg['heading_gap_lines'] < 0 || $cfg['heading_gap_lines'] > 5) throw new InvalidArgumentException('The template has invalid heading spacing.');
         foreach (['photo_width', 'photo_height', 'spacing'] as $key) if (isset($cfg['cv'][$key]) && ($cfg['cv'][$key] <= 0 || $cfg['cv'][$key] > 5)) throw new InvalidArgumentException('The template has invalid Curriculum Vitae settings.');
         if (($cfg['margins']['left'] ?? 1) + ($cfg['margins']['right'] ?? 1) >= $cfg['width'] / 1440 ||
             ($cfg['margins']['top'] ?? 1) + ($cfg['margins']['bottom'] ?? 1) >= $cfg['height'] / 1440) throw new InvalidArgumentException('The template margins leave no printable area.');
@@ -155,6 +161,9 @@ class PaperFormatter
                 $heading = $chapter || $appendixHeader || in_array($upper, ['ABSTRACT', 'APPROVAL SHEET', 'ACKNOWLEDGEMENT', 'ACKNOWLEDGEMENTS', 'TABLE OF CONTENTS', 'LIST OF TABLES', 'LIST OF FIGURES', 'LIST OF APPENDICES', 'REFERENCES', 'APPENDICES'], true);
                 if ($heading) $zone = $upper === 'ABSTRACT' ? 'abstract' : ($upper === 'REFERENCES' ? 'references' : 'body');
                 if ($zone === 'front' && !$table) $title[] = $p;
+                if (!$table && $zone !== 'front' && $text === '' && !$xp->query('.//w:sectPr | .//w:fldChar | .//w:bookmarkStart | .//w:bookmarkEnd | .//w:br | ./w:pPr/w:pageBreakBefore', $p)->length) {
+                    $p->parentNode?->removeChild($p); continue;
+                }
                 $pr = $this->ensure($p, 'pPr', true);
                 $topicHeading = !$table && ($heading || ($zone !== 'front' && $this->isTopicHeading($p, $xp)));
                 if (!$table) {
@@ -199,7 +208,7 @@ class PaperFormatter
                     $this->attr($this->ensure($pr, 'keepNext'), 'val', 1);
                     $this->attr($this->ensure($pr, 'keepLines'), 'val', 1);
                     if (!$chapter) {
-                        $gap = ($cfg['size'] ?? 12) * 20 * ($cfg['spacing'] ?? 1) * 2;
+                        $gap = ($cfg['size'] ?? 12) * 20 * ($cfg['spacing'] ?? 1) * $cfg['heading_gap_lines'];
                         $this->attr($this->ensure($pr, 'spacing'), 'after', round($gap));
                     }
                 }
