@@ -2628,6 +2628,25 @@ async function _dvGenerateFixedPdf() {
             // Show one rendered paper page at a time.
             var pages = Array.from(holder.querySelectorAll('.docx-wrapper > section.docx'));
             if (!pages.length) throw new Error('The document renderer did not produce any pages.');
+            // Keep all page boxes in the CSS counter tree. display:none on
+            // earlier pages makes visible lists start again at one.
+            var wrapper = holder.querySelector('.docx-wrapper');
+            var listResets = new Map();
+            pages.forEach(function (page) {
+                var resets = getComputedStyle(page).counterReset || '';
+                var matches = resets.match(/docx-num-[\w-]+(?:\s+-?\d+)?/g) || [];
+                matches.forEach(function (reset) { listResets.set(reset.split(/\s/)[0], reset); });
+                if (matches.length) page.style.setProperty('counter-reset', 'none', 'important');
+                page.querySelectorAll('p').forEach(function (p) {
+                    if (/\bdocx-num-/.test(p.className) && !(p.textContent || '').trim() &&
+                        !p.querySelector('img,svg,math')) {
+                        // docx-preview creates an empty numbered fragment when
+                        // a page marker precedes the list item's first text.
+                        p.style.setProperty('display', 'none', 'important');
+                    }
+                });
+            });
+            if (listResets.size && wrapper) wrapper.style.counterReset = Array.from(listResets.values()).join(' ');
             var controls = document.createElement('div');
             controls.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:14px;margin:12px 0;';
             var previous = document.createElement('button');
@@ -2643,7 +2662,11 @@ async function _dvGenerateFixedPdf() {
             function showPage(index) {
                 pageIndex = Math.max(0, Math.min(pages.length - 1, index));
                 pages.forEach(function (page, i) {
-                    page.style.setProperty('display', i === pageIndex ? 'flex' : 'none', 'important');
+                    page.style.setProperty('display', 'flex', 'important');
+                    page.style.position = i === pageIndex ? 'relative' : 'absolute';
+                    page.style.left = i === pageIndex ? 'auto' : '-100000px';
+                    page.style.visibility = i === pageIndex ? 'visible' : 'hidden';
+                    page.style.pointerEvents = i === pageIndex ? 'auto' : 'none';
                     page.setAttribute('aria-hidden', i === pageIndex ? 'false' : 'true');
                 });
                 // Fit the sheet to the modal width for readable text,
