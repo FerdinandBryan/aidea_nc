@@ -327,10 +327,18 @@ class PaperFormatter
                 if ($this->text($p) === '' && !$xp->query('.//w:bookmarkStart | .//w:bookmarkEnd | .//w:fldChar', $p)->length) { $p->parentNode->removeChild($p); continue; }
                 $this->attr($this->ensure($pr, 'keepNext'), 'val', 1);
                 $line = $xp->evaluate('string(./w:spacing/@w:line)', $pr);
-                $reserved += ($cfg['size'] ?? 12) * 20 * ($line !== '' ? (float) $line / 240 : ($cfg['spacing'] ?? 1)) * 1.2;
+                $textWidth = $cfg['width'] - (($cfg['margins']['left'] ?? 1) + ($cfg['margins']['right'] ?? 1)) * 1440;
+                $lines = max(1, ceil(mb_strlen($this->text($p)) * ($cfg['size'] ?? 12) * 10 / $textWidth));
+                $reserved += $lines * ($cfg['size'] ?? 12) * 20 * ($line !== '' ? (float) $line / 240 : ($cfg['spacing'] ?? 1)) * 1.2;
                 $reserved += (float) $xp->evaluate('string(./w:spacing/@w:before)', $pr) + (float) $xp->evaluate('string(./w:spacing/@w:after)', $pr);
             }
             $pr = $this->ensure($attachment, 'pPr', true);
+            $this->attr($this->ensure($pr, 'keepLines'), 'val', 1);
+            $this->attr($this->ensure($pr, 'keepNext'), 'val', 0);
+            $spacing = $this->ensure($pr, 'spacing');
+            $this->attr($spacing, 'before', 0); $this->attr($spacing, 'after', 0);
+            $this->attr($spacing, 'line', 240); $this->attr($spacing, 'lineRule', 'auto');
+            foreach (['beforeLines', 'afterLines', 'beforeAutospacing', 'afterAutospacing'] as $key) $this->attr($spacing, $key, 0);
             foreach (iterator_to_array($xp->query('./w:pageBreakBefore', $pr)) as $break) $break->parentNode->removeChild($break);
             foreach (iterator_to_array($xp->query('./w:r/w:br[@w:type="page"]', $attachment)) as $break) $break->parentNode->removeChild($break);
             $section = $xp->query('.//w:sectPr | following::w:sectPr[1]', $heading)->item(0);
@@ -339,7 +347,8 @@ class PaperFormatter
                 return $value !== '' ? (float) $value : 1440;
             };
             $maxWidth = ($cfg['width'] - $margin('left') - $margin('right')) * 635;
-            $maxHeight = max(1, $cfg['height'] - $margin('top') - $margin('bottom') - $reserved) * 635;
+            // Reserve a baseline and a little renderer tolerance for the inline picture.
+            $maxHeight = max(1, $cfg['height'] - $margin('top') - $margin('bottom') - $reserved - 240) * 635 * .97;
             foreach ($xp->query('.//w:drawing', $attachment) as $drawing) {
                 if (!$xp->query('.//*[local-name()="pic" and namespace-uri()="http://schemas.openxmlformats.org/drawingml/2006/picture"]', $drawing)->length) continue;
                 $extent = $xp->query('.//*[local-name()="extent" and namespace-uri()="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"]', $drawing)->item(0);

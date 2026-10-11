@@ -399,6 +399,9 @@ class PaperFormatterTest extends TestCase
         $width = (float) $xp->evaluate('string(//*[local-name()="extent"]/@cx)');
         $height = (float) $xp->evaluate('string(//*[local-name()="extent"]/@cy)');
         $this->assertLessThan(8229600, $height);
+        $this->assertSame('1', $xp->evaluate('string(//w:p[w:r/w:drawing]/w:pPr/w:keepLines/@w:val)'));
+        $this->assertSame('auto', $xp->evaluate('string(//w:p[w:r/w:drawing]/w:pPr/w:spacing/@w:lineRule)'));
+        $this->assertLessThan(9 * 914400, $height + 1392 * 635);
         $this->assertEqualsWithDelta(5943600 / 8229600, $width / $height, .00001);
     }
 

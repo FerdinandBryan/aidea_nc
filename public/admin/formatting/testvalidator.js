@@ -2499,7 +2499,8 @@ async function _dvGenerateFixedPdf() {
                     if (next.art !== items[index].art || forcedAfter(kids[j]) || forcedBefore(kids[j + 1])) break;
                     j++;
                     var captionText = Array.from(kids[j].getElementsByTagNameNS(W, 't')).map(function (t) { return t.textContent; }).join('').trim();
-                    bottom = (keepWithNext(kids[j]) || blankParagraph(kids[j]) || /^Figure\s*\d+(?:\.\d+)*\s*[.:-]/i.test(captionText)) ? next.bottom :
+                    var graphicBlock = kids[j].localName === 'tbl' || kids[j].getElementsByTagNameNS(W, 'drawing').length || kids[j].getElementsByTagNameNS(W, 'pict').length || kids[j].getElementsByTagNameNS(W, 'object').length;
+                    bottom = (graphicBlock || keepWithNext(kids[j]) || blankParagraph(kids[j]) || /^Figure\s*\d+(?:\.\d+)*\s*[.:-]/i.test(captionText)) ? next.bottom :
                         Math.min(next.bottom, next.top + next.leadHeight);
                 }
                 return bottom;
@@ -3413,7 +3414,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=19';
+    e.src = base + 'fixpaper-api.js?v=20';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };
