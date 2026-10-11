@@ -2500,6 +2500,7 @@ async function _dvGenerateFixedPdf() {
         window.docx.__dvPaged = true;
         return true;
     }
+    window._dvEnsurePagination = hook;
     if (!hook()) {
         var tries = 0, t = setInterval(function () { if (hook() || ++tries > 7200) clearInterval(t); }, 500);
     }
@@ -2606,7 +2607,7 @@ async function _dvGenerateFixedPdf() {
             if (!_dvLastFile) throw new Error('Run a format check first.');
             if (/\.pdf$/i.test(_dvLastFile.name || '')) throw new Error('Preview works on .docx files only. Upload the Word version.');
             await new Promise(function (r) { _validatorDeps.ensureJSZip(r); });
-            await loadPreviewLib(); if (typeof hook === 'function') hook();
+            await loadPreviewLib(); if (window._dvEnsurePagination) window._dvEnsurePagination();
             var blob = await dvCleanRedNotes(await _dvGenerateFixedDocx(_dvLastFile, _dvLastRules, _dvLastFormattingProfile));
             body.innerHTML = '';
             var bar = document.createElement('div');
@@ -2619,6 +2620,36 @@ async function _dvGenerateFixedPdf() {
             var _dvPrevPg = window._dvPaginateOn; window._dvPaginateOn = true;
             try { await window.docx.renderAsync(blob, holder, null, { className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: false, renderHeaders: true, renderFooters: true }); }
             finally { window._dvPaginateOn = _dvPrevPg; }
+            // Show one rendered paper page at a time.
+            var pages = Array.from(holder.querySelectorAll('.docx-wrapper > section.docx'));
+            if (!pages.length) throw new Error('The document renderer did not produce any pages.');
+            var controls = document.createElement('div');
+            controls.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:14px;margin:12px 0;';
+            var previous = document.createElement('button');
+            previous.type = 'button'; previous.className = 'btn-modal-close'; previous.textContent = 'Previous page';
+            var pageLabel = document.createElement('span');
+            pageLabel.setAttribute('role', 'status');
+            pageLabel.setAttribute('aria-live', 'polite');
+            var next = document.createElement('button');
+            next.type = 'button'; next.className = 'btn-modal-close'; next.textContent = 'Next page';
+            controls.appendChild(previous); controls.appendChild(pageLabel); controls.appendChild(next);
+            body.insertBefore(controls, holder);
+            var pageIndex = 0;
+            function showPage(index) {
+                pageIndex = Math.max(0, Math.min(pages.length - 1, index));
+                pages.forEach(function (page, i) {
+                    page.style.setProperty('display', i === pageIndex ? 'flex' : 'none', 'important');
+                    page.setAttribute('aria-hidden', i === pageIndex ? 'false' : 'true');
+                });
+                pageLabel.textContent = 'Page ' + (pageIndex + 1) + ' of ' + pages.length;
+                previous.disabled = pageIndex === 0;
+                next.disabled = pageIndex === pages.length - 1;
+                holder.scrollTop = 0;
+                body.scrollTop = 0;
+            }
+            previous.onclick = function () { showPage(pageIndex - 1); };
+            next.onclick = function () { showPage(pageIndex + 1); };
+            showPage(0);
         } catch (e) {
             console.warn('[Validator] preview failed', e);
             body.textContent = 'Could not build the preview: ' + (e && e.message ? e.message : e);
