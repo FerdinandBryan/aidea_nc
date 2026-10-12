@@ -242,7 +242,7 @@ class PaperFormatter
                 foreach ($cfg['margins'] as $side => $inch) $this->attr($margins, $side, round($inch * 1440));
             }
             $this->attachHeadingText($xp);
-            $this->isolateAppendicesDivider($xp, $cfg);
+            $this->isolateSectionDividers($xp, $cfg);
             $this->attachFigureCaptions($xp);
             $this->layoutTitle($title, $cfg, $xp);
             $this->removeBlankPageBreaks($xp);
@@ -468,10 +468,10 @@ class PaperFormatter
         foreach ($xp->query('//w:sectPr/w:type[@w:val="oddPage" or @w:val="evenPage"]') as $type) $this->attr($type, 'val', 'nextPage');
     }
 
-    private function isolateAppendicesDivider(DOMXPath $xp, array $cfg): void
+    private function isolateSectionDividers(DOMXPath $xp, array $cfg): void
     {
         foreach ($xp->query('/w:document/w:body/w:p') as $p) {
-            if (strtoupper($this->text($p)) !== 'APPENDICES') continue;
+            if (!in_array(strtoupper($this->text($p)), ['REFERENCES', 'APPENDICES'], true)) continue;
             if (preg_match('/^TOC/i', $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $p))) continue;
             // Shared divider style requested for every admin template.
             foreach ($p->getElementsByTagNameNS(self::W, 't') as $text) $text->textContent = strtoupper($text->textContent);

@@ -517,4 +517,21 @@ class PaperFormatterTest extends TestCase
         $this->assertGreaterThan(0, $this->xml($marked)->evaluate('count(//w:highlight[@w:val="yellow"])'));
     }
 
+    public function test_references_title_matches_appendices_divider_and_entries_start_on_next_page(): void
+    {
+        $file = $this->paper('<w:p><w:r><w:t>Previous chapter text.</w:t></w:r></w:p><w:p><w:r><w:t>References</w:t></w:r></w:p><w:p><w:r><w:t>Author (2025). Research source.</w:t></w:r></w:p><w:p><w:r><w:t>Appendices</w:t></w:r></w:p><w:p><w:r><w:t>Appendix A</w:t></w:r></w:p>');
+        (new PaperFormatter)->format($file, $this->rules()); $xp = $this->xml($file);
+        foreach (['REFERENCES', 'APPENDICES'] as $word) {
+            $p = '//w:p[w:r/w:t="'.$word.'"]';
+            $this->assertSame('76', $xp->evaluate('string('.$p.'/w:r/w:rPr/w:sz/@w:val)'));
+            $this->assertSame('1', $xp->evaluate('string('.$p.'/w:r/w:rPr/w:b/@w:val)'));
+            $this->assertSame('center', $xp->evaluate('string('.$p.'/w:pPr/w:jc/@w:val)'));
+            $this->assertSame('6024', $xp->evaluate('string('.$p.'/w:pPr/w:spacing/@w:before)'));
+            $this->assertSame('0', $xp->evaluate('string('.$p.'/w:pPr/w:keepNext/@w:val)'));
+            $this->assertEquals(1, $xp->evaluate('count('.$p.'//w:br[@w:type="page"])'));
+        }
+        $this->assertEquals(1, $xp->evaluate('count(//w:p[w:r/w:t="Author (2025). Research source."]//w:br[@w:type="page"])'));
+        $this->assertSame('24', $xp->evaluate('string(//w:p[w:r/w:t="Author (2025). Research source."]/w:r/w:rPr/w:sz/@w:val)'));
+    }
+
 }
