@@ -12,6 +12,16 @@ class PaperAttentionMarker
 {
     private const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
+    public function resolutions(array $originalIssues, array $remainingIssues): array
+    {
+        $remainingTypes = array_column($remainingIssues, 'type');
+        return array_map(function ($issue) use ($remainingTypes) {
+            $supported = in_array($issue['type'], ['spacing', 'margin', 'appendix-title'], true);
+            $issue['status'] = $supported && !in_array($issue['type'], $remainingTypes, true) ? 'corrected' : 'review';
+            return $issue;
+        }, $originalIssues);
+    }
+
     public function mark(string $original, array $settings, array $findings = [], bool $annotate = true): array
     {
         $path = tempnam(sys_get_temp_dir(), 'paper_attention_');

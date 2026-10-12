@@ -46,7 +46,9 @@ class PaperFormattingController extends Controller
         try {
             if (!copy($request->file('file')->getRealPath(), $path)) throw new \RuntimeException('Could not copy the uploaded paper.');
             $report = $formatter->format($path, $template['effective_rules']);
+            $original = $marker->mark($request->file('file')->getRealPath(), $report['settings'], [], false);
             $verification = $marker->mark($path, $report['settings'], [], false);
+            $report['attention_resolutions'] = $marker->resolutions($original['issues'], $verification['issues']);
             $report['fixed_validation'] = ['remaining_formatting_issues' => $verification['issues'], 'review_marks_removed' => true, 'content_review_required' => true];
             foreach ($verification['issues'] as $issue) $report['manual_review_rules'][] = $issue['message'];
             $report['manual_review_required'] = !empty($report['manual_review_rules']);

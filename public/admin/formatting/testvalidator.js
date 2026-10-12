@@ -2718,6 +2718,26 @@ async function _dvGenerateFixedPdf() {
                     validationNote.style.cssText='margin:10px 0;font-size:13px;color:'+(remaining.length?'#fbbf24':'#86efac')+';';
                     bar.appendChild(validationNote);
                 }
+                if (Array.isArray(report.attention_resolutions)) {
+                    var corrections=document.createElement('details');
+                    var corrected=report.attention_resolutions.filter(function(issue){return issue.status==='corrected';});
+                    var unresolved=report.attention_resolutions.filter(function(issue){return issue.status!=='corrected';});
+                    var heading=document.createElement('summary');
+                    heading.textContent='Needs attention results: '+corrected.length+' corrected in this paper; '+unresolved.length+' require review';
+                    corrections.appendChild(heading);
+                    var correctionList=document.createElement('ul');
+                    report.attention_resolutions.forEach(function(issue){
+                        var item=document.createElement('li');
+                        item.textContent=(issue.status==='corrected'?'Corrected: ':'Requires review: ')+issue.message;
+                        item.style.color=issue.status==='corrected'?'#86efac':'#fbbf24';
+                        correctionList.appendChild(item);
+                    });
+                    corrections.appendChild(correctionList);
+                    if (!report.attention_resolutions.length) {
+                        var clean=document.createElement('p');clean.textContent='No detected issues in the uploaded paper required correction.';corrections.appendChild(clean);
+                    }
+                    bar.appendChild(corrections);
+                }
                 var summary = document.createElement('details');
                 var title = document.createElement('summary');
                 title.textContent = 'Template: ' + report.template + ' — ' + report.paragraphs_processed + ' paragraphs processed';
@@ -3435,7 +3455,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=28';
+    e.src = base + 'fixpaper-api.js?v=29';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };
