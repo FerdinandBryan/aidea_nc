@@ -246,6 +246,7 @@ class PaperFormatter
             $this->attachFigureCaptions($xp);
             $this->layoutTitle($title, $cfg, $xp);
             $this->removeBlankPageBreaks($xp);
+            $this->flowAppendixPictures($xp, $cfg);
             $this->attachAppendixAttachments($xp, $cfg);
             $zip->addFromString('word/document.xml', $doc->saveXML());
             $applied = []; $manual = []; $defaults = $this->settings([]);
@@ -328,6 +329,39 @@ class PaperFormatter
             }
             $texts = $xp->query('.//w:t[not(ancestor::w:txbxContent)]', $target);
             foreach ($texts as $index => $text) $text->textContent = $index === 0 ? $replacement : '';
+        }
+    }
+
+    private function flowAppendixPictures(DOMXPath $xp, array $cfg): void
+    {
+        $inAppendices = false; $cv = false;
+        foreach ($xp->query('/w:document/w:body/w:p') as $p) {
+            $text = $this->text($p);
+            if (strtoupper($text) === 'APPENDICES' || $this->isAppendixHeader($p, $xp)) $inAppendices = true;
+            if ($this->isAppendixHeader($p, $xp)) {
+                preg_match('/^APPENDIX\s+([A-Z])/i', $text, $m);
+                $cv = (bool) preg_match('/curriculum\s+vitae/i', $text.' '.($cfg['appendix_titles'][strtoupper($m[1])] ?? ''));
+            }
+            if (preg_match('/curriculum\s+vitae/i', $text) && mb_strlen($text) < 180) $cv = true;
+            if (!$inAppendices || $cv) continue;
+            foreach (iterator_to_array($xp->query('.//w:drawing/*[local-name()="anchor" and namespace-uri()="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"]', $p)) as $anchor) {
+                if (!$xp->query('.//*[local-name()="pic" and namespace-uri()="http://schemas.openxmlformats.org/drawingml/2006/picture"]', $anchor)->length) continue;
+                $inline = $p->ownerDocument->createElementNS($anchor->namespaceURI, 'wp:inline');
+                foreach (['distT', 'distB', 'distL', 'distR'] as $distance) $inline->setAttribute($distance, '0');
+                foreach (iterator_to_array($anchor->childNodes) as $child) {
+                    if ($child instanceof DOMElement && in_array($child->localName, ['extent', 'effectExtent', 'docPr', 'cNvGraphicFramePr', 'graphic'], true)) $inline->appendChild($child);
+                }
+                $anchor->parentNode->replaceChild($inline, $anchor);
+            }
+            $textOnLine = false;
+            foreach (iterator_to_array($xp->query('.//w:t[not(ancestor::w:txbxContent)] | ./w:r/w:br | ./w:r/w:drawing', $p)) as $node) {
+                if ($node->localName === 't' && trim($node->textContent) !== '') $textOnLine = true;
+                elseif ($node->localName === 'br') $textOnLine = false;
+                elseif ($node->localName === 'drawing' && $textOnLine && $xp->query('.//*[local-name()="pic"]', $node)->length) {
+                    $node->parentNode->insertBefore($p->ownerDocument->createElementNS(self::W, 'w:br'), $node);
+                    $textOnLine = false;
+                }
+            }
         }
     }
 

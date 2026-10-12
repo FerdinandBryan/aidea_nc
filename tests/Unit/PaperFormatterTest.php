@@ -471,4 +471,16 @@ class PaperFormatterTest extends TestCase
         }
     }
 
+    public function test_floating_appendix_scans_flow_below_titles_without_changing_picture_content(): void
+    {
+        $picture = '<w:drawing><wp:anchor xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionV relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionV><wp:extent cx="2000000" cy="3000000"/><wp:docPr id="1" name="scan"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rIdImage"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing>';
+        $file = $this->paper('<w:p><w:r><w:t>Body illustration</w:t>'.$picture.'</w:r></w:p><w:p><w:r><w:t>APPENDICES</w:t></w:r></w:p><w:p><w:r><w:t>Appendix F</w:t></w:r></w:p><w:p><w:r><w:t>Attachment heading</w:t></w:r><w:r>'.$picture.'</w:r></w:p><w:p><w:r><w:t>Appendix G</w:t></w:r></w:p><w:p><w:r>'.$picture.'</w:r></w:p>');
+        (new PaperFormatter)->format($file, $this->rules()); $xp = $this->xml($file);
+        $this->assertEquals(2, $xp->evaluate('count(//*[local-name()="inline"])'));
+        $this->assertEquals(1, $xp->evaluate('count(//*[local-name()="anchor"])'));
+        $this->assertEquals(3, $xp->evaluate('count(//*[local-name()="blip"]/@*[local-name()="embed"])'));
+        $this->assertEquals(1, $xp->evaluate('count(//w:p[w:r/w:t="Attachment heading"]/w:r/w:br[not(@w:type="page")])'));
+        $this->assertEquals(0, $xp->evaluate('count(//*[local-name()="inline"]/*[local-name()="positionV"])'));
+    }
+
 }
