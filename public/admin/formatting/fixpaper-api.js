@@ -82,7 +82,7 @@
                 var annotated = atob(data.attention_document_base64);
                 var markedBytes = new Uint8Array(annotated.length);
                 for (var j = 0; j < annotated.length; j++) markedBytes[j] = annotated.charCodeAt(j);
-                window._dvAttentionResult = {revision:revision,blob:new Blob([markedBytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),issues:data.attention_issues || [],objects:data.attention_objects || [],fixedValidation:data.report && data.report.fixed_validation};
+                window._dvAttentionResult = {revision:revision,blob:new Blob([markedBytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),issues:data.attention_issues || [],objects:data.attention_objects || [],manualChecks:(data.review && data.review.findings || []).filter(function(f){return f.status==='manual';}).length,fixedValidation:data.report && data.report.fixed_validation};
                 document.querySelectorAll('[data-dv-attention]').forEach(function (button) {
                     button.textContent = 'Preview Needs attention (' + (data.attention_issues || []).length + ')';
                 });
@@ -101,7 +101,9 @@
             var passed=findings.filter(function(f){return f.status==='pass';}).length;
             var manual=findings.filter(function(f){return f.status==='manual';}).length;
             document.querySelectorAll('[data-dv-checklist-summary]').forEach(function(summary){
-                summary.textContent=passed+' checklist items passed - '+(data.attention_issues || []).length+' detected issues - '+manual+' manual checks'+(data.partial?' - review incomplete':'');
+                var issues=data.attention_issues || [];
+                var formatting=issues.filter(function(issue){return issue.type!=='content';}).length;
+                summary.textContent='Formatting: '+formatting+' detected issues - Content: '+(issues.length-formatting)+' advisory findings - '+manual+' checklist items require manual review - '+passed+' checklist items passed'+(data.partial?' - review incomplete':'');
             });
             cached = {file:file,key:String(templateId)+':'+String(revision),promise:Promise.resolve(fixed)};
         } catch (error) {
@@ -190,7 +192,10 @@
             if(!result || result.revision!==requestedRevision){progress.textContent=window._dvAttentionError ? 'Could not prepare the preview: '+window._dvAttentionError : 'Choose a paper and admin template, then run Check formatting.';return;}
             waiting.remove();
         }
-        var count=document.createElement('strong');count.textContent=result.issues.length+' issues detected';sidebar.appendChild(count);
+        var count=document.createElement('strong');
+        var formattingCount=result.issues.filter(function(issue){return issue.type!=='content';}).length;
+        count.textContent='Formatting: '+formattingCount+' detected issues';sidebar.appendChild(count);
+        var breakdown=document.createElement('div');breakdown.textContent='Content: '+(result.issues.length-formattingCount)+' advisory findings. '+(result.manualChecks || 0)+' checklist items require manual review.';sidebar.appendChild(breakdown);
         var list = document.createElement('ul');list.className='attention-issues';
         var cards=[];
         var entries=result.issues.concat(result.objects || []);
