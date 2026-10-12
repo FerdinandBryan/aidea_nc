@@ -248,7 +248,17 @@ class PaperFormatter
             $this->removeBlankPageBreaks($xp);
             $this->flowAppendixPictures($xp, $cfg);
             $this->attachAppendixAttachments($xp, $cfg);
+            // The fixed copy is clean; issue highlights belong to the attention copy.
+            foreach (iterator_to_array($xp->query('//w:highlight')) as $highlight) $highlight->parentNode->removeChild($highlight);
             $zip->addFromString('word/document.xml', $doc->saveXML());
+            $stylesXml = $zip->getFromName('word/styles.xml');
+            if ($stylesXml !== false) {
+                $styles = new DOMDocument;
+                if (stripos($stylesXml, '<!DOCTYPE') !== false || !@$styles->loadXML($stylesXml, LIBXML_NONET)) throw new InvalidArgumentException('The Word document contains invalid styles XML.');
+                $styleHighlights = iterator_to_array($styles->getElementsByTagNameNS(self::W, 'highlight'));
+                foreach ($styleHighlights as $highlight) $highlight->parentNode->removeChild($highlight);
+                if ($styleHighlights) $zip->addFromString('word/styles.xml', $styles->saveXML());
+            }
             $applied = []; $manual = []; $defaults = $this->settings([]);
             foreach ($rules as $rule) {
                 $name = (string) ($rule['name'] ?? $rule['detail'] ?? 'Unnamed rule');

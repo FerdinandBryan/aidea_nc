@@ -498,4 +498,23 @@ class PaperFormatterTest extends TestCase
         }
     }
 
+    public function test_fixed_copy_clears_source_and_style_highlights_without_affecting_attention_marks(): void
+    {
+        $file = $this->paper('<w:p><w:pPr><w:spacing w:line="240"/><w:rPr><w:highlight w:val="yellow"/></w:rPr></w:pPr><w:r><w:rPr><w:highlight w:val="yellow"/><w:b/></w:rPr><w:t>Research text</w:t></w:r></w:p>');
+        $zip = new ZipArchive; $zip->open($file);
+        $zip->addFromString('word/styles.xml', '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Normal"><w:rPr><w:highlight w:val="yellow"/></w:rPr></w:style></w:styles>'); $zip->close();
+        $formatter = new PaperFormatter;
+        $attention = (new PaperAttentionMarker)->mark($file, $formatter->settings($this->rules()));
+        $marked = tempnam(sys_get_temp_dir(), 'attention_clean_test_'); $this->files[] = $marked;
+        file_put_contents($marked, base64_decode($attention['document_base64']));
+        $this->assertGreaterThan(0, $this->xml($marked)->evaluate('count(//w:highlight[@w:val="yellow"])'));
+        $formatter->format($file, $this->rules()); $xp = $this->xml($file);
+        $this->assertEquals(0, $xp->evaluate('count(//w:highlight)'));
+        $this->assertEquals(1, $xp->evaluate('count(//w:b)'));
+        $this->assertSame('Research text', $xp->evaluate('string(//w:t)'));
+        $zip->open($file); $styles = $zip->getFromName('word/styles.xml'); $zip->close();
+        $this->assertStringNotContainsString('w:highlight', $styles);
+        $this->assertGreaterThan(0, $this->xml($marked)->evaluate('count(//w:highlight[@w:val="yellow"])'));
+    }
+
 }
