@@ -1477,9 +1477,9 @@ function _renderValidationResult(result, onProceed, actionLabel, formattingProfi
         footer.innerHTML = `
             ${backBtn}
             <button class="btn-modal-close" onclick="window._dvCloseModal('docValidationModal')">Cancel</button>
-            <button class="btn-modal-submit" onclick="window._dvCloseModal('docValidationModal');${onProceed}">
+            ${actionLabel === 'Format Check' ? '' : `<button class="btn-modal-submit" onclick="window._dvCloseModal('docValidationModal');${onProceed}">
                 Run ${_escHtml(actionLabel)} →
-            </button>`;
+            </button>`}`;
     } else {
         footer.innerHTML = `
             ${backBtn}
