@@ -2706,8 +2706,29 @@ async function _dvGenerateFixedPdf() {
             var blob = await _dvGenerateFixedDocx(_dvLastFile, _dvLastRules, _dvLastFormattingProfile);
             body.innerHTML = '';
             var bar = document.createElement('div');
-            bar.style.cssText = 'margin-bottom:10px;';
-            bar.innerHTML = '<button type="button" class="btn-modal-close" onclick="window._dvDownloadFixed()">Download this fixed copy</button>';
+            bar.style.cssText = 'margin-bottom:16px;';
+            bar.className='dv-fixed-report';
+            var reportStyle=document.createElement('style');
+            reportStyle.textContent=`
+                .dv-fixed-report details{margin-top:10px;border:1px solid #334155;border-radius:12px;background:#111c2e;color:#e2e8f0;overflow:hidden}
+                .dv-fixed-report summary{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 16px;cursor:pointer;list-style:none;font-size:14px;font-weight:600}
+                .dv-fixed-report summary::-webkit-details-marker{display:none}
+                .dv-fixed-report summary::after{content:'?';margin-left:auto;color:#94a3b8;font-size:20px;line-height:1}
+                .dv-fixed-report details[open]>summary::after{transform:rotate(180deg)}
+                .dv-fixed-report summary:focus-visible{outline:2px solid #93c5fd;outline-offset:-3px}
+                .dv-fixed-report details[open]>summary{border-bottom:1px solid #334155}
+                .dv-fixed-report .dv-report-label{flex:1;min-width:160px;overflow-wrap:anywhere}
+                .dv-fixed-report .dv-report-badges{display:flex;gap:8px;flex-wrap:wrap}
+                .dv-fixed-report .dv-report-badge{padding:4px 9px;border-radius:999px;background:#253348;color:#cbd5e1;font-size:12px;white-space:nowrap;font-weight:500}
+                .dv-fixed-report .dv-report-success{background:#143b2c;color:#86efac}
+                .dv-fixed-report .dv-report-warning{background:#443415;color:#fde68a}
+                .dv-fixed-report details>p{padding:0 16px;line-height:1.65;font-size:13px;overflow-wrap:anywhere;color:#cbd5e1}
+                .dv-fixed-report details>ul{list-style:none;margin:0;padding:12px 16px;max-height:260px;overflow:auto;display:grid;gap:8px;font-size:13px;line-height:1.6}
+                .dv-fixed-report details>ul>li{background:#192638;padding:10px 12px;border-radius:8px;overflow-wrap:anywhere}
+                @media(max-width:600px){.dv-fixed-report .dv-report-badges{width:100%}.dv-fixed-report summary{gap:8px}}
+            `;
+            bar.appendChild(reportStyle);
+            bar.insertAdjacentHTML('beforeend', '<button type="button" class="btn-modal-close" onclick="window._dvDownloadFixed()">Download this fixed copy</button>');
             if (blob.formattingReport) {
                 var report = blob.formattingReport;
                 if (report.fixed_validation) {
@@ -2722,7 +2743,10 @@ async function _dvGenerateFixedPdf() {
                     var corrected=report.attention_resolutions.filter(function(issue){return issue.status==='corrected';});
                     var unresolved=report.attention_resolutions.filter(function(issue){return issue.status!=='corrected';});
                     var heading=document.createElement('summary');
-                    heading.textContent='Needs attention results: '+corrected.length+' corrected in this paper; '+unresolved.length+' require review';
+                    var correctionLabel=document.createElement('span');correctionLabel.className='dv-report-label';correctionLabel.textContent='Corrections applied';heading.appendChild(correctionLabel);
+                    var badges=document.createElement('span');badges.className='dv-report-badges';
+                    [[corrected.length+' corrected','dv-report-success'],[unresolved.length+' require review',unresolved.length?'dv-report-warning':'']].forEach(function(entry){var badge=document.createElement('span');badge.className='dv-report-badge '+entry[1];badge.textContent=entry[0];badges.appendChild(badge);});
+                    heading.appendChild(badges);
                     corrections.appendChild(heading);
                     var correctionList=document.createElement('ul');
                     report.attention_resolutions.forEach(function(issue){
@@ -2739,7 +2763,8 @@ async function _dvGenerateFixedPdf() {
                 }
                 var summary = document.createElement('details');
                 var title = document.createElement('summary');
-                title.textContent = 'Template: ' + report.template + ' — ' + report.paragraphs_processed + ' paragraphs processed';
+                var templateLabel=document.createElement('span');templateLabel.className='dv-report-label';templateLabel.textContent='Template: '+report.template;title.appendChild(templateLabel);
+                var processed=document.createElement('span');processed.className='dv-report-badge';processed.textContent=report.paragraphs_processed+' paragraphs processed';title.appendChild(processed);
                 summary.appendChild(title);
                 var settings = report.settings || {};
                 var info = document.createElement('p');
