@@ -1388,7 +1388,7 @@ function _renderValidationResult(result, onProceed, actionLabel, formattingProfi
         : '<span style="color:#666;font-size:12px;">None found</span>';
 
     const statusNotice = result.valid
-        ? `<div class="fp-notice success">✅ Document confirmed as <strong>${typeMeta.label}</strong>. You may proceed with the ${_escHtml(actionLabel)}.</div>`
+        ? ''
         : `<div class="fp-notice warning">
                ❌ <strong>This does not appear to be a thesis or research paper.</strong><br>
                Detected as: <strong>${typeMeta.label}</strong>. Please ask the student to submit the correct file.
@@ -1451,7 +1451,7 @@ function _renderValidationResult(result, onProceed, actionLabel, formattingProfi
 
         ${formattingSectionHtml}
 
-        <div style="margin-top:12px;">${statusNotice}</div>
+        ${statusNotice ? `<div style="margin-top:12px;">${statusNotice}</div>` : ''}
     `;
 
     if (result.valid) {
