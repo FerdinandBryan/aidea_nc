@@ -87,8 +87,30 @@
                     button.textContent = 'Preview Needs attention (' + (data.attention_issues || []).length + ')';
                 });
             }
+            var findings=data.review && data.review.findings || [];
+            findings.forEach(function(finding){
+                var row=document.querySelector('[data-dv-checklist-rule="'+finding.rule_index+'"]');
+                var name=row && row.querySelector('.dv-rule-name');
+                if(!name || name.textContent.trim()!==finding.rule)return;
+                if(finding.status==='manual' && row.classList.contains('dv-rule-found'))return;
+                row.classList.remove('dv-rule-found','dv-rule-fail','dv-rule-manual');
+                row.classList.add(finding.status==='pass'?'dv-rule-found':finding.status==='fail'?'dv-rule-fail':'dv-rule-manual');
+                var status=row.querySelector('.dv-rule-status');if(status)status.textContent='AI review: '+finding.explanation;
+                var icon=row.querySelector('.dv-rule-top > span');if(icon)icon.textContent=finding.status==='pass'?'Pass':finding.status==='fail'?'Issue':'Review';
+            });
+            var passed=findings.filter(function(f){return f.status==='pass';}).length;
+            var manual=findings.filter(function(f){return f.status==='manual';}).length;
+            document.querySelectorAll('[data-dv-checklist-summary]').forEach(function(summary){
+                summary.textContent=passed+' checklist items passed - '+(data.attention_issues || []).length+' detected issues - '+manual+' manual checks'+(data.partial?' - review incomplete':'');
+            });
             cached = {file:file,key:String(templateId)+':'+String(revision),promise:Promise.resolve(fixed)};
-        } catch (error) { if(window._dvFixRevision===revision)window._dvAttentionError=error.message; }
+        } catch (error) {
+            if(window._dvFixRevision===revision){
+                window._dvAttentionError=error.message;
+                document.querySelectorAll('[data-dv-attention]').forEach(function(button){button.textContent='Preview Needs attention (check failed)';});
+                document.querySelectorAll('[data-dv-checklist-summary]').forEach(function(summary){summary.textContent='Checklist check could not complete: '+error.message;});
+            }
+        }
 
     }
     window._dvCheckAndFixPaper = function () {

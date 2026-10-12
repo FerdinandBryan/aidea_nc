@@ -1417,13 +1417,12 @@ function _renderValidationResult(result, onProceed, actionLabel, formattingProfi
     // ── formatting checklist + download buttons ──
     let formattingSectionHtml;
     if (formattingProfile) {
-        const ruleRowsHtml = rules.map(r => _dvRenderRuleRow(r, formattingProfile)).join('');
-        let passCount = 0;
-        rules.forEach(r => { const ev = _evaluateFormattingRule(r, formattingProfile); if (ev && ev.status === 'pass') passCount++; });
-        const needsAttention = rules.length - passCount;
+        const ruleRowsHtml = rules.map((r,index) => _dvRenderRuleRow(r, formattingProfile).replace('<div class=', '<div data-dv-checklist-rule="'+index+'" class=')).join('');
+        let passCount = 0, failCount = 0, manualCount = 0;
+        rules.forEach(r => { const ev = _evaluateFormattingRule(r, formattingProfile); if (ev && ev.status === 'pass') passCount++; else if (ev && ev.status === 'fail') failCount++; else manualCount++; });
         formattingSectionHtml = `
             <div class="fp-section-title" style="margin-top:14px;">Formatting Checklist — checked against: ${_escHtml(rulesSource)}</div>
-            <div class="dv-format-summary"><span style="color:#4ade80;">${passCount} passed</span> · <span style="color:#fbbf24;">${needsAttention} need attention</span>${formattingProfile.estimated ? ' · <span style="color:#fbbf24;">estimated from PDF layout</span>' : ''}</div>
+            <div class="dv-format-summary" data-dv-checklist-summary><span style="color:#4ade80;">${passCount} passed</span> · <span style="color:#f87171;">${failCount} failed rules</span> ? <span style="color:#fbbf24;">${manualCount} manual checks</span>${formattingProfile.estimated ? ' · <span style="color:#fbbf24;">estimated from PDF layout</span>' : ''}</div>
             <div class="dv-rule-rows">${ruleRowsHtml}</div>
             <div class="dv-download-row">
                 <button class="btn-modal-close" id="dvRedlineBtn" onclick="window._dvDownloadRedline()">📥 Download Redlined Copy (shows errors)</button>
@@ -2909,7 +2908,8 @@ async function _dvGenerateFixedPdf() {
             b1.onclick = window._dvPreviewFixed;
             var b2 = document.createElement('button');
             b2.type = 'button'; b2.className = 'btn-modal-close';
-            b2.textContent = 'Preview Needs attention (' + n + ')';
+            var attention=window._dvAttentionResult;
+            b2.textContent = attention && attention.revision===window._dvFixRevision ? 'Preview Needs attention ('+attention.issues.length+')' : 'Preview Needs attention (checking...)';
             b2.setAttribute('data-dv-attention', '1');
             b2.onclick = function () { window._dvPreviewAttention(); };
             row.appendChild(b1);
@@ -3428,7 +3428,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=25';
+    e.src = base + 'fixpaper-api.js?v=26';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };
