@@ -1425,7 +1425,6 @@ function _renderValidationResult(result, onProceed, actionLabel, formattingProfi
             <div class="dv-format-summary" data-dv-checklist-summary><span style="color:#4ade80;">${passCount} passed</span> · <span style="color:#f87171;">${failCount} failed rules</span> ? <span style="color:#fbbf24;">${manualCount} manual checks</span>${formattingProfile.estimated ? ' · <span style="color:#fbbf24;">estimated from PDF layout</span>' : ''}</div>
             <div class="dv-rule-rows">${ruleRowsHtml}</div>
             <div class="dv-download-row">
-                <button class="btn-modal-close" id="dvRedlineBtn" onclick="window._dvDownloadRedline()">📥 Download Redlined Copy (shows errors)</button>
             </div>`;
     } else {
         formattingSectionHtml = `
