@@ -89,6 +89,8 @@ class PaperFormatter
             if (in_array($type, ['spacing', 'indentation', 'size'], true) && is_numeric($value)) $cfg[$type] = (float) $value;
             if ($type === 'font' && is_string($value)) $cfg['font'] = $value;
             if ($type === 'abstract-spacing' && is_numeric($value)) $cfg['abstract'] = (float) $value;
+            if ($type === 'cv-spacing' && is_numeric($value)) $cfg['cv']['spacing'] = (float) $value;
+            if ($type === 'heading-gap-lines' && is_numeric($value)) $cfg['heading_gap_lines'] = (float) $value;
             if ($type === 'paper') {
                 $paper = strtolower(trim((string) $value));
                 if (in_array($paper, ['letter', 'short', 'short bond'], true)) { $cfg['width'] = 12240; $cfg['height'] = 15840; }

@@ -6,6 +6,7 @@ use App\Services\AdminFormattingTemplate;
 use App\Services\GeminiPaperReview;
 use App\Services\PaperFormatter;
 use App\Services\PaperAttentionMarker;
+use App\Services\GeminiFormattingPlan;
 use Illuminate\Http\Request;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
@@ -21,9 +22,13 @@ class GeminiPaperReviewController extends Controller
         $path = null;
         try {
             $review = $reviewer->review($request->file('file')->getRealPath(), $template);
+            $plan = (new GeminiFormattingPlan)->resolve($template['effective_rules'], $review['formatting_rules'] ?? [], $formatter);
             $path = tempnam(sys_get_temp_dir(), 'checked_paper_');
             if ($path === false || !copy($request->file('file')->getRealPath(), $path)) throw new RuntimeException('Could not prepare the formatted copy.', 503);
-            $report = $formatter->format($path, $template['effective_rules']);
+            $report = $formatter->format($path, $plan['rules']);
+            $report['gemini_formatting'] = ['requested' => $plan['requested'], 'validated_rules' => $plan['accepted'], 'warnings' => $plan['warnings']];
+            foreach ($plan['warnings'] as $warning) $report['manual_review_rules'][] = $warning;
+            $report['manual_review_required'] = !empty($report['manual_review_rules']);
             $report['template'] = $template['name'] ?? 'Selected template';
             $report['template_revision'] = $template['revision'];
             $attention = $marker->mark($request->file('file')->getRealPath(), $report['settings'], $review['review']['findings']);

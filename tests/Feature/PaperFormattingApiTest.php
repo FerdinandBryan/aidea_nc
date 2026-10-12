@@ -163,6 +163,22 @@ class PaperFormattingApiTest extends TestCase
         $this->post('/api/papers/ai-check', ['file' => $this->paper(), 'template_id' => '17'], ['Accept' => 'application/json'])->assertOk()->assertJsonPath('partial', true)->assertJsonPath('review.findings.0.status', 'pass')->assertJsonPath('review.findings.1.status', 'manual')->assertJsonPath('review.findings.1.rule', 'Abstract');
     }
 
+    public function test_combined_check_applies_validated_gemini_mapping_to_the_fixed_docx(): void
+    {
+        Sanctum::actingAs(new User(['name' => 'Student'])); config(['services.gemini.key' => 'test-server-key']);
+        $this->templates([['id' => 17, 'name' => 'New admin template', 'active' => true, 'rules' => [['detail' => 'Required typeface: Book Antiqua.']]]]);
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['output_text' => json_encode([
+            'summary' => 'Apply admin typeface.', 'findings' => [['rule_index' => 0, 'status' => 'manual', 'explanation' => 'Verify printed typeface.', 'paragraph' => 0, 'suggestion' => 'Apply saved typeface.']],
+            'formatting_rules' => [['rule_index' => 0, 'type' => 'font', 'value' => 'Book Antiqua', 'evidence' => 'Required typeface: Book Antiqua.']],
+        ])])]);
+        $response = $this->post('/api/papers/check-and-fix', ['file' => $this->paper(), 'template_id' => '17'], ['Accept' => 'application/json']);
+        $response->assertOk()->assertJsonPath('report.settings.font', 'Book Antiqua')->assertJsonPath('report.gemini_formatting.validated_rules.0.source_rule_index', 0);
+        $path = tempnam(sys_get_temp_dir(), 'ai_fixed_test_'); $this->files[] = $path;
+        file_put_contents($path, base64_decode($response->json('document_base64'), true));
+        $zip = new ZipArchive; $zip->open($path);
+        $this->assertStringContainsString('w:ascii="Book Antiqua"', $zip->getFromName('word/document.xml')); $zip->close();
+    }
+
     public function test_combined_check_returns_review_and_paper_formatted_by_the_admin_template(): void
     {
         Sanctum::actingAs(new User(['name' => 'Student'])); config(['services.gemini.key' => 'test-server-key']);

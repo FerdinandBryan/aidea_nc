@@ -2714,6 +2714,11 @@ async function _dvGenerateFixedPdf() {
                     '; line spacing: ' + (settings.spacing || 'preserved') + '; abstract: ' + (settings.abstract || 'same as body') +
                     '; margins (inches): ' + Object.keys(margins).map(function (side) { return side + ' ' + margins[side]; }).join(', ');
                 summary.appendChild(info);
+                if (report.gemini_formatting) {
+                    var aiInfo=document.createElement('p');
+                    aiInfo.textContent='Gemini interpreted '+(report.gemini_formatting.validated_rules || []).length+' supported formatting instructions from the selected admin checklist. Remaining or unsupported rules require review.';
+                    summary.appendChild(aiInfo);
+                }
                 var manual = document.createElement('p');
                 var remaining = report.manual_review_rules || [];
                 manual.textContent = remaining.length ? 'Rules needing manual review: ' + remaining.join('; ') : 'All listed template rules have recognized formatting settings.';
@@ -3414,7 +3419,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=23';
+    e.src = base + 'fixpaper-api.js?v=24';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };

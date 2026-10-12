@@ -23,6 +23,17 @@ review plus `document_base64` and a formatter `report`. Formatting uses the
 server-saved admin rules; Gemini cannot silently override them. Preview and
 download share this returned file. The original remains unchanged.
 
+Gemini also returns `formatting_rules`, each tied to an original `rule_index`
+with a verbatim evidence quote. The combined endpoint validates the quote,
+scope, values and conflicts before passing supported mappings to the formatter.
+Supported mappings cover fonts, point sizes, body/abstract/CV line spacing,
+side-specific margins, alignment, first-line indentation, paper size and
+heading gaps. Explicit admin settings retain precedence. Unsupported, optional,
+ambiguous or unsubstantiated mappings are skipped and reported for review.
+`report.gemini_formatting` records validated mappings and warnings. This helps
+with written checklist phrasing the deterministic parser does not recognize;
+it does not generate missing research content or prove visual compliance.
+
 The combined response also includes `attention_document_base64` and
 `attention_issues`. Needs attention displays this annotated original: yellow
 highlights identify affected paragraphs and red suggestions appear in the left
@@ -38,7 +49,8 @@ separate corrected copy without these annotations.
 The response includes an advisory summary and a finding for every checklist
 rule, with status, explanation, paragraph reference, and suggestion. Exact
 printed layout checks are marked manual. This endpoint does not rewrite or
-auto-submit the paper and does not change the deterministic formatter's rules.
+auto-submit the paper. Only validated checklist formatting mappings are applied;
+content suggestions are not automatically rewritten into the manuscript.
 Inputs are limited to 500,000 encoded bytes; larger papers are rejected rather
 than silently truncated. Missing keys, timeouts, quota errors, incomplete reviews,
 invalid JSON are reported explicitly. Missing checklist findings and unverified
