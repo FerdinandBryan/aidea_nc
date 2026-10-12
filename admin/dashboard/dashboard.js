@@ -614,7 +614,9 @@ document.addEventListener('DOMContentLoaded', () => {
     box.classList.add('tsk-host');
 
     const sub = document.getElementById('revenueYear');
-    if (sub) sub.textContent = 'Number of thesis submitted per academic year';
+    if (sub) sub.textContent = 'Loading submission totals...';
+    const totalLabel=document.getElementById('thesisYearTotal');
+    if(totalLabel) totalLabel.textContent='--';
 
     const v = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
@@ -626,13 +628,20 @@ document.addEventListener('DOMContentLoaded', () => {
       rows = Array.isArray(json) ? json : (json.data || []);
     } catch (e) {
       console.error('Thesis chart load failed', e);
+      if(sub) sub.textContent='Submission totals are temporarily unavailable.';
       showMessage(box, "Couldn't load data", initThesisChart);
       return;
     }
 
     if (chart) { chart.destroy(); chart = null; }
+    rows=rows.slice().sort(function(a,b){return String(a.academic_year).localeCompare(String(b.academic_year),undefined,{numeric:true});});
+    const total=rows.reduce(function(sum,row){return sum+(Number(row.total)||0);},0);
+    if(totalLabel) totalLabel.textContent=total.toLocaleString();
+    if(sub) sub.textContent=rows.length+' academic '+(rows.length===1?'year':'years')+' - Hover over a bar for its submission count';
+    box.style.height=Math.max(240,rows.length*46+50)+'px';
 
     if (!rows.length) {
+      if(sub) sub.textContent='Submission totals will appear when a thesis is submitted.';
       showMessage(box, 'No thesis submissions yet.');
       return;
     }
@@ -645,21 +654,24 @@ document.addEventListener('DOMContentLoaded', () => {
         datasets: [{
           label: 'Thesis submitted',
           data: rows.map(function (r) { return Number(r.total) || 0; }),
-          backgroundColor: '#4f46e5',
-          borderRadius: 4
+          backgroundColor: v('--chart-line'),
+          borderRadius: 7,
+          borderSkipped: false,
+          maxBarThickness: 24
         }]
       },
       options: {
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        layout: { padding: { right: 12 } },
+        plugins: { legend: { display: false }, tooltip: { displayColors: false, callbacks: { label: function(context){return context.parsed.x.toLocaleString()+' thesis submissions';} } } },
         scales: {
           x: { beginAtZero: true, grid: { color: v('--chart-grid') },
-               ticks: { color: v('--chart-text'), precision: 0, stepSize: 1 },
-               title: { display: true, text: 'Number of thesis submitted', color: v('--chart-text') } },
+               ticks: { color: v('--chart-text'), precision: 0, maxTicksLimit: 6 },
+               title: { display: true, text: 'Submissions', color: v('--chart-text') } },
           y: { grid: { display: false }, ticks: { color: v('--chart-text') },
-               title: { display: true, text: 'Academic year', color: v('--chart-text') } }
+               title: { display: false } }
         }
       }
     });

@@ -1191,3 +1191,13 @@ td.empty {
         margin: 0;
     }
 }
+/* Thesis submissions chart */
+.thesis-year-panel .panel-head{align-items:center;margin-bottom:22px;flex-wrap:wrap}
+.thesis-year-panel .panel-title{line-height:1.45}
+.thesis-year-panel .panel-sub{margin-top:5px;line-height:1.5}
+.thesis-total{display:flex;flex-direction:column;gap:3px;padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2);flex-shrink:0}
+.thesis-total strong{font-size:24px;line-height:1.15;color:var(--text);font-variant-numeric:tabular-nums}
+.thesis-total span{font-size:11px;color:var(--muted)}
+.thesis-chart-viewport{max-height:380px;overflow-y:auto;overscroll-behavior:contain}
+.thesis-year-panel .chart-box{min-height:240px}
+@media(max-width:480px){.thesis-year-panel{padding:18px 14px}.thesis-total{padding:8px 10px}.thesis-total strong{font-size:21px}}

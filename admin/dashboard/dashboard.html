@@ -23,7 +23,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
         rel="stylesheet" />
-    <link rel="stylesheet" href="dashboard.css" />
+    <link rel="stylesheet" href="dashboard.css?v=2" />
     <link rel="icon" type="image/png" sizes="32x32" href="../shared/logo-32.png" />
     <link rel="apple-touch-icon" href="../shared/logo-180.png" />
 </head>
@@ -149,15 +149,16 @@
 
             <!-- CHARTS -->
             <section class="charts-row">
-                <div class="panel">
+                <div class="panel thesis-year-panel">
                     <div class="panel-head">
                         <div>
-                            <h3 class="panel-title">Thesis submitted per academic year</h3>
-                            <p class="panel-sub" id="revenueYear">Number of thesis submitted</p>
+                            <h3 class="panel-title">Thesis submissions by academic year</h3>
+                            <p class="panel-sub" id="revenueYear" aria-live="polite">Loading submission totals...</p>
                         </div>
+                        <div class="thesis-total" aria-label="Total thesis submissions"><strong id="thesisYearTotal">--</strong><span>total submissions</span></div>
                     </div>
-                    <div class="chart-box"><canvas id="thesisYearChart" aria-label="Thesis submitted per academic year bar chart"
-                            role="img"></canvas></div>
+                    <div class="thesis-chart-viewport"><div class="chart-box"><canvas id="thesisYearChart" aria-label="Thesis submitted per academic year bar chart"
+                            role="img"></canvas></div></div>
                 </div>
 
                 <div class="panel">
@@ -224,7 +225,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script src="dashboard.js"></script>
+    <script src="dashboard.js?v=2"></script>
 <script src="../shared/sidebar_toggle.js"></script>
 </body>
 
