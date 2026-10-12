@@ -80,8 +80,7 @@ class PaperAttentionMarker
                 $text = $this->paragraphText($p);
                 if ($xp->query('ancestor::w:tbl | .//w:tab', $p)->length || preg_match('/^TOC/i', $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $p))) continue;
                 if (!preg_match('/^Appendix\s+([A-Z])(?:\s*[-:.]\s*(.+))?$/i', $text, $m)) continue;
-                $expected = $settings['appendix_titles'][strtoupper($m[1])] ?? null;
-                if (!$expected) continue;
+                $letter = strtoupper($m[1]);
                 $actual = trim($m[2] ?? '');
                 $targetIndex = $index;
                 $separateTitle = AppendixTitleLocator::find($p, $xp);
@@ -89,8 +88,12 @@ class PaperAttentionMarker
                     $actual = AppendixTitleLocator::text($separateTitle, $xp);
                     $targetIndex = array_search($separateTitle, $paragraphs, true);
                 }
-                if (mb_strtolower(trim($actual)) === mb_strtolower(trim($expected))) continue;
-                $message = 'Appendix '.strtoupper($m[1]).' title should be "'.$expected.'" according to the selected admin template.';
+                $matches = array_keys(array_filter($settings['appendix_titles'] ?? [], fn ($name) => $name !== null && mb_strtolower(trim($name)) === mb_strtolower(trim($actual))));
+                $expectedLetter = count($matches) === 1 && preg_match('/curriculum\s+vitae/i', $actual) ? $matches[0] : $letter;
+                $expected = $settings['appendix_titles'][$expectedLetter] ?? null;
+                if (!$expected) continue;
+                if ($expectedLetter === $letter && mb_strtolower(trim($actual)) === mb_strtolower(trim($expected))) continue;
+                $message = $expectedLetter !== $letter ? 'The selected template places "'.$expected.'" in Appendix '.$expectedLetter.', not Appendix '.$letter.'.' : 'Appendix '.$letter.' title should be "'.$expected.'" according to the selected admin template.';
                 $notes[$targetIndex][] = $message;
                 $issues[] = ['paragraph' => $targetIndex + 1, 'type' => 'appendix-title', 'message' => $message];
             }

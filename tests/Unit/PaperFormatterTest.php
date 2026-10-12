@@ -483,4 +483,19 @@ class PaperFormatterTest extends TestCase
         $this->assertEquals(0, $xp->evaluate('count(//*[local-name()="inline"]/*[local-name()="positionV"])'));
     }
 
+    public function test_known_cv_title_uses_its_template_letter_instead_of_becoming_documentation(): void
+    {
+        foreach (['K', 'M'] as $expectedLetter) {
+            $rules = array_merge($this->rules(), [['detail' => 'Appendix I - Documentation: research pictures.'], ['detail' => 'Appendix '.$expectedLetter.' - Curriculum Vitae: a 1.5 by 1.5 inch picture, maximum of one (1) page per author.']]);
+            $file = $this->paper('<w:p><w:r><w:t>Appendix I</w:t></w:r></w:p><w:p><w:r><w:t>Curriculum Vitae</w:t><w:drawing/></w:r></w:p><w:p><w:r><w:t>PERSONAL INFORMATION</w:t></w:r></w:p><w:p><w:r><w:t>Researcher Signature: ______</w:t></w:r></w:p>');
+            $formatter = new PaperFormatter;
+            $attention = (new PaperAttentionMarker)->mark($file, $formatter->settings($rules));
+            $this->assertStringContainsString('Appendix '.$expectedLetter, $attention['issues'][0]['message']);
+            $formatter->format($file, $rules); $xp = $this->xml($file);
+            $this->assertSame('Appendix '.$expectedLetter, $xp->evaluate('string(/w:document/w:body/w:p[1]//w:t)'));
+            $this->assertSame('Curriculum Vitae', $xp->evaluate('string(/w:document/w:body/w:p[2]//w:t)'));
+            $this->assertSame('Researcher Signature: ______', $xp->evaluate('string(//w:p[w:r/w:t="Researcher Signature: ______"]//w:t)'));
+        }
+    }
+
 }

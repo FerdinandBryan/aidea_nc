@@ -318,10 +318,14 @@ class PaperFormatter
     {
         foreach ($xp->query('/w:document/w:body/w:p') as $p) {
             if (!$this->isAppendixHeader($p, $xp) || !preg_match('/^APPENDIX\s+([A-Z])\b/i', $this->text($p), $m)) continue;
-            $letter = strtoupper($m[1]); $title = $cfg['appendix_titles'][$letter] ?? null;
+            $letter = strtoupper($m[1]);
+            $separateTitle = AppendixTitleLocator::find($p, $xp);
+            $sourceTitle = $separateTitle ? AppendixTitleLocator::text($separateTitle, $xp) : trim(preg_replace('/^APPENDIX\s+[A-Z]\s*[-:.]?\s*/i', '', $this->text($p)));
+            $matches = array_keys(array_filter($cfg['appendix_titles'], fn ($name) => $name !== null && mb_strtolower(trim($name)) === mb_strtolower($sourceTitle)));
+            if (count($matches) === 1 && preg_match('/curriculum\s+vitae/i', $sourceTitle)) $letter = $matches[0];
+            $title = $cfg['appendix_titles'][$letter] ?? null;
             if (!$title) continue;
             $target = $p; $replacement = 'Appendix '.$letter.' - '.$title;
-            $separateTitle = AppendixTitleLocator::find($p, $xp);
             if ($separateTitle) {
                 $labelTexts = $p->getElementsByTagNameNS(self::W, 't');
                 foreach ($labelTexts as $index => $text) $text->textContent = $index === 0 ? 'Appendix '.$letter : '';
