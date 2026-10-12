@@ -204,7 +204,7 @@ function openFormatModal(id) {
     document.getElementById('formatSelectStep').style.display = 'block';
     document.getElementById('formatResultBody').innerHTML = '';
     document.getElementById('formatResultBody').style.display = 'none';
-    document.getElementById('formatRunBtn').style.display = 'inline-flex';
+    if (document.getElementById('formatRunBtn')) document.getElementById('formatRunBtn').style.display = 'inline-flex';
     document.getElementById('formatBackBtn').style.display = 'none';
 
     openModal('formatModal');
@@ -245,7 +245,6 @@ function createFormatModal() {
             <div class="modal-footer">
                 <button class="btn-modal-close" onclick="closeModal('formatModal')">Cancel</button>
                 <button id="formatBackBtn" class="btn-modal-close" onclick="showFormatSelectStep()" style="display:none;">← Back</button>
-                <button id="formatRunBtn" class="btn-modal-submit" onclick="runSelectedFormatCheck()">Run Format Check →</button>
             </div>
         </div>`;
     document.body.appendChild(modal);
@@ -302,7 +301,7 @@ function showFormatSelectStep() {
     document.getElementById('formatSelectStep').style.display = 'block';
     document.getElementById('formatResultBody').style.display = 'none';
     document.getElementById('formatResultBody').innerHTML = '';
-    document.getElementById('formatRunBtn').style.display = 'inline-flex';
+    if (document.getElementById('formatRunBtn')) document.getElementById('formatRunBtn').style.display = 'inline-flex';
     document.getElementById('formatBackBtn').style.display = 'none';
 }
 
@@ -319,7 +318,7 @@ function runSelectedFormatCheck() {
     const resultBody = document.getElementById('formatResultBody');
     resultBody.style.display = 'block';
     resultBody.innerHTML = renderFormatSkeleton('Reading submitted file…');
-    document.getElementById('formatRunBtn').style.display = 'none';
+    if (document.getElementById('formatRunBtn')) document.getElementById('formatRunBtn').style.display = 'none';
     document.getElementById('formatBackBtn').style.display = 'inline-flex';
 
     setTimeout(() => runFormatCheck(thesis, tplId), 80);
