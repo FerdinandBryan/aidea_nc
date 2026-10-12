@@ -84,7 +84,8 @@ class PaperAttentionMarker
                 if ($index >= 0 && isset($paragraphs[$index])) $notes[$index][] = $message;
                 else $message .= ' No exact paragraph was identified.';
                 if (!empty($finding['suggestion'])) $message .= ' Suggestion: '.$finding['suggestion'];
-                $issues[] = ['paragraph' => max(0, $index + 1), 'type' => 'content', 'message' => $message];
+                if (in_array($finding['measurement_type'] ?? '', ['spacing', 'margin'], true)) continue; // Already located by the structural checks above.
+                $issues[] = ['paragraph' => max(0, $index + 1), 'type' => $finding['measurement_type'] ?? 'content', 'message' => $message];
             }
             foreach ($paragraphs as $index => $p) {
                 $text = $this->paragraphText($p);

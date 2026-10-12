@@ -25,6 +25,7 @@ class GeminiPaperReviewController extends Controller
         try {
             $review = $reviewer->review($request->file('file')->getRealPath(), $template);
             $plan = (new GeminiFormattingPlan)->resolve($template['effective_rules'], $review['formatting_rules'] ?? [], $formatter);
+            $review['review']['findings'] = (new \App\Services\DocxFormattingReview)->apply($request->file('file')->getRealPath(), $template['effective_rules'], $review['review']['findings'], $formatter);
             $path = tempnam(sys_get_temp_dir(), 'checked_paper_');
             if ($path === false || !copy($request->file('file')->getRealPath(), $path)) throw new RuntimeException('Could not prepare the formatted copy.', 503);
             $report = $formatter->format($path, $plan['rules']);
