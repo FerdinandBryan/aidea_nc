@@ -17,6 +17,9 @@ sends paper text and the selected admin checklist to Google. Free-tier data hand
 `POST /api/papers/ai-check` requires a Sanctum bearer token and multipart fields
 `file` (DOCX, up to 20 MB) and `template_id`. The server loads the active saved
 template through the same resolver as the formatting API. Client rules are ignored.
+Uploads are validated using the Word ZIP package, content types and document
+XML, rather than MIME guessing alone. Valid exported DOCX files remain
+uploadable when fileinfo identifies them as generic binary or ZIP files.
 
 `POST /api/papers/check-and-fix` accepts the same fields and returns the advisory
 review plus `document_base64` and a formatter `report`. Formatting uses the
@@ -45,6 +48,10 @@ Explicit paragraph line spacing and section margins are compared with
 the selected template. Inherited or unverifiable settings are not treated as
 confirmed failures. AI content failures remain advisory. Fix paper displays the
 separate corrected copy without these annotations.
+Body spacing checks exclude graphic/text-box/table layout, respect abstract
+and CV scopes, and do not compare point-based exact spacing with line multiples.
+Rechecking the fixed copy evaluates that uploaded document again; it does not
+reuse the original paper's errors or mark every item passed because it was fixed.
 
 The response includes an advisory summary and a finding for every checklist
 rule, with status, explanation, paragraph reference, and suggestion. Exact

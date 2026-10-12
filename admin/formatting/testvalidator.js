@@ -397,12 +397,20 @@ async function _extractDocxFormatting(file) {
                 }
 
                 const paragraphs = [];
+                let zone = "front";
                 const pEls = xmlDoc.getElementsByTagNameNS(_WORD_NS, 'p');
                 for (let i = 0; i < pEls.length; i++) {
                     const p = pEls[i];
                     const tNodes = p.getElementsByTagNameNS(_WORD_NS, 't');
                     const text = Array.from(tNodes).map(n => n.textContent).join('').trim();
                     if (!text) continue;
+                    const upper=text.toUpperCase();
+                    const header=/^(CHAPTER\s|ABSTRACT$|APPROVAL SHEET$|ACKNOWLEDGEMENTS?$|TABLE OF CONTENTS$|LIST OF (?:TABLES|FIGURES|APPENDICES)$|REFERENCES$|APPENDICES$|APPENDIX\s+[A-Z]\b)/i.test(text);
+                    if (upper==='ABSTRACT') zone='abstract';
+                    else if (/curriculum\s+vitae/i.test(text) && text.length<180) zone='cv';
+                    else if (header) zone='body';
+                    let layoutExcluded=p.getElementsByTagNameNS(_WORD_NS,'drawing').length>0 || p.getElementsByTagNameNS(_WORD_NS,'pict').length>0 || p.getElementsByTagNameNS(_WORD_NS,'object').length>0;
+                    for(let parent=p.parentNode;parent && parent.nodeType===1;parent=parent.parentNode){if(parent.namespaceURI===_WORD_NS && ['tbl','txbxContent'].includes(parent.localName))layoutExcluded=true;}
 
                     const pPrList = p.getElementsByTagNameNS(_WORD_NS, 'pPr');
                     const pPr = pPrList.length ? pPrList[0] : null;
@@ -440,7 +448,7 @@ async function _extractDocxFormatting(file) {
                     paragraphs.push({
                         index: i,
                         snippet: text.slice(0, 70) + (text.length > 70 ? '…' : ''),
-                        lineSpacing, lineRule,
+                        lineSpacing, lineRule, zone, header, layoutExcluded,
                         firstLineIndent, alignment,
                     });
                 }
@@ -559,13 +567,14 @@ function _evaluateFormattingRuleRaw(rule, profile) {
     const type = (rule.type || '').toLowerCase();
     const tolerance = typeof rule.tolerance === 'number' ? rule.tolerance : _RULE_TOLERANCE_DEFAULTS[type];
 
-    if (type === 'spacing') {
+    if (['spacing','abstract-spacing','cv-spacing'].includes(type)) {
         const target = parseFloat(rule.value);
         if (Number.isNaN(target)) return null;
-        const checked = profile.paragraphs.filter(p => p.lineSpacing != null);
+        const checked = profile.paragraphs.filter(p => p.lineSpacing != null && !p.layoutExcluded && (!p.lineRule || p.lineRule==='auto') &&
+            (type==='abstract-spacing' ? p.zone==='abstract' && !p.header : type==='cv-spacing' ? p.zone==='cv' : !['abstract','cv','front'].includes(p.zone)));
         if (!checked.length) return { status: 'manual', violations: [], checkedCount: 0 };
         const violations = checked
-            .filter(p => Math.abs(p.lineSpacing - target) > tolerance)
+            .filter(p => Math.abs(p.lineSpacing - target) > (tolerance ?? _RULE_TOLERANCE_DEFAULTS.spacing))
             .map(p => ({ ...p, actual: p.lineSpacing }));
         return { status: violations.length ? 'fail' : 'pass', violations, checkedCount: checked.length, target, unit: 'x line height' };
     }
@@ -3419,7 +3428,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=24';
+    e.src = base + 'fixpaper-api.js?v=25';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };

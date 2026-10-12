@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Rules\ValidWordDocument;
+
 use App\Services\AdminFormattingTemplate;
 use App\Services\GeminiPaperReview;
 use App\Services\PaperFormatter;
@@ -17,7 +19,7 @@ class GeminiPaperReviewController extends Controller
 {
     public function checkAndFix(Request $request, AdminFormattingTemplate $templates, GeminiPaperReview $reviewer, PaperFormatter $formatter, PaperAttentionMarker $marker)
     {
-        $data = $request->validate(['file' => 'required|file|mimes:docx|max:20480', 'template_id' => 'required|string|max:120']);
+        $data = $request->validate(['file' => ['bail', 'required', 'file', 'max:20480', new ValidWordDocument], 'template_id' => 'required|string|max:120']);
         $template = $templates->load($data['template_id']);
         $path = null;
         try {
@@ -48,7 +50,7 @@ class GeminiPaperReviewController extends Controller
 
     public function store(Request $request, AdminFormattingTemplate $templates, GeminiPaperReview $reviewer)
     {
-        $data = $request->validate(['file' => 'required|file|mimes:docx|max:20480', 'template_id' => 'required|string|max:120']);
+        $data = $request->validate(['file' => ['bail', 'required', 'file', 'max:20480', new ValidWordDocument], 'template_id' => 'required|string|max:120']);
         $template = $templates->load($data['template_id']);
         try {
             return response()->json($reviewer->review($request->file('file')->getRealPath(), $template))->header('Cache-Control', 'private, no-store');

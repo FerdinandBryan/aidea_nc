@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Rules\ValidWordDocument;
+
 use App\Services\PaperFormatter;
 use App\Services\AdminFormattingTemplate;
 use Illuminate\Http\Request;
@@ -23,7 +25,7 @@ class PaperFormattingController extends Controller
     public function store(Request $request, PaperFormatter $formatter, AdminFormattingTemplate $templates)
     {
         $data = $request->validate([
-            'file' => 'required|file|mimes:docx|max:20480',
+            'file' => ['bail', 'required', 'file', 'max:20480', new ValidWordDocument],
             'template_id' => 'required|string|max:120',
             'include_report' => 'sometimes|boolean',
         ]);

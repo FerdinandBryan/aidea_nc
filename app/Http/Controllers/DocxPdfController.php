@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Rules\ValidWordDocument;
+
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
@@ -10,7 +12,7 @@ class DocxPdfController extends Controller
 {
     public function convert(Request $request)
     {
-        $request->validate(['file' => 'required|file|mimes:docx|max:20480']);
+        $request->validate(['file' => ['bail', 'required', 'file', 'max:20480', new ValidWordDocument]]);
 
         $dir = storage_path('app/docx-convert/' . uniqid('', true));
         File::makeDirectory($dir, 0775, true);

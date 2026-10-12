@@ -42,6 +42,43 @@ class PaperFormattingApiTest extends TestCase
         $this->postJson('/api/papers/fix', [])->assertUnauthorized();
     }
 
+    public function test_exported_fixed_docx_can_be_reuploaded_even_when_mime_is_generic_zip(): void
+    {
+        Sanctum::actingAs(new User(['name' => 'Student'])); config(['services.gemini.key' => 'test-server-key']);
+        $rules = [['type' => 'spacing', 'value' => 2], ['type' => 'margin', 'value' => ['left' => 1.5, 'right' => 1, 'top' => 1, 'bottom' => 1]]];
+        $source = $this->paper();
+        $original = new ZipArchive; $original->open($source->getRealPath());
+        $path = tempnam(sys_get_temp_dir(), 'generic_word_'); $this->files[] = $path;
+        $generic = new ZipArchive; $generic->open($path, ZipArchive::OVERWRITE);
+        $generic->addFromString('unrelated.bin', str_repeat('generic-package-data', 10000));
+        $generic->setCompressionName('unrelated.bin', ZipArchive::CM_STORE);
+        foreach (['[Content_Types].xml', 'word/document.xml'] as $name) $generic->addFromString($name, $original->getFromName($name));
+        $generic->close(); $original->close();
+        $upload = new UploadedFile($path, 'valid-paper.docx', 'application/octet-stream', null, true);
+        $this->assertNotSame('docx', $upload->guessExtension());
+        $template = [['id' => 17, 'active' => true, 'rules' => $rules]];
+        $this->templates($template);
+        $fixed = $this->post('/api/papers/fix', ['file' => $upload, 'template_id' => '17', 'include_report' => 1], ['Accept' => 'application/json'])->assertOk();
+        $download = tempnam(sys_get_temp_dir(), 'reuploaded_word_'); $this->files[] = $download;
+        file_put_contents($download, base64_decode($fixed->json('document_base64'), true));
+        $this->templates($template);
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['output_text' => json_encode(['summary' => 'Review layout.', 'findings' => [
+            ['rule_index' => 0, 'status' => 'manual', 'explanation' => 'Verify spacing.', 'paragraph' => 0, 'suggestion' => ''],
+            ['rule_index' => 1, 'status' => 'manual', 'explanation' => 'Verify margins.', 'paragraph' => 0, 'suggestion' => ''],
+        ], 'formatting_rules' => []])])]);
+        $this->post('/api/papers/check-and-fix', ['file' => new UploadedFile($download, 'downloaded_fixed.docx', 'application/octet-stream', null, true), 'template_id' => '17'], ['Accept' => 'application/json'])
+            ->assertOk()->assertJsonPath('attention_issues', []);
+    }
+
+    public function test_renamed_non_word_file_is_rejected_by_package_validation(): void
+    {
+        Sanctum::actingAs(new User(['name' => 'Student']));
+        $path = tempnam(sys_get_temp_dir(), 'not_word_'); $this->files[] = $path;
+        file_put_contents($path, 'This is not a Word document.');
+        $this->post('/api/papers/fix', ['file' => new UploadedFile($path, 'fake.docx', 'application/octet-stream', null, true), 'template_id' => '17'], ['Accept' => 'application/json'])
+            ->assertUnprocessable()->assertJsonValidationErrors('file');
+    }
+
     public function test_api_uses_saved_template_not_client_rules(): void
     {
         Sanctum::actingAs(new User(['name' => 'Student']));

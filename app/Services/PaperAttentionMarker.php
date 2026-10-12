@@ -35,7 +35,7 @@ class PaperAttentionMarker
                 $isHeading = strtoupper($text) === 'ABSTRACT';
                 if ($isHeading) $abstract = true;
                 elseif (preg_match('/^(CHAPTER\s|TABLE OF CONTENTS|LIST OF|ACKNOWLEDGEMENT|REFERENCES|APPENDICES)/i', $text)) $abstract = false;
-                if ($xp->query('ancestor::w:tbl', $p)->length) continue;
+                if ($xp->query('ancestor::w:tbl | ancestor::w:txbxContent | .//w:drawing | .//w:pict | .//w:object', $p)->length) continue;
                 $target = $abstract && !$isHeading ? ($settings['abstract'] ?? $settings['spacing']) : $settings['spacing'];
                 if ($cv) $target = $settings['cv']['spacing'] ?? $target;
                 $spacing = $xp->query('./w:pPr/w:spacing', $p)->item(0);

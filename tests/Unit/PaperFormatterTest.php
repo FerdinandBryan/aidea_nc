@@ -498,6 +498,18 @@ class PaperFormatterTest extends TestCase
         }
     }
 
+    public function test_rechecking_fixed_paper_does_not_flag_graphic_layout_as_body_spacing(): void
+    {
+        $file = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:line="240"/></w:pPr><w:r><w:t>Body text.</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:line="240"/></w:pPr><w:r><w:drawing/><w:t>Graphic label</w:t></w:r></w:p><w:p><w:r><w:pict><w:txbxContent><w:p><w:pPr><w:spacing w:line="240"/></w:pPr><w:r><w:t>Drawing label</w:t></w:r></w:p></w:txbxContent></w:pict></w:r></w:p>');
+        $formatter = new PaperFormatter;
+        $before = (new PaperAttentionMarker)->mark($file, $formatter->settings($this->rules()));
+        $this->assertCount(1, $before['issues']);
+        $this->assertSame('spacing', $before['issues'][0]['type']);
+        $formatter->format($file, $this->rules());
+        $after = (new PaperAttentionMarker)->mark($file, $formatter->settings($this->rules()));
+        $this->assertCount(0, $after['issues']);
+    }
+
     public function test_fixed_copy_clears_source_and_style_highlights_without_affecting_attention_marks(): void
     {
         $file = $this->paper('<w:p><w:pPr><w:spacing w:line="240"/><w:rPr><w:highlight w:val="yellow"/></w:rPr></w:pPr><w:r><w:rPr><w:highlight w:val="yellow"/><w:b/></w:rPr><w:t>Research text</w:t></w:r></w:p>');
