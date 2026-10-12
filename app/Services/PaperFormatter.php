@@ -143,6 +143,9 @@ class PaperFormatter
             $xp = new DOMXPath($doc); $xp->registerNamespace('w', self::W);
             $body = $xp->query('/w:document/w:body')->item(0);
             if (!$body instanceof DOMElement) throw new InvalidArgumentException('The Word document has no body.');
+            foreach (iterator_to_array($xp->query('//w:body//w:p')) as $p) {
+                if (str_starts_with($this->text($p), 'Needs attention:') && strtoupper($xp->evaluate('string(.//w:rPr/w:color/@w:val)', $p)) === 'FF0000') $p->parentNode->removeChild($p);
+            }
             foreach (iterator_to_array($xp->query('//w:lastRenderedPageBreak')) as $old) $old->parentNode->removeChild($old);
             $this->splitChapterParagraphs($doc, $xp);
             $this->alignAppendixTitles($xp, $cfg);

@@ -82,7 +82,7 @@
                 var annotated = atob(data.attention_document_base64);
                 var markedBytes = new Uint8Array(annotated.length);
                 for (var j = 0; j < annotated.length; j++) markedBytes[j] = annotated.charCodeAt(j);
-                window._dvAttentionResult = {revision:revision,blob:new Blob([markedBytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),issues:data.attention_issues || [],objects:data.attention_objects || []};
+                window._dvAttentionResult = {revision:revision,blob:new Blob([markedBytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),issues:data.attention_issues || [],objects:data.attention_objects || [],fixedValidation:data.report && data.report.fixed_validation};
                 document.querySelectorAll('[data-dv-attention]').forEach(function (button) {
                     button.textContent = 'Preview Needs attention (' + (data.attention_issues || []).length + ')';
                 });
@@ -174,7 +174,7 @@
         legend.className='attention-legend';
         [['attention-yellow','Yellow: affected text'],['attention-red','Red: issue notes']].forEach(function(entry){var badge=document.createElement('span');badge.className=entry[0];badge.textContent=entry[1];legend.appendChild(badge);});
         sidebar.appendChild(legend);
-        var advisory=document.createElement('p');advisory.textContent='AI content findings are advisory. Unverifiable rules require manual review.';sidebar.appendChild(advisory);
+        var advisory=document.createElement('p');advisory.textContent='These cards describe the uploaded paper. Formatting corrections appear in Fix paper. AI content findings and unverifiable rules require review.';sidebar.appendChild(advisory);
         overlay.appendChild(box); document.body.appendChild(overlay);
         overlay.onclick = function(e){if(e.target===overlay)dismiss();}; document.addEventListener('keydown',onKey);close.focus();
         var result = window._dvAttentionResult;
@@ -202,7 +202,11 @@
             var category=objectLabels[issue.type] || (issue.type==='appendix-title'?'Appendix title':issue.type==='content'?'Wording / checklist':issue.type==='margin'?'Margin':'Spacing');
             if(objectLabels[issue.type])card.classList.add('attention-object');
             label.textContent=category+(issue.paragraph?' - Paragraph '+issue.paragraph:' - No exact location');card.appendChild(label);
-            var message=document.createElement('span');message.textContent=issue.message;card.appendChild(message);item.appendChild(card);list.appendChild(item);
+            var message=document.createElement('span');message.textContent=issue.message;card.appendChild(message);
+            if(['spacing','margin','appendix-title'].includes(issue.type) && result.fixedValidation && !(result.fixedValidation.remaining_formatting_issues || []).length){
+                var resolved=document.createElement('span');resolved.textContent='Corrected in Fix paper';resolved.style.cssText='display:block;color:#86efac;font-size:12px;margin-top:8px;';card.appendChild(resolved);
+            }
+            item.appendChild(card);list.appendChild(item);
             cards.push({button:card,label:label,issue:issue,category:category});
         });
         if((result.objects || []).length){var inventory=document.createElement('p');inventory.textContent=result.objects.length+' figure / table detections (review classifications below)';sidebar.appendChild(inventory);}

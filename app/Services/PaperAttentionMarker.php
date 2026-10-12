@@ -12,7 +12,7 @@ class PaperAttentionMarker
 {
     private const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
-    public function mark(string $original, array $settings, array $findings = []): array
+    public function mark(string $original, array $settings, array $findings = [], bool $annotate = true): array
     {
         $path = tempnam(sys_get_temp_dir(), 'paper_attention_');
         if (!$path || !copy($original, $path)) throw new InvalidArgumentException('Could not prepare the attention copy.');
@@ -97,6 +97,7 @@ class PaperAttentionMarker
                 $notes[$targetIndex][] = $message;
                 $issues[] = ['paragraph' => $targetIndex + 1, 'type' => 'appendix-title', 'message' => $message];
             }
+            if (!$annotate) return ['issues' => $issues];
             foreach ($notes as $index => $messages) {
                 $p = $paragraphs[$index];
                 foreach (iterator_to_array($xp->query('.//w:r[w:t]', $p)) as $run) {

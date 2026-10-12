@@ -6,6 +6,7 @@ use App\Rules\ValidWordDocument;
 
 use App\Services\PaperFormatter;
 use App\Services\AdminFormattingTemplate;
+use App\Services\PaperAttentionMarker;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -22,7 +23,7 @@ class PaperFormattingController extends Controller
             'revision' => $template['revision'], 'settings' => $settings])->header('Cache-Control', 'private, no-store');
     }
 
-    public function store(Request $request, PaperFormatter $formatter, AdminFormattingTemplate $templates)
+    public function store(Request $request, PaperFormatter $formatter, AdminFormattingTemplate $templates, PaperAttentionMarker $marker)
     {
         $data = $request->validate([
             'file' => ['bail', 'required', 'file', 'max:20480', new ValidWordDocument],
@@ -45,6 +46,10 @@ class PaperFormattingController extends Controller
         try {
             if (!copy($request->file('file')->getRealPath(), $path)) throw new \RuntimeException('Could not copy the uploaded paper.');
             $report = $formatter->format($path, $template['effective_rules']);
+            $verification = $marker->mark($path, $report['settings'], [], false);
+            $report['fixed_validation'] = ['remaining_formatting_issues' => $verification['issues'], 'review_marks_removed' => true, 'content_review_required' => true];
+            foreach ($verification['issues'] as $issue) $report['manual_review_rules'][] = $issue['message'];
+            $report['manual_review_required'] = !empty($report['manual_review_rules']);
             $report['template_revision'] = $template['revision'];
             if ($request->boolean('include_report')) {
                 $report['template'] = $template['name'] ?? 'Selected template';

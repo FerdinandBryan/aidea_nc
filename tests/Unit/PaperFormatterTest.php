@@ -546,4 +546,19 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('24', $xp->evaluate('string(//w:p[w:r/w:t="Author (2025). Research source."]/w:r/w:rPr/w:sz/@w:val)'));
     }
 
+    public function test_fixed_paper_removes_old_system_notes_and_verification_adds_no_marks(): void
+    {
+        $file = $this->paper('<w:p><w:pPr><w:spacing w:line="240"/></w:pPr><w:r><w:rPr><w:highlight w:val="yellow"/></w:rPr><w:t>Research text.</w:t></w:r></w:p><w:p><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>Needs attention: Line spacing requires 2.</w:t></w:r></w:p>');
+        $formatter = new PaperFormatter; $formatter->format($file, $this->rules());
+        $hash = hash_file('sha256', $file);
+        $verified = (new PaperAttentionMarker)->mark($file, $formatter->settings($this->rules()), [], false);
+        $this->assertSame([], $verified['issues']);
+        $this->assertArrayNotHasKey('document_base64', $verified);
+        $this->assertSame($hash, hash_file('sha256', $file));
+        $xp = $this->xml($file);
+        $this->assertSame('Research text.', $xp->evaluate('string(//w:t)'));
+        $this->assertEquals(1, $xp->evaluate('count(//w:p)'));
+        $this->assertEquals(0, $xp->evaluate('count(//w:highlight | //w:color[@w:val="FF0000"])'));
+    }
+
 }

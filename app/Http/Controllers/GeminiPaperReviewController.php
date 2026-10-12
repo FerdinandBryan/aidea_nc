@@ -34,6 +34,11 @@ class GeminiPaperReviewController extends Controller
             $report['template'] = $template['name'] ?? 'Selected template';
             $report['template_revision'] = $template['revision'];
             $attention = $marker->mark($request->file('file')->getRealPath(), $report['settings'], $review['review']['findings']);
+            $verification = $marker->mark($path, $report['settings'], [], false);
+            $report['fixed_validation'] = ['remaining_formatting_issues' => $verification['issues'],
+                'review_marks_removed' => true, 'content_review_required' => count(array_filter($review['review']['findings'], fn ($finding) => $finding['status'] !== 'pass')) > 0];
+            foreach ($verification['issues'] as $issue) $report['manual_review_rules'][] = $issue['message'];
+            $report['manual_review_required'] = !empty($report['manual_review_rules']);
             return response()->json($review + ['document_base64' => base64_encode(file_get_contents($path)), 'report' => $report,
                 'attention_document_base64' => $attention['document_base64'], 'attention_issues' => $attention['issues'], 'attention_objects' => $attention['objects']])
                 ->header('Cache-Control', 'private, no-store');

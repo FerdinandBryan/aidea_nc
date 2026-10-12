@@ -2711,6 +2711,13 @@ async function _dvGenerateFixedPdf() {
             bar.innerHTML = '<button type="button" class="btn-modal-close" onclick="window._dvDownloadFixed()">Download this fixed copy</button>';
             if (blob.formattingReport) {
                 var report = blob.formattingReport;
+                if (report.fixed_validation) {
+                    var validationNote=document.createElement('p');
+                    var remaining=report.fixed_validation.remaining_formatting_issues || [];
+                    validationNote.textContent=remaining.length ? remaining.length+' supported formatting issues remain. See template details before using this copy.' : 'Rechecked corrected copy: no detected spacing, margin or appendix-title issues. Content and manual checks may still require review.';
+                    validationNote.style.cssText='margin:10px 0;font-size:13px;color:'+(remaining.length?'#fbbf24':'#86efac')+';';
+                    bar.appendChild(validationNote);
+                }
                 var summary = document.createElement('details');
                 var title = document.createElement('summary');
                 title.textContent = 'Template: ' + report.template + ' — ' + report.paragraphs_processed + ' paragraphs processed';
@@ -3428,7 +3435,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=26';
+    e.src = base + 'fixpaper-api.js?v=27';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };

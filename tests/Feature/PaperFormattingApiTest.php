@@ -223,7 +223,8 @@ class PaperFormattingApiTest extends TestCase
         Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['output_text' => json_encode(['summary' => 'Use the formatter for spacing.', 'findings' => [['rule_index' => 0, 'status' => 'manual', 'explanation' => 'Spacing needs layout verification.', 'paragraph' => 0, 'suggestion' => 'Apply template spacing.']]])])]);
         $upload = $this->paper(); $originalHash = hash_file('sha256', $upload->getRealPath());
         $response = $this->post('/api/papers/check-and-fix', ['file' => $upload, 'template_id' => '17'], ['Accept' => 'application/json']);
-        $response->assertOk()->assertJsonPath('template', 'Active admin template')->assertJsonPath('report.settings.spacing', 2)->assertJsonPath('review.findings.0.status', 'manual');
+        $response->assertOk()->assertJsonPath('template', 'Active admin template')->assertJsonPath('report.settings.spacing', 2)->assertJsonPath('review.findings.0.status', 'manual')
+            ->assertJsonPath('report.fixed_validation.remaining_formatting_issues', [])->assertJsonPath('report.fixed_validation.review_marks_removed', true);
         $response->assertJsonStructure(['attention_document_base64', 'attention_issues']);
         $attentionPath = tempnam(sys_get_temp_dir(), 'attention_api_test_'); $this->files[] = $attentionPath;
         file_put_contents($attentionPath, base64_decode($response->json('attention_document_base64'), true));
