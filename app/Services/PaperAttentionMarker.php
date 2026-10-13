@@ -85,7 +85,7 @@ class PaperAttentionMarker
                 else $message .= ' No exact paragraph was identified.';
                 if (!empty($finding['suggestion'])) $message .= ' Suggestion: '.$finding['suggestion'];
                 if (in_array($finding['measurement_type'] ?? '', ['spacing', 'margin'], true)) continue; // Already located by the structural checks above.
-                $issues[] = ['paragraph' => max(0, $index + 1), 'type' => $finding['measurement_type'] ?? 'content', 'message' => $message];
+                $issues[] = ['paragraph' => max(0, $index + 1), 'type' => $finding['measurement_type'] ?? 'content', 'issue_kind' => $finding['issue_kind'] ?? null, 'message' => $message];
             }
             foreach ($paragraphs as $index => $p) {
                 $text = $this->paragraphText($p);

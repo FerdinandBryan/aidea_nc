@@ -13,6 +13,19 @@ use ZipArchive;
 
 class PaperFormattingApiTest extends TestCase
 {
+    public function test_missing_required_section_overrides_an_assumed_ai_pass(): void
+    {
+        Sanctum::actingAs(new User(['name' => 'Student'])); config(['services.gemini.key' => 'test-server-key']);
+        $this->templates([['id' => 17, 'active' => true, 'rules' => [['detail' => 'The manuscript has the required APPROVAL SHEET.']]]]);
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['output_text' => json_encode([
+            'summary' => 'Approval expected.', 'findings' => [['rule_index' => 0, 'status' => 'pass', 'paragraph' => 0, 'explanation' => 'Approval sheet is expected.', 'suggestion' => '']],
+        ])])]);
+        $this->post('/api/papers/check-and-fix', ['file' => $this->paper(), 'template_id' => '17'], ['Accept' => 'application/json'])
+            ->assertOk()->assertJsonPath('review.findings.0.status', 'fail')
+            ->assertJsonPath('attention_issues.0.issue_kind', 'missing_section')
+            ->assertJsonPath('report.attention_resolutions.0.status', 'review');
+    }
+
     private array $files = [];
 
     protected function tearDown(): void
