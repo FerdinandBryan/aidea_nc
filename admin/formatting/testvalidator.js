@@ -2786,7 +2786,7 @@ async function _dvGenerateFixedPdf() {
                 summary.appendChild(info);
                 if (report.gemini_formatting) {
                     var aiInfo=document.createElement('p');
-                    aiInfo.textContent='Gemini interpreted '+(report.gemini_formatting.validated_rules || []).length+' supported formatting instructions from the selected admin checklist. Remaining or unsupported rules require review.';
+                    aiInfo.textContent='AIDEA interpreted '+(report.gemini_formatting.validated_rules || []).length+' supported formatting instructions from the selected admin checklist. Remaining or unsupported rules require review.';
                     summary.appendChild(aiInfo);
                 }
                 var remaining=report.manual_review_rules || [];
