@@ -2713,8 +2713,8 @@ async function _dvGenerateFixedPdf() {
                 .dv-fixed-report details{margin-top:10px;border:1px solid #334155;border-radius:12px;background:#111c2e;color:#e2e8f0;overflow:hidden}
                 .dv-fixed-report summary{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 16px;cursor:pointer;list-style:none;font-size:14px;font-weight:600}
                 .dv-fixed-report summary::-webkit-details-marker{display:none}
-                .dv-fixed-report summary::after{content:'?';margin-left:auto;color:#94a3b8;font-size:20px;line-height:1}
-                .dv-fixed-report details[open]>summary::after{transform:rotate(180deg)}
+                .dv-fixed-report summary::after{content:'';width:8px;height:8px;border-right:2px solid #94a3b8;border-bottom:2px solid #94a3b8;transform:rotate(45deg);margin-left:auto;flex-shrink:0}
+                .dv-fixed-report details[open]>summary::after{transform:rotate(225deg)}
                 .dv-fixed-report summary:focus-visible{outline:2px solid #93c5fd;outline-offset:-3px}
                 .dv-fixed-report details[open]>summary{border-bottom:1px solid #334155}
                 .dv-fixed-report .dv-report-label{flex:1;min-width:160px;overflow-wrap:anywhere}
@@ -2725,6 +2725,15 @@ async function _dvGenerateFixedPdf() {
                 .dv-fixed-report details>p{padding:0 16px;line-height:1.65;font-size:13px;overflow-wrap:anywhere;color:#cbd5e1}
                 .dv-fixed-report details>ul{list-style:none;margin:0;padding:12px 16px;max-height:260px;overflow:auto;display:grid;gap:8px;font-size:13px;line-height:1.6}
                 .dv-fixed-report details>ul>li{background:#192638;padding:10px 12px;border-radius:8px;overflow-wrap:anywhere}
+                .dv-fixed-report .dv-template-heading{display:flex;flex-direction:column;gap:4px}
+                .dv-fixed-report .dv-template-heading small{font-size:11px;color:#94a3b8;font-weight:500}
+                .dv-fixed-report .dv-template-heading strong{font-size:15px;line-height:1.4;color:#f8fafc}
+                .dv-fixed-report .dv-template-settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:16px;margin:0}
+                .dv-fixed-report .dv-template-settings>div{background:#192638;border:1px solid #29374c;border-radius:9px;padding:11px 12px;min-width:0}
+                .dv-fixed-report .dv-template-settings dt{font-size:11px;color:#94a3b8;margin-bottom:5px}
+                .dv-fixed-report .dv-template-settings dd{margin:0;color:#f1f5f9;font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+                .dv-fixed-report .dv-template-review{margin:0 16px 16px;padding:12px;background:#2c2618;border:1px solid #554324;border-radius:9px;color:#fde68a;font-size:12px;line-height:1.6}
+                .dv-fixed-report .dv-template-review ul{max-height:160px;overflow:auto;margin:8px 0 0;padding-left:18px}
                 @media(max-width:600px){.dv-fixed-report .dv-report-badges{width:100%}.dv-fixed-report summary{gap:8px}}
             `;
             bar.appendChild(reportStyle);
@@ -2763,25 +2772,29 @@ async function _dvGenerateFixedPdf() {
                 }
                 var summary = document.createElement('details');
                 var title = document.createElement('summary');
-                var templateLabel=document.createElement('span');templateLabel.className='dv-report-label';templateLabel.textContent='Template: '+report.template;title.appendChild(templateLabel);
+                var templateLabel=document.createElement('span');templateLabel.className='dv-report-label dv-template-heading';
+                var templateCaption=document.createElement('small');templateCaption.textContent='Applied admin template';templateLabel.appendChild(templateCaption);
+                var templateName=document.createElement('strong');templateName.textContent=report.template || 'Selected template';templateLabel.appendChild(templateName);title.appendChild(templateLabel);
                 var processed=document.createElement('span');processed.className='dv-report-badge';processed.textContent=report.paragraphs_processed+' paragraphs processed';title.appendChild(processed);
                 summary.appendChild(title);
                 var settings = report.settings || {};
-                var info = document.createElement('p');
-                var margins = settings.margins || {};
-                info.textContent = 'Font: ' + (settings.font || 'preserved') + '; size: ' + (settings.size || 'preserved') +
-                    '; line spacing: ' + (settings.spacing || 'preserved') + '; abstract: ' + (settings.abstract || 'same as body') +
-                    '; margins (inches): ' + Object.keys(margins).map(function (side) { return side + ' ' + margins[side]; }).join(', ');
+                var info=document.createElement('dl');info.className='dv-template-settings';
+                var margins=settings.margins || {};
+                var entries=[['Font',settings.font || 'Original font'],['Font size',settings.size ? settings.size+' pt' : 'Original size'],['Body line spacing',settings.spacing ? settings.spacing+'x' : 'Original spacing'],['Abstract spacing',settings.abstract ? settings.abstract+'x' : 'Same as body']];
+                ['left','right','top','bottom'].forEach(function(side){if(margins[side]!=null)entries.push([side.charAt(0).toUpperCase()+side.slice(1)+' margin',margins[side]+' in']);});
+                entries.forEach(function(entry){var cell=document.createElement('div');var label=document.createElement('dt');label.textContent=entry[0];var value=document.createElement('dd');value.textContent=entry[1];cell.appendChild(label);cell.appendChild(value);info.appendChild(cell);});
                 summary.appendChild(info);
                 if (report.gemini_formatting) {
                     var aiInfo=document.createElement('p');
                     aiInfo.textContent='Gemini interpreted '+(report.gemini_formatting.validated_rules || []).length+' supported formatting instructions from the selected admin checklist. Remaining or unsupported rules require review.';
                     summary.appendChild(aiInfo);
                 }
-                var manual = document.createElement('p');
-                var remaining = report.manual_review_rules || [];
-                manual.textContent = remaining.length ? 'Rules needing manual review: ' + remaining.join('; ') : 'All listed template rules have recognized formatting settings.';
-                summary.appendChild(manual);
+                var remaining=report.manual_review_rules || [];
+                if(remaining.length){
+                    var manual=document.createElement('div');manual.className='dv-template-review';
+                    var reviewTitle=document.createElement('strong');reviewTitle.textContent=remaining.length+' template instructions need manual review';manual.appendChild(reviewTitle);
+                    var reviewList=document.createElement('ul');remaining.forEach(function(rule){var row=document.createElement('li');row.textContent=rule;reviewList.appendChild(row);});manual.appendChild(reviewList);summary.appendChild(manual);
+                }
                 bar.appendChild(summary);
             }
             var holder = document.createElement('div');
