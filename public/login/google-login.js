@@ -43,6 +43,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         body: JSON.stringify({ code: result.code }),
                     });
                     const data = await response.json();
+                    if (response.status === 404 && data.registration_required === true) {
+                        window.location.assign('../register/register.html');
+                        return;
+                    }
                     if (!response.ok || !data.token) throw new Error(data.message || 'Could not sign in.');
                     localStorage.setItem('auth_token', data.token);
                     localStorage.setItem('aidea_user', JSON.stringify(data.user));

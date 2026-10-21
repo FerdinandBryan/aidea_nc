@@ -63,7 +63,10 @@ class GoogleRegistrationController extends Controller
             if (!$user) {
                 $user = User::where('email', $email)->first();
                 if (!$user) {
-                    return response()->json(['message' => 'No account found. Please register first.'], 404);
+                    return response()->json([
+                        'message' => 'No account found. Please register first.',
+                        'registration_required' => true,
+                    ], 404);
                 }
                 // Google is authoritative for Gmail and verified Workspace addresses.
                 // Other existing accounts need password-based linking, not email matching.

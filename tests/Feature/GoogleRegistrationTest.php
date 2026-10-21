@@ -110,7 +110,8 @@ class GoogleRegistrationTest extends TestCase
             ]),
         ]);
         $headers = ['Origin' => 'https://frontend.example', 'X-Requested-With' => 'XMLHttpRequest'];
-        $this->withHeaders($headers)->postJson('/api/auth/google/login', ['code' => 'first-code'])->assertNotFound();
+        $this->withHeaders($headers)->postJson('/api/auth/google/login', ['code' => 'first-code'])
+            ->assertNotFound()->assertJsonPath('registration_required', true)->assertJsonMissingPath('token');
         $this->withHeaders($headers)->postJson('/api/auth/google/register', ['code' => 'register-code'])->assertCreated();
         $this->withHeaders($headers)->postJson('/api/auth/google/login', ['code' => 'login-code'])
             ->assertOk()->assertJsonPath('user.role', 'student')->assertJsonStructure(['token'])
