@@ -1,0 +1,32 @@
+# Wasmer builds the AIDEA subdirectory. Stage it before Composer so command
+# overrides cannot discard the install step's implicit source-file inputs.
+load("//anybuild/tools:laravel.bzl", "laravel_config", "laravel_serve")
+load("//anybuild/tools:php.bzl", "php_build")
+
+app_subdir = "AIDEA"
+
+config = laravel_config(
+    schema = 1,
+    name = "aidea_nc",
+    php_version = "8.4",
+    php_framework = "laravel",
+    php_public_dir = "public",
+    phpix = True,
+    composer_enable = True,
+    composer_build_script = "post-update-cmd",
+)
+
+app = mount("app")
+build = php_build(
+    config,
+    app = app,
+    build_pre = [copy(".", app.path, ignore = [
+        ".git", ".env", ".env.*", "auth.json", "vendor", "node_modules",
+    ])],
+    extra_use_deps = [dep("node", "24"), dep("npm", "11")],
+    after_install = [run("npm install", group = "install")],
+    after_build = [run("npm run build", group = "build")],
+    extra_ignore = ["node_modules", ".env", ".env.*", "auth.json"],
+)
+
+laravel_serve(config, build)
