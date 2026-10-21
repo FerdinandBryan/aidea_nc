@@ -98,6 +98,11 @@
                     <p>Your name, email, and a password.</p>
                 </div>
 
+                <div style="margin-bottom:20px;text-align:center;">
+                    <button type="button" id="googleRegister" class="btn-submit" data-api="https://aidea-nc.wasmer.app/api" disabled style="width:100%;background:#fff;color:#1f2937;border:1px solid #d1d5db;">Continue with Google</button>
+                    <p id="googleRegisterStatus" role="status" aria-live="polite" style="font-size:13px;margin:8px 0;"></p>
+                    <p style="font-size:13px;">or register with your email</p>
+                </div>
                 <form id="registerForm" novalidate>
 
                     <div class="row">
@@ -405,6 +410,7 @@
     <div id="toastWrap" aria-live="polite"></div>
 
     <script src="register.js"></script>
+    <script src="google-register.js"></script>
 </body>
 
 </html>
