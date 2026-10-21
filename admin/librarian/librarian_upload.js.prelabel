@@ -1,5 +1,5 @@
 (function () {
-  var API = 'https://aideanc-production.up.railway.app/api';
+  var API = 'https://aideanc-production-84b5.up.railway.app/api';
   var MIN_WORDS = 150, MAX_WORDS = 200, MAX_BYTES = 20 * 1024 * 1024;
   var modal = document.getElementById('uploadModal');
   var openBtn = document.getElementById('addDocBtn');

@@ -1,8 +1,8 @@
-// my-profile.js — My Profile (student side)
+// my-profile.js ï¿½ My Profile (student side)
 // Reads/saves via the real /api/profile endpoints. localStorage.aidea_user
 // is kept in sync only as a cache for other pages (dashboard footer etc.).
 
-const API_BASE = 'https://aideanc-production.up.railway.app/api';
+const API_BASE = 'https://aidea-nc.wasmer.app/api';
 const LOGIN_URL = '../login/login.html';
 const THEME_KEY = 'aidea_user_theme';
 
@@ -327,8 +327,8 @@ function initPasswordForm() {
 async function loadStats() {
   try {
     const d = await api('/dashboard/stats');
-    $('pstat-submissions').textContent = d.submissions ?? '—';
-    $('pstat-approved').textContent = d.approved ?? '—';
+    $('pstat-submissions').textContent = d.submissions ?? 'ï¿½';
+    $('pstat-approved').textContent = d.approved ?? 'ï¿½';
   } catch (err) {
     console.warn('Stats error:', err);
   }

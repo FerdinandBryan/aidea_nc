@@ -3,7 +3,7 @@
 // and talks to the real Laravel API. Papers come from the admin's
 // approved-thesis store in localStorage ('aidea_repository').
 
-const API_BASE = 'https://aideanc-production.up.railway.app/api';
+const API_BASE = 'https://aidea-nc.wasmer.app/api';
 const LOGIN_URL = '../login/login.html';
 const THEME_KEY = 'aidea_user_theme';
 const REPO_KEY = 'aidea_repository';

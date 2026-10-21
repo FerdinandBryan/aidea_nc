@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -16,7 +15,9 @@ return new class extends Migration {
                 $table->string('student_name')->nullable();
             }
         });
-        DB::statement('ALTER TABLE thesis_assignments MODIFY thesis_submission_id BIGINT UNSIGNED NULL');
+        Schema::table('thesis_assignments', function (Blueprint $table) {
+            $table->unsignedBigInteger('thesis_submission_id')->nullable()->change();
+        });
     }
 
     public function down(): void

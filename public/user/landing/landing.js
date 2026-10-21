@@ -13,7 +13,7 @@
    breaking the page â€” check the console for what failed.
  */
 
-const API_BASE = 'https://aideanc-production.up.railway.app/api';
+const API_BASE = 'https://aidea-nc.wasmer.app/api';
 
 /* â”€â”€ Navigation: redirect to real pages  */
 function openModal(id) {

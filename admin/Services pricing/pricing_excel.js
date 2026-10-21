@@ -1,7 +1,7 @@
 // pricing_excel.js (admin) - upload Excel, save to server, show with clickable links.
 (function () {
     'use strict';
-    var API = 'https://aideanc-production.up.railway.app/api';
+    var API = 'https://aidea-nc.wasmer.app/api';
     var SHEETJS = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
     var MAX_BYTES = 2 * 1024 * 1024, MAX_ROWS = 2000, MAX_COLS = 30;
 

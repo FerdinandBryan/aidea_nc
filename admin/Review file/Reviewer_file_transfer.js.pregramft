@@ -4,7 +4,7 @@
 // fixed recipient (the admin) instead of a reviewer dropdown.
 // Same session/theme/drawer/sign-out conventions as Thesis_reviewer.js.
 
-const ADMIN_API = 'https://aideanc-production.up.railway.app/api';
+const ADMIN_API = 'https://aideanc-production-84b5.up.railway.app/api';
 const LOGIN_URL = '../../user/login/login.html';
 
 

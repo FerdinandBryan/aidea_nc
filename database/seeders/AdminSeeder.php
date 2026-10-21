@@ -10,15 +10,27 @@ class AdminSeeder extends Seeder
 {
     public function run(): void
     {
-        User::updateOrCreate(
-            ['email' => 'admin_norzagaray@gmail.com'],
+        $email = config('admin.email');
+        if (User::where('email', $email)->exists()) {
+            return;
+        }
+
+        $password = config('admin.initial_password');
+        if (!$password) {
+            throw new \RuntimeException('Set ADMIN_INITIAL_PASSWORD before creating the initial administrator.');
+        }
+
+        User::firstOrCreate(
+            ['email' => $email],
             [
                 'fname' => 'AIDEA',
                 'lname' => 'Administrator',
                 'mi' => null,
-                'password_hash' => Hash::make('Admin@AIDEA2026'),
+                'password_hash' => Hash::make($password),
                 'is_verified' => 1,
                 'is_admin' => 1,
+                'email_verified_at' => now(),
+                'role' => 'admin',
             ]
         );
     }

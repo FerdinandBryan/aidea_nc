@@ -1,7 +1,7 @@
 // pricing_sheet_view.js (student) - shows the admin's Excel sheet with clickable links.
 (function () {
     'use strict';
-    var API = 'https://aideanc-production.up.railway.app/api';
+    var API = 'https://aidea-nc.wasmer.app/api';
 
     function esc(s) {
         return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {

@@ -1,7 +1,7 @@
 // dashboard.js — Admin side
 // Pulls real data from Laravel API using auth_token from localStorage.
 
-const ADMIN_API = 'https://aideanc-production.up.railway.app/api';
+const ADMIN_API = 'https://aideanc-production-84b5.up.railway.app/api';
 const LOGIN_URL = '../../user/login/login.html';
 
 // ── Session helpers ────────────────────────────────────────────────────────

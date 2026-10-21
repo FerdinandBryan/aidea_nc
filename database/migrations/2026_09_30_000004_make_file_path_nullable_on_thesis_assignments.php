@@ -1,13 +1,16 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement('ALTER TABLE thesis_assignments MODIFY file_path VARCHAR(255) NULL');
+        Schema::table('thesis_assignments', function (Blueprint $table) {
+            $table->string('file_path')->nullable()->change();
+        });
     }
 
     public function down(): void

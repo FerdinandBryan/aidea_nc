@@ -391,7 +391,7 @@
             '<p style="margin:14px 0 0;font-size:12px;color:#64748b">A new template must be an image (PNG, JPG or WebP). For a PDF, export it as an image first.</p>' +
             '</div>');
         var file = m.o.querySelector('#cgFile');
-        var tplBase = (typeof API_BASE !== 'undefined' ? API_BASE : 'https://aideanc-production.up.railway.app/api');
+        var tplBase = (typeof API_BASE !== 'undefined' ? API_BASE : 'https://aideanc-production-84b5.up.railway.app/api');
         var tplHd = { 'Accept': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') };
         (function () {
             var first = m.o.querySelector('[data-choice]'), grid = first && first.parentNode;
@@ -516,7 +516,7 @@
         redraw();
         o.addEventListener('input', redraw); if (isTpl) runOcr(st, q, redraw);
         o.addEventListener('change', redraw);
-        fetch((typeof API_BASE !== 'undefined' ? API_BASE : 'https://aideanc-production.up.railway.app/api') + '/services', { headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') } }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function (j) {
+        fetch((typeof API_BASE !== 'undefined' ? API_BASE : 'https://aideanc-production-84b5.up.railway.app/api') + '/services', { headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') } }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function (j) {
             var a = Array.isArray(j) ? j : (j.services || j.data || j.items || j.results || []);
             var seen = {}, names = [];
             a.forEach(function (s) {
@@ -591,7 +591,7 @@
                 setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
             }, 'image/png');
         });
-        var CG_BASE = (typeof API_BASE !== 'undefined' ? API_BASE : 'https://aideanc-production.up.railway.app/api');
+        var CG_BASE = (typeof API_BASE !== 'undefined' ? API_BASE : 'https://aideanc-production-84b5.up.railway.app/api');
         var cgPays = [];
         function cgHeaders() { return { 'Accept': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') }; }
         function cgFillUsers() {

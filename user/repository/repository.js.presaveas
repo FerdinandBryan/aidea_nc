@@ -3,7 +3,7 @@
 // (approved + visible_in_repo). "Read paper" streams the file from
 // /api/thesis/file/{id} using the student's login token.
 
-const API_BASE = 'https://aideanc-production.up.railway.app/api';
+const API_BASE = 'https://aideanc-production-84b5.up.railway.app/api';
 const LOGIN_URL = '../login/login.html';
 const THEME_KEY = 'aidea_user_theme'; // shared with the other student pages
 

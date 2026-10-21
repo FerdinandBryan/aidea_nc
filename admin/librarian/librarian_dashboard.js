@@ -4,7 +4,7 @@
 (function () {
     'use strict';
 
-    const API_BASE = 'https://aideanc-production.up.railway.app/api';
+    const API_BASE = 'https://aidea-nc.wasmer.app/api';
     const LOGIN_URL = '../../user/login/login.html';
 
     // Roles allowed on this page. If the stored user has a `role` field that is

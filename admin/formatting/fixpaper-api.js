@@ -1,6 +1,6 @@
 /* The selected server template is authoritative for both preview and download. */
 (function () {
-    var endpoint = 'https://aideanc-production.up.railway.app/api/papers/fix';
+    var endpoint = 'https://aidea-nc.wasmer.app/api/papers/fix';
     var cached = null;
     window._dvInvalidateFixedCopy = function () { cached = null; };
     _dvGenerateFixedDocx = async function (file) {
@@ -66,7 +66,7 @@
             var form = new FormData();
             form.append('file', new Blob([await _resolveArrayBuffer(file)], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), file.name || 'paper.docx');
             form.append('template_id', String(templateId));
-            var response = await fetch('https://aideanc-production.up.railway.app/api/papers/check-and-fix', {
+            var response = await fetch('https://aidea-nc.wasmer.app/api/papers/check-and-fix', {
                 method:'POST', headers:{Accept:'application/json',Authorization:'Bearer '+localStorage.getItem('auth_token')}, body:form
             });
             var data = await response.json();

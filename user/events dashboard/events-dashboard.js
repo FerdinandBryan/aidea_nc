@@ -1,4 +1,4 @@
-const API_BASE = 'https://aideanc-production.up.railway.app/api';
+const API_BASE = 'https://aidea-nc.wasmer.app/api';
 
 /* ══════════════════════════════════════════════════
    SESSION / USER IDENTITY

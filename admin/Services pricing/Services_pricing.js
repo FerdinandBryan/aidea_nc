@@ -1,6 +1,6 @@
 // Services_pricing.js — AIDEA Admin | Laravel API + Universal Code Detection + Icon Picker
 
-const API_BASE = 'https://aideanc-production.up.railway.app/api';
+const API_BASE = 'https://aidea-nc.wasmer.app/api';
 const LOGIN_URL = '../../user/login/login.html';
 
 let services = [];

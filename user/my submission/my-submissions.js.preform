@@ -2,7 +2,7 @@
 // Depends on login.js (AideaSession), same as before.
 
 const THEME_KEY = 'aidea_user_theme'; // shared with the other student pages
-const SUBMISSIONS_URL = 'https://aideanc-production.up.railway.app/api/thesis/my-submissions';
+const SUBMISSIONS_URL = 'https://aideanc-production-84b5.up.railway.app/api/thesis/my-submissions';
 const LOGIN_URL = '../login/login.html';
 
 const $ = id => document.getElementById(id);

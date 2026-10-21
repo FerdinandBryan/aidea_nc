@@ -1,6 +1,6 @@
 /* AIDEA Admin - Templates.js: upload, list and delete certificate templates (Receipts page). */
 (function () {
-    var BASE = (typeof API_BASE !== 'undefined' ? API_BASE : 'https://aideanc-production.up.railway.app/api');
+    var BASE = (typeof API_BASE !== 'undefined' ? API_BASE : 'https://aideanc-production-84b5.up.railway.app/api');
     function hd() { return { 'Accept': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || '') }; }
     var list = document.getElementById('tplList'), nameIn = document.getElementById('tplName'), fileIn = document.getElementById('tplFile'), addBtn = document.getElementById('tplAdd');
     if (!list || !addBtn) return;

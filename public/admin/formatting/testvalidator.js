@@ -2239,7 +2239,7 @@ async function _dvGenerateFixedPdf() {
 /* FORMAT_TEMPLATES_FROM_SERVER: load published templates from the backend (they used to be browser-only) */
 (function () {
     if (document.getElementById('createModal')) return; // the admin templates page does its own sync
-    var API = 'https://aideanc-production.up.railway.app/api';
+    var API = 'https://aidea-nc.wasmer.app/api';
     var FLAG = 'aidea_ft_from_server';
     function token() { try { return localStorage.getItem('auth_token'); } catch (e) { return null; } }
     window._dvRefreshTemplates = function () {

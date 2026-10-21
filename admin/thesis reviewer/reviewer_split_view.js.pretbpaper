@@ -691,7 +691,7 @@
       var tt = card && card.querySelector('.review-card-title');
       nm = (((tt && tt.textContent) || 'paper').replace(/[^\w\- ]+/g, '').trim() || 'paper') + '.docx';
     }
-    var base = (typeof ADMIN_API !== 'undefined') ? ADMIN_API : 'https://aideanc-production.up.railway.app/api';
+    var base = (typeof ADMIN_API !== 'undefined') ? ADMIN_API : 'https://aideanc-production-84b5.up.railway.app/api';
     var token = '';
     try { token = localStorage.getItem('auth_token') || ''; } catch (e) { }
     function getBlob() {
@@ -830,7 +830,7 @@
       if (window.console) console.error('Split viewer:', err);
     }
 
-    var base = (typeof ADMIN_API !== 'undefined') ? ADMIN_API : 'https://aideanc-production.up.railway.app/api';
+    var base = (typeof ADMIN_API !== 'undefined') ? ADMIN_API : 'https://aideanc-production-84b5.up.railway.app/api';
     var token = '';
     try { token = localStorage.getItem('auth_token') || ''; } catch (e) { }
     var target = src ? base + '/reviewer/assignments/' + src.id + '/file/' + src.n : url;
