@@ -71,6 +71,11 @@ function openGcashModal(id) {
     currentService = allServices.find(s => s.id === id);
     if (!currentService) return;
 
+    const paymentHeading = document.querySelector('#gcashModalOverlay h3');
+    if (paymentHeading) {
+        paymentHeading.textContent = Number(currentService.price) === 0 ? 'Free' : 'GCash Payment';
+    }
+
     document.getElementById('gmServiceLabel').textContent = currentService.name;
     document.getElementById('gmSvcName').textContent = currentService.name;
     document.getElementById('gmSvcAmount').textContent = '₱ ' + Number(currentService.price).toLocaleString();
