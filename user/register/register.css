@@ -301,6 +301,10 @@ button {
     }
 }
 
+.form-header {
+    margin-bottom: 20px;
+}
+
 .form-header h1 {
     font-size: 28px;
     font-weight: 800;
