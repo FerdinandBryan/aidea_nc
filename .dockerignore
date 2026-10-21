@@ -14,4 +14,3 @@ storage/*.key
 public/storage
 *.bak*
 *.pre*
-AIDEA
