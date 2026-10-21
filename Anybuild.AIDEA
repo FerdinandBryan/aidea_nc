@@ -14,6 +14,7 @@ config = laravel_config(
     phpix = True,
     composer_enable = True,
     composer_build_script = "post-update-cmd",
+    commands = {"after_deploy": "php artisan migrate --force"},
 )
 
 app = mount("app")

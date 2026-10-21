@@ -31,6 +31,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     protected $hidden = [
         'password_hash',
+        'google_sub',
     ];
 
     protected $casts = [

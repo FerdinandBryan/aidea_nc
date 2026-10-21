@@ -53,6 +53,7 @@ Route::prefix('students')->group(function () {
 Route::post('/register', [AuthController::class, 'register']);
 Route::get('/auth/google/config', [\App\Http\Controllers\GoogleRegistrationController::class, 'configuration']);
 Route::post('/auth/google/register', [\App\Http\Controllers\GoogleRegistrationController::class, 'store'])->middleware('throttle:10,1');
+Route::post('/auth/google/login', [\App\Http\Controllers\GoogleRegistrationController::class, 'login'])->middleware('throttle:10,1');
 Route::post('/verify-email', [AuthController::class, 'verifyEmail'])->middleware('throttle:20,1');
 Route::post('/resend-email-code', [AuthController::class, 'resendEmailCode'])->middleware('throttle:10,1');
 Route::post('/login', [AuthController::class, 'login']);

@@ -26,3 +26,15 @@ Google-created users can set a password through the existing password reset flow
 to sign in later. This change adds registration, not Google sign-in for existing users.
 
 Reference: https://developers.google.com/identity/oauth2/web/guides/use-code-model
+# Google sign-in
+
+The sign-in pages also use the popup authorization-code flow and post to
+`POST /api/auth/google/login`. The existing role-based redirect is reused.
+Unknown accounts must register first; archived accounts and accounts awaiting
+an email code cannot sign in through Google.
+
+Deploy the `2026_10_22_000001_add_google_sub_to_users_table.php` migration before
+using the updated Google endpoints. Registration saves Google's stable subject
+identifier. Sign-in uses that identifier; first-time email matching for existing
+accounts is limited to verified Gmail or Google Workspace addresses. Other
+unlinked accounts must use their password.

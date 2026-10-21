@@ -17,13 +17,23 @@ class GoogleRegistrationController extends Controller
 
     public function store(Request $request)
     {
+        return $this->authenticate($request, false);
+    }
+
+    public function login(Request $request)
+    {
+        return $this->authenticate($request, true);
+    }
+
+    private function authenticate(Request $request, bool $signIn)
+    {
         $request->validate(['code' => 'required|string|max:4096']);
         // The popup callback posts from our own frontend, never from a Google redirect.
         $origin = rtrim((string) config('services.google.frontend_origin'), '/');
         abort_unless($origin && $request->header('Origin') === $origin
             && $request->header('X-Requested-With') === 'XMLHttpRequest', 403);
         abort_unless(config('services.google.client_id') && config('services.google.client_secret'), 503,
-            'Google registration is not configured yet.');
+            'Google sign-in is not configured yet.');
 
         try {
             $tokens = Http::asForm()->timeout(15)->post('https://oauth2.googleapis.com/token', [
@@ -48,6 +58,34 @@ class GoogleRegistrationController extends Controller
             || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return response()->json(['message' => 'Please use a Google account with a verified email address.'], 422);
         }
+        if ($signIn) {
+            $user = User::where('google_sub', $profile['sub'])->first();
+            if (!$user) {
+                $user = User::where('email', $email)->first();
+                if (!$user) {
+                    return response()->json(['message' => 'No account found. Please register first.'], 404);
+                }
+                // Google is authoritative for Gmail and verified Workspace addresses.
+                // Other existing accounts need password-based linking, not email matching.
+                if ($user->google_sub || (!str_ends_with($email, '@gmail.com') && empty($profile['hd']))) {
+                    return response()->json(['message' => 'Please sign in with your password for this account.'], 403);
+                }
+            }
+            if (!empty($user->archived_at)) {
+                return response()->json(['message' => 'This account has been archived. Please contact the administrator.'], 403);
+            }
+            if (\Illuminate\Support\Facades\Schema::hasTable('email_verification_codes')
+                && \Illuminate\Support\Facades\DB::table('email_verification_codes')->where('email', strtolower($user->email))->exists()) {
+                return response()->json(['message' => 'Please confirm your email with the code we sent before signing in.'], 403);
+            }
+            $user->forceFill(['google_sub' => $profile['sub']])->save();
+            $user->tokens()->delete();
+            return response()->json([
+                'success' => true,
+                'token' => $user->createToken('aidea-session')->plainTextToken,
+                'user' => $user,
+            ]);
+        }
         if (User::where('email', $email)->exists()) {
             return response()->json(['message' => 'This email is already registered. Sign in to your existing account.'], 409);
         }
@@ -61,6 +99,7 @@ class GoogleRegistrationController extends Controller
             'is_admin' => false,
             'role' => 'student',
         ]);
+        $user->forceFill(['google_sub' => $profile['sub']])->save();
         return response()->json([
             'success' => true,
             'token' => $user->createToken('aidea-session')->plainTextToken,
