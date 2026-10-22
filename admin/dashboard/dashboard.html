@@ -26,6 +26,7 @@
     <link rel="stylesheet" href="dashboard.css?v=2" />
     <link rel="icon" type="image/png" sizes="32x32" href="../shared/logo-32.png" />
     <link rel="apple-touch-icon" href="../shared/logo-180.png" />
+    <link rel="stylesheet" href="submission-trends.css?v=1" />
 </head>
 
 <body>
@@ -149,16 +150,33 @@
 
             <!-- CHARTS -->
             <section class="charts-row">
-                <div class="panel thesis-year-panel">
-                    <div class="panel-head">
+                <div class="panel submission-trends" id="submissionTrends" aria-busy="true">
+                    <div class="trend-heading">
                         <div>
-                            <h3 class="panel-title">Thesis submissions by academic year</h3>
-                            <p class="panel-sub" id="revenueYear" aria-live="polite">Loading submission totals...</p>
+                            <h3 class="panel-title">Submission trends</h3>
+                            <p class="panel-sub" id="trendSummary" aria-live="polite">Loading submission totals…</p>
                         </div>
-                        <div class="thesis-total" aria-label="Total thesis submissions"><strong id="thesisYearTotal">--</strong><span>total submissions</span></div>
+                        <div class="trend-controls">
+                            <label for="trendRange">Academic years
+                                <select id="trendRange" disabled><option value="recent">Latest 5 years</option><option value="all">All years</option></select>
+                            </label>
+                            <label for="trendView">View
+                                <select id="trendView" disabled><option value="bar">Columns</option><option value="line">Line</option><option value="table">Table</option></select>
+                            </label>
+                        </div>
                     </div>
-                    <div class="thesis-chart-viewport"><div class="chart-box"><canvas id="thesisYearChart" aria-label="Thesis submitted per academic year bar chart"
-                            role="img"></canvas></div></div>
+                    <div class="trend-metrics">
+                        <div class="trend-metric"><strong id="trendTotal">—</strong><span>Submissions in selected years</span></div>
+                        <div class="trend-metric"><strong id="trendLatest">—</strong><span id="trendLatestLabel">Latest academic year</span></div>
+                        <div class="trend-metric"><strong id="trendChange">—</strong><span id="trendChangeLabel">Year-over-year change</span></div>
+                    </div>
+                    <div class="trend-plot" id="trendPlot" hidden><div class="trend-plot-inner" id="trendPlotInner"><canvas id="trendCanvas" role="img" aria-label="Thesis submissions by academic year"></canvas></div></div>
+                    <div class="trend-table" id="trendTable" role="region" aria-label="Academic-year submission totals" tabindex="0" hidden>
+                        <table><thead><tr><th scope="col">Academic year</th><th scope="col">Submissions</th><th scope="col">Share</th></tr></thead><tbody id="trendTableBody"></tbody></table>
+                    </div>
+                    <p class="trend-message" id="trendMessage" role="status">Loading submission trends…</p>
+                    <button class="trend-retry" id="trendRetry" type="button" hidden>Try again</button>
+                    <p class="trend-footnote" id="trendFootnote">Counts are shown for recorded years. Missing years are not treated as zero.</p>
                 </div>
 
                 <div class="panel">

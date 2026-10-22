@@ -1,0 +1,38 @@
+.submission-trends { min-width: 0; }
+.submission-trends [hidden] { display: none !important; }
+.trend-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.trend-heading .panel-title { font-size: 17px; }
+.trend-heading .panel-sub { margin-top: 6px; line-height: 1.5; }
+.trend-controls { display: flex; flex-wrap: wrap; gap: 10px; }
+.trend-controls label { display: grid; min-width: 0; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 600; }
+.trend-controls select { font: inherit; font-size: 12px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 28px 9px 10px; min-height: 38px; }
+.trend-controls select:focus-visible, .trend-retry:focus-visible { outline: 2px solid var(--chart-line); outline-offset: 3px; }
+.trend-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 24px 0 20px; }
+.trend-metric { padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.trend-metric strong { display: block; font-size: 25px; line-height: 1.2; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.trend-metric span { display: block; color: var(--muted); font-size: 11px; line-height: 1.5; margin-top: 7px; }
+.trend-metric [data-direction="up"] { color: var(--chart-line); }
+.trend-plot { height: 260px; overflow-x: auto; overflow-y: hidden; }
+.trend-plot-inner { height: 100%; position: relative; }
+.trend-table { overflow-x: auto; max-height: 300px; }
+.trend-table table { min-width: 360px; }
+.trend-table th, .trend-table td { text-align: left; padding: 12px; }
+.trend-table th:nth-child(n+2), .trend-table td:nth-child(n+2) { text-align: right; font-variant-numeric: tabular-nums; }
+.trend-table th { position: sticky; top: 0; background: var(--surface); }
+.trend-message { color: var(--muted); text-align: center; padding: 48px 20px 18px; line-height: 1.6; font-size: 13px; }
+.trend-retry { display: block; margin: 0 auto 24px; padding: 8px 16px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; font: inherit; cursor: pointer; }
+.trend-footnote { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); color: var(--muted); font-size: 11px; line-height: 1.6; }
+@media (max-width: 600px) {
+    .trend-controls { width: 100%; }
+    .trend-controls label { flex: 1; }
+    .trend-controls select { width: 100%; min-width: 0; }
+    .trend-metrics { gap: 7px; margin-top: 18px; }
+    .trend-metric { padding: 11px 9px; }
+    .trend-metric strong { font-size: 21px; }
+    .trend-table table { display: table; width: 100%; }
+    .trend-table thead { display: table-header-group; position: static; width: auto; height: auto; clip: auto; overflow: visible; }
+    .trend-table tbody { display: table-row-group; }
+    .trend-table tr { display: table-row; border: 0; background: transparent; }
+    .trend-table td { display: table-cell; width: auto; }
+    .trend-table td::before { display: none; }
+}
