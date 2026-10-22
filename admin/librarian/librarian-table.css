@@ -1,0 +1,56 @@
+.submissions-table-wrap {
+    margin: 12px 0 0;
+    padding: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.submissions-table {
+    display: table;
+    width: 100%;
+    min-width: 980px;
+    border-collapse: collapse;
+    border: 1px solid var(--border);
+}
+
+.submissions-table thead {
+    display: table-header-group;
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    background: var(--surface-2);
+}
+
+.submissions-table tbody { display: table-row-group; }
+
+.submissions-table tr,
+.submissions-table tbody tr:has(td.empty) {
+    display: table-row;
+    width: auto;
+    border-radius: 0;
+    padding: 0;
+    margin: 0;
+}
+
+.submissions-table th,
+.submissions-table td,
+.submissions-table tbody tr:last-child td,
+.submissions-table tbody td:first-child,
+.submissions-table tbody td:last-child,
+.submissions-table thead th:first-child,
+.submissions-table thead th:last-child {
+    display: table-cell;
+    width: auto;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+.submissions-table th { font-weight: 700; }
+.submissions-table td::before { display: none; }
+.submissions-table .thesis-title { white-space: normal; min-width: 240px; }
+.submissions-table .action-cell { white-space: nowrap; margin: 0; }
+.submissions-table .action-cell button + button { margin-left: 6px; }
+.submissions-table tbody td.empty { display: table-cell; padding: 28px 16px; }

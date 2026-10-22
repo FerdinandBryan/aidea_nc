@@ -25,6 +25,7 @@
         rel="stylesheet" />
     <!-- Same stylesheet as the admin page: copy Thesis_submissions.css into this folder unchanged -->
     <link rel="stylesheet" href="../Thesis submissions/Thesis_submissions.css" />
+    <link rel="stylesheet" href="librarian-table.css?v=1" />
     <link rel="icon" type="image/png" sizes="32x32" href="../shared/logo-32.png" />
     <link rel="apple-touch-icon" href="../shared/logo-180.png" />
 </head>
@@ -159,8 +160,8 @@
 
             <!-- TABLE -->
             <section class="panel">
-                <div class="table-wrap">
-                    <table>
+                <div class="table-wrap submissions-table-wrap" role="region" aria-label="Thesis submissions" tabindex="0">
+                    <table class="submissions-table">
                         <thead>
                             <tr>
                                 <th>#</th>
