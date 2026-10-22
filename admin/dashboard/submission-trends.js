@@ -99,7 +99,8 @@
                     backgroundColor: line ? color('--chart-fill') : color('--chart-line'),
                     borderColor: color('--chart-line'), borderWidth: line ? 2 : 0,
                     borderRadius: 6, borderSkipped: false, maxBarThickness: 40,
-                    pointRadius: 5, pointHoverRadius: 7, fill: line, tension: 0,
+                    pointRadius: 5, pointHoverRadius: 7, fill: line,
+                    tension: line ? 0.4 : 0, cubicInterpolationMode: 'monotone',
                 }],
             },
             options: {
