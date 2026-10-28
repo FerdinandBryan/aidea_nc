@@ -426,11 +426,15 @@
     function install() {
         var prev = _dvGenerateFixedDocx;
         _dvGenerateFixedDocx = async function (file, rules, profile) {
-            var cfg = parseRules(rules);
-            var checklist = (rules || []).some(function (r) { return r && (r.id === 'checklist-spacing' || r.id === 'checklist-margin'); });
-            if (!cfg || checklist) return shortPaper(await prev.apply(this, arguments));
+            var list = Array.isArray(rules) ? rules : [];
+            var cfg = parseRules(list);
+            var checklist = list.some(function (r) { return r && (r.id === 'checklist-spacing' || r.id === 'checklist-margin'); });
+            if (!list.length || !cfg || checklist) {
+                var untouched = new Blob([await _resolveArrayBuffer(file)], { type: (file && file.type) || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+                return untouched;
+            }
             try { return await shortPaper(await build(file, cfg)); }
-            catch (e) { console.warn('[Validator] fixpaper failed, using old generator', e); return shortPaper(await prev.apply(this, arguments)); }
+            catch (e) { console.warn('[Validator] fixpaper failed, using the original document', e); return new Blob([await _resolveArrayBuffer(file)], { type: (file && file.type) || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }); }
         };
         console.log('[Validator] fixpaper installed');
     }

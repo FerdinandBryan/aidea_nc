@@ -16,7 +16,8 @@ class AdminFormattingTemplate
         if (!$template || empty($template['active']) || !is_array($template['rules'] ?? null)) {
             throw ValidationException::withMessages(['template_id' => 'Select an active format template saved by the admin.']);
         }
-        $rules = $template['rules'];
+        $rules = is_array($template['rules'] ?? null) ? $template['rules'] : [];
+        if (!is_array($template['rules'] ?? null)) throw ValidationException::withMessages(['template_id' => 'The admin template has invalid formatting rules.']);
         $formatting = $template['formatting'] ?? [];
         if (!is_array($formatting)) throw ValidationException::withMessages(['template_id' => 'The admin template has invalid formatting settings.']);
         $types = ['font' => 'font', 'font_size' => 'size', 'line_spacing' => 'spacing',
@@ -34,7 +35,6 @@ class AdminFormattingTemplate
             }
             $rules[] = ['name' => 'Admin setting: '.$name, 'type' => $types[$name], 'value' => $value];
         }
-        if (!$rules) throw ValidationException::withMessages(['template_id' => 'This admin template has no formatting rules.']);
         $template['effective_rules'] = $rules;
         $template['revision'] = hash('sha256', json_encode($rules, JSON_UNESCAPED_UNICODE));
         return $template;

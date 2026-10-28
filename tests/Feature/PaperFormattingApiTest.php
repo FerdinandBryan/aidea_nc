@@ -153,6 +153,24 @@ class PaperFormattingApiTest extends TestCase
             ->assertJsonPath('settings.margins.left', 2)->assertJsonStructure(['revision']);
     }
 
+    public function test_empty_template_rules_leave_the_document_unchanged_instead_of_using_defaults(): void
+    {
+        Sanctum::actingAs(new User(['name' => 'Student']));
+        $this->templates([['id' => 17, 'name' => 'Blank template', 'active' => true, 'rules' => []]]);
+        $response = $this->post('/api/papers/fix', ['file' => $this->paper(), 'template_id' => '17', 'include_report' => 1], ['Accept' => 'application/json']);
+        $response->assertOk();
+        $decoded = base64_decode($response->json('document_base64'), true);
+        $this->assertIsString($decoded);
+        $this->assertStringStartsWith('PK', $decoded);
+        $tmp = tempnam(sys_get_temp_dir(), 'blank_template_'); $this->files[] = $tmp;
+        file_put_contents($tmp, $decoded);
+        $zip = new ZipArchive; $this->assertTrue($zip->open($tmp) === true);
+        $xml = $zip->getFromName('word/document.xml');
+        $zip->close();
+        $this->assertStringNotContainsString('w:line=', $xml);
+        $this->assertStringContainsString('<w:t>Title</w:t>', $xml);
+    }
+
     public function test_missing_admin_template_is_rejected_instead_of_using_defaults(): void
     {
         Sanctum::actingAs(new User(['name' => 'Student']));

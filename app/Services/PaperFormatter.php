@@ -122,6 +122,16 @@ class PaperFormatter
 
     public function format(string $path, array $rules): array
     {
+        if (empty($rules)) {
+            $zip = new ZipArchive;
+            $zip->open($path);
+            $zip->close();
+            return ['settings' => $this->settings([]), 'paragraphs_processed' => 0,
+                'applied_rules' => [], 'manual_review_rules' => [],
+                'manual_review_required' => false,
+                'note' => 'No admin formatting rules were selected, so the paper was left unchanged.'];
+        }
+
         $cfg = $this->settings($rules);
 
         $zip = new ZipArchive;
