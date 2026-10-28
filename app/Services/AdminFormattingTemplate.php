@@ -11,8 +11,10 @@ class AdminFormattingTemplate
     {
         $row = DB::table('format_templates')->orderBy('id')->first();
         $list = $row ? json_decode($row->data, true) : [];
-        $template = collect(is_array($list) ? $list : [])->first(fn ($item) =>
-            is_array($item) && (string) ($item['id'] ?? '') === $id);
+        $items = is_array($list) ? $list : [];
+        $template = collect($items)->first(fn ($item) =>
+            is_array($item) && (string) ($item['id'] ?? '') === (string) $id);
+
         if (!$template || empty($template['active']) || !is_array($template['rules'] ?? null)) {
             throw ValidationException::withMessages(['template_id' => 'Select an active format template saved by the admin.']);
         }

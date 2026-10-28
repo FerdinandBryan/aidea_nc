@@ -171,6 +171,19 @@ class PaperFormattingApiTest extends TestCase
         $this->assertStringContainsString('<w:t>Title</w:t>', $xml);
     }
 
+    public function test_selected_template_id_is_used_even_when_multiple_templates_are_saved(): void
+    {
+        Sanctum::actingAs(new User(['name' => 'Student']));
+        $this->templates([
+            ['id' => 7, 'name' => 'Wrong template', 'active' => true, 'rules' => [['detail' => 'Times New Roman 12pt, double spaced.'], ['type' => 'spacing', 'value' => 2]], 'formatting' => ['font' => 'Times New Roman', 'font_size' => 12, 'line_spacing' => 2]],
+            ['id' => 17, 'name' => 'Correct template', 'active' => true, 'rules' => [['detail' => 'Arial 10pt, 1.5 spacing.'], ['type' => 'spacing', 'value' => 1.5]], 'formatting' => ['font' => 'Arial', 'font_size' => 10, 'line_spacing' => 1.5]],
+        ]);
+        $this->getJson('/api/format-templates/17/formatting')->assertOk()
+            ->assertJsonPath('settings.font', 'Arial')
+            ->assertJsonPath('settings.size', 10)
+            ->assertJsonPath('settings.spacing', 1.5);
+    }
+
     public function test_missing_admin_template_is_rejected_instead_of_using_defaults(): void
     {
         Sanctum::actingAs(new User(['name' => 'Student']));
