@@ -460,6 +460,7 @@ function saveTemplate() {
 
     const rules = collectRules();
     const active = document.getElementById('tplActive').checked;
+    let savedTemplateId = editingId;
 
     // Serialize file metadata (we can't store the actual File object in localStorage)
     let fileData = null;
@@ -483,6 +484,7 @@ function saveTemplate() {
     } else {
         // Create
         const newId = templates.length ? Math.max(...templates.map(t => t.id)) + 1 : 1;
+        savedTemplateId = newId;
         templates.push({
             id: newId, name, type,
             description: document.getElementById('tplDesc').value.trim(),
@@ -493,7 +495,7 @@ function saveTemplate() {
         showToast(`Template "${name}" created.`, 'success');
     }
 
-    saveTemplates(templates);
+    saveTemplates(templates, { templateId: savedTemplateId, referenceFile: tplSelectedFile });
     filtered = [...templates];
     applyFilter();
     updateStats();
@@ -697,6 +699,61 @@ window.getFormatRulesForThesis = function (thesis) {
 
     return [...builtIn, ...customRules];
 };
+
+(function () {
+    var API = 'https://aidea-nc.wasmer.app/api';
+    function token() { try { return localStorage.getItem('auth_token'); } catch (e) { return null; } }
+    function call(method, body) {
+        var auth = token();
+        if (!auth) return Promise.reject(new Error('Sign in again before saving the admin template.'));
+        return fetch(API + '/format-templates', {
+            method: method,
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: 'Bearer ' + auth },
+            body: body ? JSON.stringify(body) : undefined
+        }).then(function (response) {
+            if (!response.ok) throw new Error('Template save failed (HTTP ' + response.status + ').');
+            return response.json();
+        });
+    }
+    var localSave = saveTemplates;
+    saveTemplates = function (items, upload) {
+        localSave(items);
+        call('PUT', { templates: items }).then(function () {
+            if (!upload || !upload.referenceFile) return;
+            if (!/\.docx$/i.test(upload.referenceFile.name || '')) {
+                showToast('Only a Word DOCX template can be used as the formatting reference.', 'warning');
+                return;
+            }
+            var form = new FormData();
+            form.append('file', upload.referenceFile, upload.referenceFile.name || 'template.docx');
+            return fetch(API + '/format-templates/' + encodeURIComponent(upload.templateId) + '/reference', {
+                method: 'POST', headers: { Accept: 'application/json', Authorization: 'Bearer ' + token() }, body: form
+            }).then(function (response) {
+                if (!response.ok) throw new Error('Reference upload failed (HTTP ' + response.status + ').');
+                showToast('Admin DOCX formatting reference uploaded.', 'success');
+            });
+        }).catch(function (error) {
+            console.warn('[Templates] server save failed', error);
+            showToast('Template saved on this device, but server synchronization failed: ' + error.message, 'warning');
+        });
+    };
+    function pull() {
+        var auth = token();
+        if (!auth) return;
+        fetch(API + '/format-templates', { headers: { Accept: 'application/json', Authorization: 'Bearer ' + auth } })
+            .then(function (response) { if (!response.ok) throw new Error('HTTP ' + response.status); return response.json(); })
+            .then(function (items) {
+                if (!Array.isArray(items) || !items.length) return;
+                templates.length = 0;
+                Array.prototype.push.apply(templates, items);
+                localSave(templates);
+                filtered = templates.slice();
+                applyFilter();
+                updateStats();
+            }).catch(function (error) { console.warn('[Templates] could not load from server', error); });
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', pull); else pull();
+})();
 /* DV_LOAD_NEEDS_FILE: Load thesis checklist button stays disabled in the New Format Template modal until a reference file is chosen */
 (function () {
     var st = document.createElement('style');
