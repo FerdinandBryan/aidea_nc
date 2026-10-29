@@ -125,7 +125,150 @@ class PaperFormatter
 
     public function formatUsingReference(string $path, string $referencePath): array
     {
-        return $this->format($path, $this->referenceRules($referencePath));
+        $rules = $this->referenceRules($referencePath);
+        $layoutRules = array_values(array_filter($rules, fn ($rule) => in_array($rule['type'] ?? '', ['margin', 'page-size'], true)));
+        $report = $this->format($path, $layoutRules);
+        $report['paragraphs_processed'] = $this->applyReferenceFormatting($path, $referencePath);
+        $report['settings'] = $this->settings($rules);
+        $report['applied_rules'] = array_values(array_unique(array_merge($report['applied_rules'], ['Admin example paragraph styles'])));
+        $report['note'] = 'Formatting was copied from the admin example paper while preserving the student document content.';
+        return $report;
+    }
+
+    private function applyReferenceFormatting(string $path, string $referencePath): int
+    {
+        $studentZip = new ZipArchive; $referenceZip = new ZipArchive;
+        if ($studentZip->open($path) !== true || $referenceZip->open($referencePath) !== true) {
+            if ($studentZip->status === ZipArchive::ER_OK) $studentZip->close();
+            throw new InvalidArgumentException('The admin reference template is not a valid Word document.');
+        }
+        try {
+            $studentXml = $studentZip->getFromName('word/document.xml');
+            $referenceXml = $referenceZip->getFromName('word/document.xml');
+            if ($studentXml === false || $referenceXml === false || stripos($referenceXml, '<!DOCTYPE') !== false) {
+                throw new InvalidArgumentException('The admin reference template is not a valid Word document.');
+            }
+            $studentDoc = new DOMDocument; $referenceDoc = new DOMDocument;
+            if (!@$studentDoc->loadXML($studentXml, LIBXML_NONET) || !@$referenceDoc->loadXML($referenceXml, LIBXML_NONET)) {
+                throw new InvalidArgumentException('The admin reference template contains invalid document XML.');
+            }
+            $studentXp = new DOMXPath($studentDoc); $studentXp->registerNamespace('w', self::W);
+            $referenceXp = new DOMXPath($referenceDoc); $referenceXp->registerNamespace('w', self::W);
+            $referenceRoles = $this->referenceParagraphRoles($referenceXp);
+            $studentRoles = $this->referenceParagraphRoles($studentXp);
+            $paragraphProperties = ['pStyle', 'keepNext', 'keepLines', 'widowControl', 'pBdr', 'shd', 'tabs', 'bidi', 'snapToGrid', 'spacing', 'ind', 'contextualSpacing', 'jc', 'textDirection', 'outlineLvl'];
+            $runProperties = ['rStyle', 'rFonts', 'b', 'bCs', 'i', 'iCs', 'caps', 'smallCaps', 'color', 'spacing', 'sz', 'szCs', 'u', 'vertAlign', 'lang'];
+            $processed = 0;
+            foreach ($studentRoles as $role => $paragraphs) {
+                if (empty($referenceRoles[$role])) continue;
+                $source = $referenceRoles[$role][0];
+                foreach ($paragraphs as $target) {
+                    $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $runProperties);
+                    $processed++;
+                }
+            }
+            $studentZip->addFromString('word/document.xml', $studentDoc->saveXML());
+
+            $referenceStylesXml = $referenceZip->getFromName('word/styles.xml');
+            if ($referenceStylesXml !== false && stripos($referenceStylesXml, '<!DOCTYPE') === false) {
+                $referenceStyles = new DOMDocument;
+                if (@$referenceStyles->loadXML($referenceStylesXml, LIBXML_NONET) && $referenceStyles->documentElement?->namespaceURI === self::W) {
+                    $studentStylesXml = $studentZip->getFromName('word/styles.xml');
+                    $studentStyles = new DOMDocument;
+                    $hasStudentStyles = $studentStylesXml !== false && stripos($studentStylesXml, '<!DOCTYPE') === false && @$studentStyles->loadXML($studentStylesXml, LIBXML_NONET) && $studentStyles->documentElement?->localName === 'styles' && $studentStyles->documentElement?->namespaceURI === self::W;
+                    if ($hasStudentStyles) {
+                        $studentStylesXp = new DOMXPath($studentStyles); $studentStylesXp->registerNamespace('w', self::W);
+                        $referenceStylesXp = new DOMXPath($referenceStyles); $referenceStylesXp->registerNamespace('w', self::W);
+                        $referenceDefaults = $referenceStylesXp->query('/w:styles/w:docDefaults')->item(0);
+                        $studentDefaults = $studentStylesXp->query('/w:styles/w:docDefaults')->item(0);
+                        if ($referenceDefaults) {
+                            $copy = $studentStyles->importNode($referenceDefaults, true);
+                            if ($studentDefaults) $studentDefaults->parentNode->replaceChild($copy, $studentDefaults);
+                            else $studentStyles->documentElement->insertBefore($copy, $studentStyles->documentElement->firstChild);
+                        }
+                        foreach ($referenceStylesXp->query('/w:styles/w:style[@w:styleId]') as $referenceStyle) {
+                            $styleId = $referenceStyle->getAttributeNS(self::W, 'styleId');
+                            $existing = null;
+                            foreach ($studentStylesXp->query('/w:styles/w:style[@w:styleId]') as $studentStyle) {
+                                if ($studentStyle->getAttributeNS(self::W, 'styleId') === $styleId) { $existing = $studentStyle; break; }
+                            }
+                            $copy = $studentStyles->importNode($referenceStyle, true);
+                            if ($existing) $existing->parentNode->replaceChild($copy, $existing);
+                            else $studentStyles->documentElement->appendChild($copy);
+                        }
+                    } else {
+                        $studentStyles = $referenceStyles;
+                    }
+                    $studentZip->addFromString('word/styles.xml', $studentStyles->saveXML());
+                }
+            }
+            return $processed;
+        } finally { $studentZip->close(); $referenceZip->close(); }
+    }
+
+    private function referenceParagraphRoles(DOMXPath $xp): array
+    {
+        $roles = []; $zone = 'cover'; $coverIndex = 0;
+        foreach ($xp->query('/w:document/w:body//w:p[not(ancestor::w:txbxContent)]') as $paragraph) {
+            if (!$paragraph instanceof DOMElement) continue;
+            $text = $this->text($paragraph);
+            if ($text === '') continue;
+            $upper = strtoupper($text);
+            if ($this->isChapter($text)) { $role = 'chapter'; $zone = 'body'; }
+            elseif (in_array($upper, ['ABSTRACT', 'APPROVAL SHEET', 'ACKNOWLEDGEMENT', 'ACKNOWLEDGEMENTS', 'TABLE OF CONTENTS', 'LIST OF TABLES', 'LIST OF FIGURES', 'LIST OF APPENDICES', 'REFERENCES', 'APPENDICES'], true)) {
+                $role = 'section:'.$upper;
+                $zone = $upper === 'ABSTRACT' ? 'abstract' : ($upper === 'REFERENCES' ? 'references' : 'body');
+            } elseif ($zone === 'cover') $role = 'cover:'.($coverIndex++);
+            elseif ($this->isTopicHeading($paragraph, $xp)) {
+                $style = $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph);
+                $outline = $xp->evaluate('string(./w:pPr/w:outlineLvl/@w:val)', $paragraph);
+                $level = preg_match('/heading[ _-]?(\d+)/i', $style, $match) ? $match[1] : (is_numeric($outline) && $outline < 9 ? (string) ((int) $outline + 1) : '');
+                $role = $level !== '' ? 'topic:'.$level : 'topic';
+            } elseif ($zone === 'abstract') $role = 'abstract:body';
+            elseif ($zone === 'references') $role = 'references:entry';
+            else $role = 'body';
+            $roles[$role][] = $paragraph;
+        }
+        return $roles;
+    }
+
+    private function copyReferenceParagraph(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp, array $paragraphProperties, array $runProperties): void
+    {
+        $sourcePr = $referenceXp->query('./w:pPr', $source)->item(0);
+        $targetPr = $studentXp->query('./w:pPr', $target)->item(0);
+        if ($sourcePr || $targetPr) {
+            $targetPr ??= $this->ensure($target, 'pPr', true);
+            foreach ($paragraphProperties as $name) {
+                foreach (iterator_to_array($studentXp->query('./w:'.$name, $targetPr)) as $old) $old->parentNode->removeChild($old);
+                $targetProperty = $this->ensure($targetPr, $name);
+                if ($sourcePr) {
+                    $copy = $referenceXp->query('./w:'.$name, $sourcePr)->item(0);
+                    if ($copy) $targetPr->replaceChild($target->ownerDocument->importNode($copy, true), $targetProperty);
+                    else $targetPr->removeChild($targetProperty);
+                } else {
+                    $targetPr->removeChild($targetProperty);
+                }
+            }
+        }
+        $sourceRun = $referenceXp->query('./w:r[.//w:t][1]', $source)->item(0);
+        $sourceRunPr = $sourceRun instanceof DOMElement ? $referenceXp->query('./w:rPr', $sourceRun)->item(0) : null;
+        foreach ($studentXp->query('./w:r[.//w:t]', $target) as $run) {
+            if (!$run instanceof DOMElement) continue;
+            $targetRunPr = $studentXp->query('./w:rPr', $run)->item(0);
+            if (!$sourceRunPr && !$targetRunPr) continue;
+            $targetRunPr ??= $this->ensure($run, 'rPr', true);
+            foreach ($runProperties as $name) {
+                foreach (iterator_to_array($studentXp->query('./w:'.$name, $targetRunPr)) as $old) $old->parentNode->removeChild($old);
+                $targetProperty = $this->ensure($targetRunPr, $name);
+                if ($sourceRunPr) {
+                    $copy = $referenceXp->query('./w:'.$name, $sourceRunPr)->item(0);
+                    if ($copy) $targetRunPr->replaceChild($run->ownerDocument->importNode($copy, true), $targetProperty);
+                    else $targetRunPr->removeChild($targetProperty);
+                } else {
+                    $targetRunPr->removeChild($targetProperty);
+                }
+            }
+        }
     }
 
     private function referenceRules(string $path): array

@@ -82,13 +82,32 @@ class PaperFormatterTest extends TestCase
 
         $xp = $this->xml($student);
         $body = '//w:p[w:r/w:t="Student paragraph."]';
-        $this->assertSame('360', $xp->evaluate('string('.$body.'/w:pPr/w:spacing/@w:line)'));
-        $this->assertSame('360', $xp->evaluate('string('.$body.'/w:pPr/w:ind/@w:firstLine)'));
-        $this->assertSame('both', $xp->evaluate('string('.$body.'/w:pPr/w:jc/@w:val)'));
-        $this->assertSame('Arial', $xp->evaluate('string('.$body.'/w:r/w:rPr/w:rFonts/@w:ascii)'));
-        $this->assertSame('20', $xp->evaluate('string('.$body.'/w:r/w:rPr/w:sz/@w:val)'));
+        $this->assertSame('BodyText', $xp->evaluate('string('.$body.'/w:pPr/w:pStyle/@w:val)'));
         $this->assertSame('11906', $xp->evaluate('string(//w:pgSz/@w:w)'));
         $this->assertSame('1440', $xp->evaluate('string(//w:pgMar/@w:left)'));
+        $zip = new ZipArchive; $zip->open($student); $styles = $zip->getFromName('word/styles.xml'); $zip->close();
+        $this->assertStringContainsString('w:line="360"', $styles);
+        $this->assertStringContainsString('w:firstLine="360"', $styles);
+        $this->assertStringContainsString('w:val="both"', $styles);
+        $this->assertStringContainsString('w:ascii="Arial"', $styles);
+        $this->assertStringContainsString('w:val="20"', $styles);
+    }
+
+    public function test_reference_chapter_style_is_applied_to_the_matching_student_heading(): void
+    {
+        $reference = $this->paper('<w:p><w:pPr><w:pStyle w:val="TemplateChapter"/></w:pPr><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Reference body.</w:t></w:r></w:p>');
+        $zip = new ZipArchive; $zip->open($reference);
+        $zip->addFromString('word/styles.xml', '<w:styles xmlns:w="'.self::W.'"><w:style w:type="paragraph" w:styleId="TemplateChapter"><w:pPr><w:spacing w:before="600" w:after="300"/><w:jc w:val="center"/></w:pPr><w:rPr><w:b/><w:sz w:val="28"/></w:rPr></w:style></w:styles>');
+        $zip->close();
+        $student = $this->paper('<w:p><w:r><w:t>Student title</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Student body.</w:t></w:r></w:p>');
+
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+
+        $xp = $this->xml($student);
+        $this->assertSame('TemplateChapter', $xp->evaluate('string(//w:p[w:r/w:t="CHAPTER 1"]/w:pPr/w:pStyle/@w:val)'));
+        $zip = new ZipArchive; $zip->open($student); $styles = $zip->getFromName('word/styles.xml'); $zip->close();
+        $this->assertStringContainsString('w:styleId="TemplateChapter"', $styles);
+        $this->assertStringContainsString('w:before="600"', $styles);
     }
 
     public function test_docx_uses_template_settings_and_chapter_has_a_real_page_break(): void
