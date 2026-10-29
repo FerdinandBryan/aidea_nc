@@ -216,6 +216,8 @@ Route::post('/papers/fix', [\App\Http\Controllers\PaperFormattingController::cla
     ->middleware(['auth:sanctum', 'throttle:10,1']);
 Route::get('/format-templates/{templateId}/formatting', [\App\Http\Controllers\PaperFormattingController::class, 'show'])
     ->middleware('auth:sanctum');
+Route::post('/format-templates/{templateId}/reference', [\App\Http\Controllers\AdminFormattingTemplateController::class, 'storeReference'])
+    ->middleware(['auth:sanctum', 'admin', 'throttle:10,1']);
 
 \Illuminate\Support\Facades\Route::get('/format-templates', function () {
     $row = \Illuminate\Support\Facades\DB::table('format_templates')->orderBy('id')->first();

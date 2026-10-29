@@ -77,7 +77,7 @@ class PaperFormatter
             if (preg_match('/short bond|8\.5\s*(?:"|inches)?\s*(?:by|x)\s*11/i', $text)) { $cfg['width'] = 12240; $cfg['height'] = 15840; }
             if (!preg_match('/heading|title|abstract|references|appendices|table|figure/i', $text)) {
                 if (preg_match('/\b(justified|justify|left[- ]aligned|right[- ]aligned|center[- ]aligned)\b/i', $text, $m)) $cfg['alignment'] = str_starts_with(strtolower($m[1]), 'just') ? 'both' : explode('-', str_replace(' ', '-', strtolower($m[1])))[0];
-                if (preg_match('/(?:first[- ]line\s+indent(?:ation)?|indent(?:ation)?)\s*(?:of|:|=|is)?\s*(\d+(?:\.\d+)?)\s*(?:inch|in\b|")/i', $text, $m)) $cfg['indentation'] = (float) $m[1];
+                if (preg_match('/(?:first[- ]line\b.*?\bindent(?:ed|ation)?|\bindent(?:ed|ation)?\b)\D{0,40}(\d+(?:\.\d+)?)\s*(?:inch|in\b|")/i', $text, $m)) $cfg['indentation'] = (float) $m[1];
             }
             if (preg_match('/hanging inden/i', $text)) $cfg['hanging'] = true;
         }
@@ -97,6 +97,9 @@ class PaperFormatter
                 elseif ($paper === 'a4') { $cfg['width'] = 11906; $cfg['height'] = 16838; }
                 elseif ($paper === 'legal') { $cfg['width'] = 12240; $cfg['height'] = 20160; }
                 else throw new InvalidArgumentException('The admin template paper size must be letter, a4, or legal.');
+            }
+            if ($type === 'page-size' && is_array($value) && is_numeric($value['width'] ?? null) && is_numeric($value['height'] ?? null)) {
+                $cfg['width'] = (int) $value['width']; $cfg['height'] = (int) $value['height'];
             }
             if ($type === 'alignment') {
                 $value = strtolower(trim((string) $value));
@@ -118,6 +121,135 @@ class PaperFormatter
         if (($cfg['margins']['left'] ?? 1) + ($cfg['margins']['right'] ?? 1) >= $cfg['width'] / 1440 ||
             ($cfg['margins']['top'] ?? 1) + ($cfg['margins']['bottom'] ?? 1) >= $cfg['height'] / 1440) throw new InvalidArgumentException('The template margins leave no printable area.');
         return $cfg;
+    }
+
+    public function formatUsingReference(string $path, string $referencePath): array
+    {
+        return $this->format($path, $this->referenceRules($referencePath));
+    }
+
+    private function referenceRules(string $path): array
+    {
+        $zip = new ZipArchive;
+        if ($zip->open($path) !== true) throw new InvalidArgumentException('The admin reference template is not a valid Word document.');
+        try {
+            $xml = $zip->getFromName('word/document.xml');
+            if ($xml === false || stripos($xml, '<!DOCTYPE') !== false) throw new InvalidArgumentException('The admin reference template is not a valid Word document.');
+            $doc = new DOMDocument;
+            if (!@$doc->loadXML($xml, LIBXML_NONET)) throw new InvalidArgumentException('The admin reference template contains invalid document XML.');
+            $xp = new DOMXPath($doc); $xp->registerNamespace('w', self::W);
+            $stylesXp = null; $stylesXml = $zip->getFromName('word/styles.xml');
+            if ($stylesXml !== false && stripos($stylesXml, '<!DOCTYPE') === false) {
+                $styles = new DOMDocument;
+                if (@$styles->loadXML($stylesXml, LIBXML_NONET)) { $stylesXp = new DOMXPath($styles); $stylesXp->registerNamespace('w', self::W); }
+            }
+
+            $candidates = []; $afterChapter = [];
+            $chapterSeen = false;
+            foreach ($xp->query('/w:document/w:body/w:p') as $paragraph) {
+                if (!$paragraph instanceof DOMElement) continue;
+                $text = $this->text($paragraph);
+                if ($this->isChapter($text)) { $chapterSeen = true; continue; }
+                if ($text === '' || $this->isTopicHeading($paragraph, $xp)) continue;
+                $candidates[] = $paragraph;
+                if ($chapterSeen) $afterChapter[] = $paragraph;
+            }
+            $bodyParagraph = $afterChapter[0] ?? $candidates[0] ?? null;
+            $direct = static function (?DOMElement $parent, string $name): ?DOMElement {
+                if (!$parent) return null;
+                foreach ($parent->childNodes as $child) if ($child instanceof DOMElement && $child->namespaceURI === self::W && $child->localName === $name) return $child;
+                return null;
+            };
+            $paragraphProperties = $bodyParagraph ? $xp->query('./w:pPr', $bodyParagraph)->item(0) : null;
+            $firstRun = $bodyParagraph ? $xp->query('./w:r[.//w:t][1]', $bodyParagraph)->item(0) : null;
+            $runProperties = $direct($firstRun instanceof DOMElement ? $firstRun : null, 'rPr');
+            $styleChain = static function (?DOMXPath $styleXPath, ?DOMElement $properties, string $referenceName) use ($direct): array {
+                if (!$styleXPath || !$properties) return [];
+                $reference = $direct($properties, $referenceName);
+                $styleId = $reference?->getAttributeNS(self::W, 'val') ?? '';
+                $styles = []; $seen = [];
+                while ($styleId !== '' && !isset($seen[$styleId])) {
+                    $seen[$styleId] = true; $style = null;
+                    foreach ($styleXPath->query('//w:style') as $candidate) {
+                        if ($candidate instanceof DOMElement && $candidate->getAttributeNS(self::W, 'styleId') === $styleId) { $style = $candidate; break; }
+                    }
+                    if (!$style) break;
+                    $styles[] = $style;
+                    $basedOn = $direct($style, 'basedOn');
+                    $styleId = $basedOn?->getAttributeNS(self::W, 'val') ?? '';
+                }
+                return $styles;
+            };
+            $paragraphStyles = $styleChain($stylesXp, $paragraphProperties instanceof DOMElement ? $paragraphProperties : null, 'pStyle');
+            $runStyles = $styleChain($stylesXp, $runProperties, 'rStyle');
+            $paragraphStyleProperties = array_values(array_filter(array_map(fn ($style) => $direct($style, 'pPr'), $paragraphStyles)));
+            $paragraphStyleRuns = array_values(array_filter(array_map(fn ($style) => $direct($style, 'rPr'), $paragraphStyles)));
+            $runStyleRuns = array_values(array_filter(array_map(fn ($style) => $direct($style, 'rPr'), $runStyles)));
+            $normalParagraph = $stylesXp?->query('//w:style[@w:styleId="Normal"]/w:pPr')->item(0);
+            $defaultParagraph = $stylesXp?->query('//w:docDefaults/w:pPrDefault/w:pPr')->item(0);
+            $normalRun = $stylesXp?->query('//w:style[@w:styleId="Normal"]/w:rPr')->item(0);
+            $defaultRun = $stylesXp?->query('//w:docDefaults/w:rPrDefault/w:rPr')->item(0);
+            $rules = [];
+
+            foreach (array_merge([$runProperties], $runStyleRuns, $paragraphStyleRuns, [$normalRun, $defaultRun]) as $properties) {
+                if (!$properties) continue;
+                $propertyXPath = $properties->ownerDocument === $doc ? $xp : $stylesXp;
+                $font = $propertyXPath->evaluate('string(./w:rFonts/@w:ascii | ./w:rFonts/@w:hAnsi)', $properties);
+                if ($font !== '') { $rules[] = ['type' => 'font', 'value' => $font]; break; }
+            }
+            $fontSize = null;
+            foreach (array_merge([$runProperties], $runStyleRuns, $paragraphStyleRuns, [$normalRun, $defaultRun]) as $properties) {
+                if (!$properties) continue;
+                $propertyXPath = $properties->ownerDocument === $doc ? $xp : $stylesXp;
+                $value = $propertyXPath->evaluate('string(./w:sz/@w:val)', $properties);
+                if (is_numeric($value) && (float) $value > 0) { $fontSize = (float) $value / 2; break; }
+            }
+            if ($fontSize !== null) $rules[] = ['type' => 'size', 'value' => $fontSize];
+
+            foreach (array_merge([$paragraphProperties], $paragraphStyleProperties, [$normalParagraph, $defaultParagraph]) as $properties) {
+                if (!$properties) continue;
+                $propertyXPath = $properties->ownerDocument === $doc ? $xp : $stylesXp;
+                $spacing = $propertyXPath->query('./w:spacing[@w:line]', $properties)->item(0);
+                if ($spacing) {
+                    $line = (float) $spacing->getAttributeNS(self::W, 'line');
+                    $lineRule = $spacing->getAttributeNS(self::W, 'lineRule');
+                    if ($line > 0) {
+                        $multiplier = $lineRule === 'exact' && $fontSize ? $line / ($fontSize * 20) : $line / 240;
+                        if ($multiplier > 0 && $multiplier <= 5) $rules[] = ['type' => 'spacing', 'value' => round($multiplier, 3)];
+                    }
+                    break;
+                }
+            }
+            foreach (array_merge([$paragraphProperties], $paragraphStyleProperties, [$normalParagraph, $defaultParagraph]) as $properties) {
+                if (!$properties) continue;
+                $propertyXPath = $properties->ownerDocument === $doc ? $xp : $stylesXp;
+                $value = $propertyXPath->evaluate('string(./w:ind/@w:firstLine)', $properties);
+                if (is_numeric($value) && (float) $value >= 0) { $rules[] = ['type' => 'indentation', 'value' => (float) $value / 1440]; break; }
+            }
+            foreach (array_merge([$paragraphProperties], $paragraphStyleProperties, [$normalParagraph, $defaultParagraph]) as $properties) {
+                if (!$properties) continue;
+                $propertyXPath = $properties->ownerDocument === $doc ? $xp : $stylesXp;
+                $alignment = $propertyXPath->evaluate('string(./w:jc/@w:val)', $properties);
+                if (in_array($alignment, ['left', 'right', 'center', 'both'], true)) { $rules[] = ['type' => 'alignment', 'value' => $alignment]; break; }
+            }
+
+            $section = $xp->query('//w:sectPr')->item($xp->query('//w:sectPr')->length - 1);
+            if ($section) {
+                $pageSize = $xp->query('./w:pgSz', $section)->item(0);
+                $width = $pageSize?->getAttributeNS(self::W, 'w'); $height = $pageSize?->getAttributeNS(self::W, 'h');
+                if (is_numeric($width) && is_numeric($height) && $width > 0 && $height > 0) $rules[] = ['type' => 'page-size', 'value' => ['width' => (int) $width, 'height' => (int) $height]];
+                $pageMargins = $xp->query('./w:pgMar', $section)->item(0);
+                if ($pageMargins) {
+                    $margins = [];
+                    foreach (['top', 'bottom', 'left', 'right'] as $side) {
+                        $value = $pageMargins->getAttributeNS(self::W, $side);
+                        if (is_numeric($value)) $margins[$side] = (float) $value / 1440;
+                    }
+                    if ($margins) $rules[] = ['type' => 'margin', 'value' => $margins];
+                }
+            }
+            return $rules;
+        } finally { $zip->close(); }
     }
 
     public function format(string $path, array $rules): array

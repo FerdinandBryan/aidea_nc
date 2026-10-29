@@ -60,6 +60,37 @@ class PaperFormatterTest extends TestCase
         $this->assertSame(1.5, $cfg['spacing']);
     }
 
+    public function test_first_line_indent_from_admin_rule_is_applied_to_body_paragraphs(): void
+    {
+        $rules = [...$this->rules(), ['name' => 'Paragraph indentation', 'detail' => 'The first line of every paragraph should be indented by 0.5 inches.']];
+        $file = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Body paragraph.</w:t></w:r></w:p>');
+
+        (new PaperFormatter)->format($file, $rules);
+
+        $this->assertSame('720', $this->xml($file)->evaluate('string(//w:p[w:r/w:t="Body paragraph."]/w:pPr/w:ind/@w:firstLine)'));
+    }
+
+    public function test_empty_rules_apply_layout_from_the_admin_reference_docx(): void
+    {
+        $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="BodyText"/></w:pPr><w:r><w:t>Reference body.</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>');
+        $zip = new ZipArchive; $zip->open($reference);
+        $zip->addFromString('word/styles.xml', '<w:styles xmlns:w="'.self::W.'"><w:style w:type="paragraph" w:styleId="BodyText"><w:pPr><w:spacing w:line="360" w:lineRule="auto"/><w:ind w:firstLine="360"/><w:jc w:val="both"/></w:pPr><w:rPr><w:rFonts w:ascii="Arial"/><w:sz w:val="20"/></w:rPr></w:style></w:styles>');
+        $zip->close();
+        $student = $this->paper('<w:p><w:r><w:t>Title</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Student paragraph.</w:t></w:r></w:p>');
+
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+
+        $xp = $this->xml($student);
+        $body = '//w:p[w:r/w:t="Student paragraph."]';
+        $this->assertSame('360', $xp->evaluate('string('.$body.'/w:pPr/w:spacing/@w:line)'));
+        $this->assertSame('360', $xp->evaluate('string('.$body.'/w:pPr/w:ind/@w:firstLine)'));
+        $this->assertSame('both', $xp->evaluate('string('.$body.'/w:pPr/w:jc/@w:val)'));
+        $this->assertSame('Arial', $xp->evaluate('string('.$body.'/w:r/w:rPr/w:rFonts/@w:ascii)'));
+        $this->assertSame('20', $xp->evaluate('string('.$body.'/w:r/w:rPr/w:sz/@w:val)'));
+        $this->assertSame('11906', $xp->evaluate('string(//w:pgSz/@w:w)'));
+        $this->assertSame('1440', $xp->evaluate('string(//w:pgMar/@w:left)'));
+    }
+
     public function test_docx_uses_template_settings_and_chapter_has_a_real_page_break(): void
     {
         $file = $this->paper('<w:p><w:r><w:t>Title</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Body</w:t></w:r></w:p><w:p><w:r><w:t>ABSTRACT</w:t></w:r></w:p><w:p><w:r><w:t>Abstract text</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>Table text</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr>');

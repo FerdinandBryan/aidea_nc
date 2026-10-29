@@ -15,11 +15,11 @@ class AdminFormattingTemplate
         $template = collect($items)->first(fn ($item) =>
             is_array($item) && (string) ($item['id'] ?? '') === (string) $id);
 
-        if (!$template || empty($template['active']) || !is_array($template['rules'] ?? null)) {
+        if (!$template || empty($template['active'])) {
             throw ValidationException::withMessages(['template_id' => 'Select an active format template saved by the admin.']);
         }
+        if (array_key_exists('rules', $template) && !is_array($template['rules'])) throw ValidationException::withMessages(['template_id' => 'The admin template has invalid formatting rules.']);
         $rules = is_array($template['rules'] ?? null) ? $template['rules'] : [];
-        if (!is_array($template['rules'] ?? null)) throw ValidationException::withMessages(['template_id' => 'The admin template has invalid formatting rules.']);
         $formatting = $template['formatting'] ?? [];
         if (!is_array($formatting)) throw ValidationException::withMessages(['template_id' => 'The admin template has invalid formatting settings.']);
         $types = ['font' => 'font', 'font_size' => 'size', 'line_spacing' => 'spacing',
@@ -38,7 +38,22 @@ class AdminFormattingTemplate
             $rules[] = ['name' => 'Admin setting: '.$name, 'type' => $types[$name], 'value' => $value];
         }
         $template['effective_rules'] = $rules;
-        $template['revision'] = hash('sha256', json_encode($rules, JSON_UNESCAPED_UNICODE));
+        $reference = $this->referencePath($id);
+        $template['revision'] = hash('sha256', json_encode([
+            'rules' => $rules,
+            'reference' => $reference ? hash_file('sha256', $reference) : null,
+        ], JSON_UNESCAPED_UNICODE));
         return $template;
+    }
+
+    public function referenceStoragePath(string $id): string
+    {
+        return storage_path('app/private/format-templates/'.hash('sha256', $id).'.docx');
+    }
+
+    public function referencePath(string $id): ?string
+    {
+        $path = $this->referenceStoragePath($id);
+        return is_file($path) ? $path : null;
     }
 }

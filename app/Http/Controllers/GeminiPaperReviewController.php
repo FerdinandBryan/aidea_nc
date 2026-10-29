@@ -23,12 +23,21 @@ class GeminiPaperReviewController extends Controller
         $template = $templates->load($data['template_id']);
         $path = null;
         try {
-            $review = $reviewer->review($request->file('file')->getRealPath(), $template);
-            $plan = (new GeminiFormattingPlan)->resolve($template['effective_rules'], $review['formatting_rules'] ?? [], $formatter);
-            $review['review']['findings'] = (new \App\Services\DocxFormattingReview)->apply($request->file('file')->getRealPath(), $template['effective_rules'], $review['review']['findings'], $formatter);
+            $noRules = empty($template['effective_rules']);
+            if ($noRules) {
+                $review = ['summary' => 'No checklist rules were added. Formatting was taken from the admin reference template when available.', 'review' => ['findings' => []]];
+                $plan = ['rules' => [], 'accepted' => [], 'warnings' => [], 'requested' => 0];
+            } else {
+                $review = $reviewer->review($request->file('file')->getRealPath(), $template);
+                $plan = (new GeminiFormattingPlan)->resolve($template['effective_rules'], $review['formatting_rules'] ?? [], $formatter);
+                $review['review']['findings'] = (new \App\Services\DocxFormattingReview)->apply($request->file('file')->getRealPath(), $template['effective_rules'], $review['review']['findings'], $formatter);
+            }
             $path = tempnam(sys_get_temp_dir(), 'checked_paper_');
             if ($path === false || !copy($request->file('file')->getRealPath(), $path)) throw new RuntimeException('Could not prepare the formatted copy.', 503);
-            $report = $formatter->format($path, $plan['rules']);
+            $reference = $noRules ? $templates->referencePath($data['template_id']) : null;
+            $report = $reference
+                ? $formatter->formatUsingReference($path, $reference)
+                : $formatter->format($path, $plan['rules']);
             $report['gemini_formatting'] = ['requested' => $plan['requested'], 'validated_rules' => $plan['accepted'], 'warnings' => $plan['warnings']];
             foreach ($plan['warnings'] as $warning) $report['manual_review_rules'][] = $warning;
             $report['manual_review_required'] = !empty($report['manual_review_rules']);

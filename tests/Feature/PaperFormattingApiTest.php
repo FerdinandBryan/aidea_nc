@@ -27,19 +27,22 @@ class PaperFormattingApiTest extends TestCase
     }
 
     private array $files = [];
+    private array $referenceFiles = [];
 
     protected function tearDown(): void
     {
         foreach ($this->files as $file) @unlink($file);
+        foreach ($this->referenceFiles as $file) @unlink($file);
         parent::tearDown();
     }
 
-    private function paper(): UploadedFile
+    private function paper(?string $body = null): UploadedFile
     {
         $path = tempnam(sys_get_temp_dir(), 'paper_api_'); $this->files[] = $path;
         $zip = new ZipArchive; $zip->open($path, ZipArchive::OVERWRITE);
         $zip->addFromString('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
-        $zip->addFromString('word/document.xml', '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Title</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p></w:body></w:document>'); $zip->close();
+        $body ??= '<w:p><w:r><w:t>Title</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p>';
+        $zip->addFromString('word/document.xml', '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'.$body.'</w:body></w:document>'); $zip->close();
         return new UploadedFile($path, 'thesis.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', null, true);
     }
 
@@ -169,6 +172,50 @@ class PaperFormattingApiTest extends TestCase
         $zip->close();
         $this->assertStringNotContainsString('w:line=', $xml);
         $this->assertStringContainsString('<w:t>Title</w:t>', $xml);
+    }
+
+    public function test_empty_rules_use_the_uploaded_admin_docx_as_the_student_format(): void
+    {
+        $templateId = 'reference-layout-test';
+        $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:line="360" w:lineRule="auto"/><w:ind w:firstLine="360"/><w:jc w:val="both"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial"/><w:sz w:val="20"/></w:rPr><w:t>Reference body.</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>');
+        Sanctum::actingAs(new User(['is_admin' => true]));
+        $this->templates([['id' => $templateId, 'active' => true]]);
+        $beforeRevision = $this->getJson('/api/format-templates/'.$templateId.'/formatting')->assertOk()->json('revision');
+        $this->templates([['id' => $templateId, 'active' => true]]);
+        $this->post('/api/format-templates/'.$templateId.'/reference', ['file' => $reference], ['Accept' => 'application/json'])->assertOk();
+        $referencePath = (new \App\Services\AdminFormattingTemplate)->referenceStoragePath($templateId);
+        $this->referenceFiles[] = $referencePath;
+        $this->assertFileExists($referencePath);
+        $this->templates([['id' => $templateId, 'active' => true]]);
+        $afterRevision = $this->getJson('/api/format-templates/'.$templateId.'/formatting')->assertOk()->json('revision');
+        $this->assertNotSame($beforeRevision, $afterRevision);
+
+        Sanctum::actingAs(new User(['name' => 'Student']));
+        $this->templates([['id' => $templateId, 'active' => true]]);
+        Http::preventStrayRequests();
+        $response = $this->post('/api/papers/check-and-fix', [
+            'file' => $this->paper('<w:p><w:r><w:t>Title</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Student paragraph.</w:t></w:r></w:p>'),
+            'template_id' => $templateId,
+        ], ['Accept' => 'application/json'])->assertOk();
+        $this->assertSame([], $response->json('report.gemini_formatting.validated_rules'));
+
+        $fixedPath = tempnam(sys_get_temp_dir(), 'reference_fixed_'); $this->files[] = $fixedPath;
+        file_put_contents($fixedPath, base64_decode($response->json('document_base64'), true));
+        $zip = new ZipArchive; $this->assertTrue($zip->open($fixedPath) === true);
+        $xml = $zip->getFromName('word/document.xml'); $zip->close();
+        $this->assertStringContainsString('w:line="360"', $xml);
+        $this->assertStringContainsString('w:firstLine="360"', $xml);
+        $this->assertStringContainsString('w:ascii="Arial"', $xml);
+        $this->assertStringContainsString('w:sz w:val="20"', $xml);
+        $this->assertStringContainsString('w:w="11906"', $xml);
+        $this->assertStringContainsString('w:left="1440"', $xml);
+
+        $this->templates([['id' => $templateId, 'active' => true]]);
+        $this->post('/api/papers/fix', [
+            'file' => $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Direct fix paragraph.</w:t></w:r></w:p>'),
+            'template_id' => $templateId, 'include_report' => 1,
+        ], ['Accept' => 'application/json'])->assertOk()->assertJsonPath('report.settings.indentation', 0.25)
+            ->assertJsonPath('report.settings.spacing', 1.5)->assertJsonPath('report.settings.font', 'Arial');
     }
 
     public function test_selected_template_id_is_used_even_when_multiple_templates_are_saved(): void
