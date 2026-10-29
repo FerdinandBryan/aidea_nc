@@ -110,6 +110,21 @@ class PaperFormatterTest extends TestCase
         $this->assertStringContainsString('w:before="600"', $styles);
     }
 
+    public function test_reference_uppercase_section_title_and_topic_heading_keep_distinct_styles(): void
+    {
+        $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="TemplateSectionTitle"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>THE PROBLEM AND ITS BACKGROUND</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="TemplateTopic"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Introduction</w:t></w:r></w:p><w:p><w:r><w:t>Reference body.</w:t></w:r></w:p>');
+        $zip = new ZipArchive; $zip->open($reference);
+        $zip->addFromString('word/styles.xml', '<w:styles xmlns:w="'.self::W.'"><w:style w:type="paragraph" w:styleId="TemplateSectionTitle"><w:pPr><w:jc w:val="center"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="TemplateTopic"><w:pPr><w:jc w:val="left"/></w:pPr><w:rPr><w:b/><w:sz w:val="20"/></w:rPr></w:style></w:styles>');
+        $zip->close();
+        $student = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>THE PROBLEM AND ITS BACKGROUND</w:t></w:r></w:p><w:p><w:r><w:t>Introduction</w:t></w:r></w:p><w:p><w:r><w:t>Student body.</w:t></w:r></w:p>');
+
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+
+        $xp = $this->xml($student);
+        $this->assertSame('TemplateSectionTitle', $xp->evaluate('string(//w:p[w:r/w:t="THE PROBLEM AND ITS BACKGROUND"]/w:pPr/w:pStyle/@w:val)'));
+        $this->assertSame('TemplateTopic', $xp->evaluate('string(//w:p[w:r/w:t="Introduction"]/w:pPr/w:pStyle/@w:val)'));
+    }
+
     public function test_docx_uses_template_settings_and_chapter_has_a_real_page_break(): void
     {
         $file = $this->paper('<w:p><w:r><w:t>Title</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Body</w:t></w:r></w:p><w:p><w:r><w:t>ABSTRACT</w:t></w:r></w:p><w:p><w:r><w:t>Abstract text</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>Table text</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr>');

@@ -219,17 +219,25 @@ class PaperFormatter
                 $role = 'section:'.$upper;
                 $zone = $upper === 'ABSTRACT' ? 'abstract' : ($upper === 'REFERENCES' ? 'references' : 'body');
             } elseif ($zone === 'cover') $role = 'cover:'.($coverIndex++);
-            elseif ($this->isTopicHeading($paragraph, $xp)) {
+            elseif ($this->isReferenceTopicHeading($paragraph, $xp)) {
                 $style = $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph);
                 $outline = $xp->evaluate('string(./w:pPr/w:outlineLvl/@w:val)', $paragraph);
                 $level = preg_match('/heading[ _-]?(\d+)/i', $style, $match) ? $match[1] : (is_numeric($outline) && $outline < 9 ? (string) ((int) $outline + 1) : '');
-                $role = $level !== '' ? 'topic:'.$level : 'topic';
+                $role = $level !== '' ? 'topic:'.$level : (preg_match('/\p{L}/u', $text) && $text === mb_strtoupper($text) ? 'topic:uppercase' : 'topic');
             } elseif ($zone === 'abstract') $role = 'abstract:body';
             elseif ($zone === 'references') $role = 'references:entry';
             else $role = 'body';
             $roles[$role][] = $paragraph;
         }
         return $roles;
+    }
+
+    private function isReferenceTopicHeading(DOMElement $paragraph, DOMXPath $xp): bool
+    {
+        if ($this->isTopicHeading($paragraph, $xp)) return true;
+        $text = $this->text($paragraph);
+        if ($text === '' || mb_strlen($text) > 140 || preg_match('/[.!?;:]$/u', $text) || $xp->query('./w:pPr/w:numPr', $paragraph)->length) return false;
+        return (bool) preg_match('/\p{L}/u', $text);
     }
 
     private function copyReferenceParagraph(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp, array $paragraphProperties, array $runProperties): void
