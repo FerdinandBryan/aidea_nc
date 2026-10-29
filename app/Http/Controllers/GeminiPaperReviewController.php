@@ -34,9 +34,9 @@ class GeminiPaperReviewController extends Controller
             }
             $path = tempnam(sys_get_temp_dir(), 'checked_paper_');
             if ($path === false || !copy($request->file('file')->getRealPath(), $path)) throw new RuntimeException('Could not prepare the formatted copy.', 503);
-            $reference = $noRules ? $templates->referencePath($data['template_id']) : null;
+            $reference = $templates->referencePath($data['template_id']);
             $report = $reference
-                ? $formatter->formatUsingReference($path, $reference)
+                ? $formatter->formatUsingReference($path, $reference, $plan['rules'])
                 : $formatter->format($path, $plan['rules']);
             $report['gemini_formatting'] = ['requested' => $plan['requested'], 'validated_rules' => $plan['accepted'], 'warnings' => $plan['warnings']];
             foreach ($plan['warnings'] as $warning) $report['manual_review_rules'][] = $warning;

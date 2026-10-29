@@ -123,13 +123,12 @@ class PaperFormatter
         return $cfg;
     }
 
-    public function formatUsingReference(string $path, string $referencePath): array
+    public function formatUsingReference(string $path, string $referencePath, array $rules = []): array
     {
-        $rules = $this->referenceRules($referencePath);
-        $layoutRules = array_values(array_filter($rules, fn ($rule) => in_array($rule['type'] ?? '', ['margin', 'page-size'], true)));
-        $report = $this->format($path, $layoutRules);
-        $report['paragraphs_processed'] = $this->applyReferenceFormatting($path, $referencePath);
-        $report['settings'] = $this->settings($rules);
+        $referenceRules = $this->referenceRules($referencePath);
+        $paragraphsProcessed = $this->applyReferenceFormatting($path, $referencePath);
+        $report = $this->format($path, array_merge($rules, $referenceRules));
+        $report['paragraphs_processed'] = max($report['paragraphs_processed'], $paragraphsProcessed);
         $report['applied_rules'] = array_values(array_unique(array_merge($report['applied_rules'], ['Admin example paragraph styles'])));
         $report['note'] = 'Formatting was copied from the admin example paper while preserving the student document content.';
         return $report;

@@ -45,9 +45,9 @@ class PaperFormattingController extends Controller
         if ($path === false) throw new \RuntimeException('Could not create the paper processing file.');
         try {
             if (!copy($request->file('file')->getRealPath(), $path)) throw new \RuntimeException('Could not copy the uploaded paper.');
-            $reference = empty($template['effective_rules']) ? $templates->referencePath($data['template_id']) : null;
+            $reference = $templates->referencePath($data['template_id']);
             $report = $reference
-                ? $formatter->formatUsingReference($path, $reference)
+                ? $formatter->formatUsingReference($path, $reference, $template['effective_rules'])
                 : $formatter->format($path, $template['effective_rules']);
             $original = $marker->mark($request->file('file')->getRealPath(), $report['settings'], [], false);
             $verification = $marker->mark($path, $report['settings'], [], false);

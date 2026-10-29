@@ -216,6 +216,13 @@ class PaperFormattingApiTest extends TestCase
             'template_id' => $templateId, 'include_report' => 1,
         ], ['Accept' => 'application/json'])->assertOk()->assertJsonPath('report.settings.indentation', 0.25)
             ->assertJsonPath('report.settings.spacing', 1.5)->assertJsonPath('report.settings.font', 'Arial');
+
+        $this->templates([['id' => $templateId, 'active' => true, 'rules' => [['name' => 'Checklist', 'detail' => 'Required content is present.']]]]);
+        $this->post('/api/papers/fix', [
+            'file' => $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Checklist paragraph.</w:t></w:r></w:p>'),
+            'template_id' => $templateId, 'include_report' => 1,
+        ], ['Accept' => 'application/json'])->assertOk()->assertJsonPath('report.settings.indentation', 0.25)
+            ->assertJsonPath('report.settings.spacing', 1.5)->assertJsonPath('report.settings.font', 'Arial');
     }
 
     public function test_selected_template_id_is_used_even_when_multiple_templates_are_saved(): void
