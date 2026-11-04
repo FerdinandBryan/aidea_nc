@@ -193,7 +193,10 @@ class PaperFormattingApiTest extends TestCase
     public function test_empty_rules_use_the_uploaded_admin_docx_as_the_student_format(): void
     {
         $templateId = 'reference-layout-test';
-        $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:line="360" w:lineRule="auto"/><w:ind w:firstLine="360"/><w:jc w:val="both"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial"/><w:sz w:val="20"/></w:rPr><w:t>Reference body.</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>');
+        $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="TemplateHeading"/></w:pPr><w:r><w:t>THE PROBLEM AND ITS BACKGROUND</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>Introduction</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:line="360" w:lineRule="auto"/><w:ind w:firstLine="360"/><w:jc w:val="both"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial"/><w:sz w:val="20"/></w:rPr><w:t>Reference body.</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>');
+        $referenceZip = new ZipArchive; $referenceZip->open($reference);
+        $referenceZip->addFromString('word/styles.xml', '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="TemplateHeading"><w:pPr><w:jc w:val="center"/></w:pPr><w:rPr><w:b/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:pPr><w:jc w:val="left"/></w:pPr><w:rPr><w:b/></w:rPr></w:style></w:styles>');
+        $referenceZip->close();
         Sanctum::actingAs(new User(['is_admin' => true]));
         $this->templates([['id' => $templateId, 'active' => true]]);
         $beforeRevision = $this->getJson('/api/format-templates/'.$templateId.'/formatting')->assertOk()->json('revision');
@@ -210,10 +213,19 @@ class PaperFormattingApiTest extends TestCase
         $this->templates([['id' => $templateId, 'active' => true]]);
         Http::preventStrayRequests();
         $response = $this->post('/api/papers/check-and-fix', [
-            'file' => $this->paper('<w:p><w:r><w:t>Title</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Student paragraph.</w:t></w:r></w:p>'),
+            'file' => $this->paper('<w:p><w:r><w:t>Title</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:t>Student paragraph.</w:t></w:r></w:p>'),
             'template_id' => $templateId,
         ], ['Accept' => 'application/json'])->assertOk();
         $this->assertSame([], $response->json('report.gemini_formatting.validated_rules'));
+        $attentionIssues = $response->json('attention_issues');
+        $this->assertTrue(collect($attentionIssues)->contains(fn ($issue) => $issue['type'] === 'spacing'));
+        $this->assertTrue(collect($attentionIssues)->contains(fn ($issue) => ($issue['issue_kind'] ?? null) === 'missing_section' && str_contains($issue['message'], 'Introduction')));
+        $attentionPath = tempnam(sys_get_temp_dir(), 'reference_attention_'); $this->files[] = $attentionPath;
+        file_put_contents($attentionPath, base64_decode($response->json('attention_document_base64'), true));
+        $attentionZip = new ZipArchive; $this->assertTrue($attentionZip->open($attentionPath) === true);
+        $attentionXml = $attentionZip->getFromName('word/document.xml'); $attentionZip->close();
+        $this->assertStringContainsString('[Missing template heading: Introduction]', $attentionXml);
+        $this->assertGreaterThanOrEqual(2, substr_count($attentionXml, 'w:val="yellow"'));
 
         $fixedPath = tempnam(sys_get_temp_dir(), 'reference_fixed_'); $this->files[] = $fixedPath;
         file_put_contents($fixedPath, base64_decode($response->json('document_base64'), true));

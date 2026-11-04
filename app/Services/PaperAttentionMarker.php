@@ -22,7 +22,7 @@ class PaperAttentionMarker
         }, $originalIssues);
     }
 
-    public function mark(string $original, array $settings, array $findings = [], bool $annotate = true): array
+    public function mark(string $original, array $settings, array $findings = [], bool $annotate = true, array $templateHeadings = []): array
     {
         $path = tempnam(sys_get_temp_dir(), 'paper_attention_');
         if (!$path || !copy($original, $path)) throw new InvalidArgumentException('Could not prepare the attention copy.');
@@ -35,7 +35,14 @@ class PaperAttentionMarker
             $doc = new DOMDocument;
             if (!$xml || stripos($xml, '<!DOCTYPE') !== false || !@$doc->loadXML($xml, LIBXML_NONET)) throw new InvalidArgumentException('The Word document contains invalid XML.');
             $xp = new DOMXPath($doc); $xp->registerNamespace('w', self::W);
+            $stylesXp = null; $stylesXml = $zip->getFromName('word/styles.xml');
+            if ($stylesXml !== false && stripos($stylesXml, '<!DOCTYPE') === false) {
+                $stylesDoc = new DOMDocument;
+                if (@$stylesDoc->loadXML($stylesXml, LIBXML_NONET)) { $stylesXp = new DOMXPath($stylesDoc); $stylesXp->registerNamespace('w', self::W); }
+            }
             $paragraphs = iterator_to_array($xp->query('//w:body//w:p'));
+            $templateHeadingKeys = [];
+            foreach ($templateHeadings as $heading) $templateHeadingKeys[mb_strtolower(preg_replace('/\s+/u', ' ', trim((string) $heading)))] = true;
             $notes = []; $issues = []; $abstract = false; $cv = false; $appendices = false;
             foreach ($paragraphs as $index => $p) {
                 $text = ''; foreach ($xp->query('.//w:t', $p) as $t) $text .= $t->textContent;
@@ -48,11 +55,10 @@ class PaperAttentionMarker
                 if ($xp->query('ancestor::w:tbl | ancestor::w:txbxContent | .//w:drawing | .//w:pict | .//w:object', $p)->length) continue;
                 $target = $abstract && !$isHeading ? ($settings['abstract'] ?? $settings['spacing']) : $settings['spacing'];
                 if ($cv) $target = $settings['cv']['spacing'] ?? $target;
-                $spacing = $xp->query('./w:pPr/w:spacing', $p)->item(0);
-                if ($target !== null && $spacing && $spacing->hasAttributeNS(self::W, 'line') &&
-                    in_array($spacing->getAttributeNS(self::W, 'lineRule'), ['', 'auto'], true)) {
-                    $actual = (float) $spacing->getAttributeNS(self::W, 'line') / 240;
-                    if (abs($actual - $target) > .02) {
+                $headingKey = mb_strtolower(preg_replace('/\s+/u', ' ', $text));
+                if ($target !== null && !isset($templateHeadingKeys[$headingKey])) {
+                    $actual = $this->lineSpacing($p, $xp, $stylesXp);
+                    if ($actual !== null && abs($actual - $target) > .02) {
                         $message = 'Line spacing is '.round($actual, 2).'; the selected admin template requires '.$target.'.';
                         $notes[$index][] = $message; $issues[] = ['paragraph' => $index + 1, 'type' => 'spacing', 'message' => $message];
                     }
@@ -107,6 +113,38 @@ class PaperAttentionMarker
                 $message = $expectedLetter !== $letter ? 'The selected template places "'.$expected.'" in Appendix '.$expectedLetter.', not Appendix '.$letter.'.' : 'Appendix '.$letter.' title should be "'.$expected.'" according to the selected admin template.';
                 $notes[$targetIndex][] = $message;
                 $issues[] = ['paragraph' => $targetIndex + 1, 'type' => 'appendix-title', 'message' => $message];
+            }
+            $existingHeadingKeys = [];
+            foreach ($paragraphs as $paragraph) {
+                $key = mb_strtolower(preg_replace('/\s+/u', ' ', $this->paragraphText($paragraph)));
+                if ($key !== '') $existingHeadingKeys[$key] = true;
+            }
+            foreach ($templateHeadings as $heading) {
+                $heading = trim((string) $heading);
+                $key = mb_strtolower(preg_replace('/\s+/u', ' ', $heading));
+                if ($key === '' || isset($existingHeadingKeys[$key])) continue;
+                $message = 'Admin template heading is missing: '.$heading.'.';
+                $paragraphNumber = 0;
+                if ($annotate) {
+                    $placeholder = $doc->createElementNS(self::W, 'w:p');
+                    $run = $doc->createElementNS(self::W, 'w:r');
+                    $runProperties = $doc->createElementNS(self::W, 'w:rPr');
+                    $highlight = $doc->createElementNS(self::W, 'w:highlight');
+                    $highlight->setAttributeNS(self::W, 'w:val', 'yellow');
+                    $runProperties->appendChild($highlight); $run->appendChild($runProperties);
+                    $textNode = $doc->createElementNS(self::W, 'w:t');
+                    $textNode->textContent = '[Missing template heading: '.$heading.']';
+                    $run->appendChild($textNode); $placeholder->appendChild($run);
+                    $body = $xp->query('/w:document/w:body')->item(0);
+                    $sectionProperties = $body ? $xp->query('./w:sectPr', $body)->item(0) : null;
+                    if (!$body) throw new InvalidArgumentException('The Word document has no body.');
+                    $body->insertBefore($placeholder, $sectionProperties);
+                    $paragraphNumber = count($paragraphs) + 1;
+                    $paragraphs[] = $placeholder;
+                    $notes[$paragraphNumber - 1][] = $message;
+                }
+                $issues[] = ['paragraph' => $paragraphNumber, 'type' => 'content', 'issue_kind' => 'missing_section', 'message' => $message];
+                $existingHeadingKeys[$key] = true;
             }
             if (!$annotate) return ['issues' => $issues];
             foreach ($notes as $index => $messages) {
@@ -180,6 +218,41 @@ class PaperAttentionMarker
     {
         $text = ''; foreach ($p->getElementsByTagNameNS(self::W, 't') as $t) $text .= $t->textContent;
         return trim($text);
+    }
+
+    private function lineSpacing(DOMElement $paragraph, DOMXPath $xp, ?DOMXPath $stylesXp): ?float
+    {
+        $check = function (?DOMXPath $query, ?DOMElement $properties): ?float {
+            if (!$query || !$properties) return null;
+            $spacing = $query->query('./w:spacing[@w:line]', $properties)->item(0);
+            if (!$spacing || !in_array($spacing->getAttributeNS(self::W, 'lineRule'), ['', 'auto'], true)) return null;
+            $line = $spacing->getAttributeNS(self::W, 'line');
+            return is_numeric($line) ? (float) $line / 240 : null;
+        };
+        $paragraphProperties = $xp->query('./w:pPr', $paragraph)->item(0);
+        $actual = $check($xp, $paragraphProperties instanceof DOMElement ? $paragraphProperties : null);
+        if ($actual !== null) return $actual;
+        if ($stylesXp) {
+            $styleId = $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph);
+            $seen = [];
+            while ($styleId !== '' && !isset($seen[$styleId])) {
+                $seen[$styleId] = true; $style = null;
+                foreach ($stylesXp->query('//w:style') as $candidate) {
+                    if ($candidate instanceof DOMElement && $candidate->getAttributeNS(self::W, 'styleId') === $styleId) { $style = $candidate; break; }
+                }
+                if (!$style) break;
+                $actual = $check($stylesXp, $stylesXp->query('./w:pPr', $style)->item(0));
+                if ($actual !== null) return $actual;
+                $styleId = $stylesXp->evaluate('string(./w:basedOn/@w:val)', $style);
+            }
+            $normal = $stylesXp->query('//w:style[@w:styleId="Normal"]/w:pPr')->item(0);
+            $actual = $check($stylesXp, $normal instanceof DOMElement ? $normal : null);
+            if ($actual !== null) return $actual;
+            $defaults = $stylesXp->query('//w:docDefaults/w:pPrDefault/w:pPr')->item(0);
+            $actual = $check($stylesXp, $defaults instanceof DOMElement ? $defaults : null);
+            if ($actual !== null) return $actual;
+        }
+        return null;
     }
 
     private function child(DOMElement $parent, string $name, bool $first = false): DOMElement

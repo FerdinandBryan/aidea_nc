@@ -46,8 +46,9 @@ class GeminiPaperReviewController extends Controller
             $report['manual_review_required'] = !empty($report['manual_review_rules']);
             $report['template'] = $template['name'] ?? 'Selected template';
             $report['template_revision'] = $template['revision'];
-            $attention = $marker->mark($request->file('file')->getRealPath(), $report['settings'], $review['review']['findings']);
-            $verification = $marker->mark($path, $report['settings'], [], false);
+            $templateHeadings = $reference ? $formatter->referenceHeadings($reference) : [];
+            $attention = $marker->mark($request->file('file')->getRealPath(), $report['settings'], $review['review']['findings'], true, $templateHeadings);
+            $verification = $marker->mark($path, $report['settings'], [], false, $templateHeadings);
             $report['attention_resolutions'] = $marker->resolutions($attention['issues'], $verification['issues']);
             $report['fixed_validation'] = ['remaining_formatting_issues' => $verification['issues'],
                 'review_marks_removed' => true, 'content_review_required' => count(array_filter($review['review']['findings'], fn ($finding) => $finding['status'] !== 'pass')) > 0];

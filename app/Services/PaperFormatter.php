@@ -134,6 +134,29 @@ class PaperFormatter
         return $report;
     }
 
+    public function referenceHeadings(string $path): array
+    {
+        $zip = new ZipArchive;
+        if ($zip->open($path) !== true) throw new InvalidArgumentException('The admin reference template is not a valid Word document.');
+        try {
+            $xml = $zip->getFromName('word/document.xml');
+            if ($xml === false || stripos($xml, '<!DOCTYPE') !== false) throw new InvalidArgumentException('The admin reference template is not a valid Word document.');
+            $doc = new DOMDocument;
+            if (!@$doc->loadXML($xml, LIBXML_NONET)) throw new InvalidArgumentException('The admin reference template contains invalid document XML.');
+            $xp = new DOMXPath($doc); $xp->registerNamespace('w', self::W);
+            $headings = [];
+            foreach ($this->referenceParagraphRoles($xp) as $role => $paragraphs) {
+                if ($role !== 'chapter' && !str_starts_with($role, 'section:') && !str_starts_with($role, 'topic')) continue;
+                foreach ($paragraphs as $paragraph) {
+                    $text = $this->text($paragraph);
+                    $key = mb_strtolower(preg_replace('/\s+/u', ' ', $text));
+                    if ($key !== '' && !isset($headings[$key])) $headings[$key] = $text;
+                }
+            }
+            return array_values($headings);
+        } finally { $zip->close(); }
+    }
+
     private function applyReferenceFormatting(string $path, string $referencePath, array $referenceRules): int
     {
         $studentZip = new ZipArchive; $referenceZip = new ZipArchive;
