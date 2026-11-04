@@ -127,14 +127,14 @@ class PaperFormatter
     {
         $referenceRules = $this->referenceRules($referencePath);
         $report = $this->format($path, array_merge($rules, $referenceRules));
-        $paragraphsProcessed = $this->applyReferenceFormatting($path, $referencePath);
+        $paragraphsProcessed = $this->applyReferenceFormatting($path, $referencePath, $referenceRules);
         $report['paragraphs_processed'] = max($report['paragraphs_processed'], $paragraphsProcessed);
         $report['applied_rules'] = array_values(array_unique(array_merge($report['applied_rules'], ['Admin example paragraph styles'])));
         $report['note'] = 'Formatting was copied from the admin example paper while preserving the student document content.';
         return $report;
     }
 
-    private function applyReferenceFormatting(string $path, string $referencePath): int
+    private function applyReferenceFormatting(string $path, string $referencePath, array $referenceRules): int
     {
         $studentZip = new ZipArchive; $referenceZip = new ZipArchive;
         if ($studentZip->open($path) !== true || $referenceZip->open($referencePath) !== true) {
@@ -157,6 +157,7 @@ class PaperFormatter
             $studentRoles = $this->referenceParagraphRoles($studentXp);
             $paragraphProperties = ['pStyle', 'keepNext', 'keepLines', 'widowControl', 'pBdr', 'shd', 'tabs', 'bidi', 'snapToGrid', 'spacing', 'ind', 'contextualSpacing', 'jc', 'textDirection', 'outlineLvl'];
             $runProperties = ['rStyle', 'rFonts', 'b', 'bCs', 'i', 'iCs', 'caps', 'smallCaps', 'color', 'spacing', 'sz', 'szCs', 'u', 'vertAlign', 'lang'];
+            $referenceIndent = $this->settings($referenceRules)['indentation'];
             $processed = 0;
             foreach ($studentRoles as $role => $paragraphs) {
                 if (empty($referenceRoles[$role])) continue;
@@ -166,6 +167,11 @@ class PaperFormatter
                     $source = $sources[count($sources) === count($paragraphs) ? $index : 0];
                     $copyHeadingText = $isTemplateHeading && count($sources) === count($paragraphs);
                     $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $runProperties, $copyHeadingText);
+                    if ($role === 'body' && $referenceIndent !== null) {
+                        $indent = $this->ensure($this->ensure($target, 'pPr', true), 'ind');
+                        foreach (['hanging', 'hangingChars', 'firstLineChars'] as $key) $indent->removeAttributeNS(self::W, $key);
+                        $this->attr($indent, 'firstLine', round($referenceIndent * 1440));
+                    }
                     $processed++;
                 }
             }

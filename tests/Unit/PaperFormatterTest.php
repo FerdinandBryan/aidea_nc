@@ -76,13 +76,15 @@ class PaperFormatterTest extends TestCase
         $zip = new ZipArchive; $zip->open($reference);
         $zip->addFromString('word/styles.xml', '<w:styles xmlns:w="'.self::W.'"><w:style w:type="paragraph" w:styleId="BodyText"><w:pPr><w:spacing w:line="360" w:lineRule="auto"/><w:ind w:firstLine="360"/><w:jc w:val="both"/></w:pPr><w:rPr><w:rFonts w:ascii="Arial"/><w:sz w:val="20"/></w:rPr></w:style></w:styles>');
         $zip->close();
-        $student = $this->paper('<w:p><w:r><w:t>Title</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Student paragraph.</w:t></w:r></w:p>');
+        $student = $this->paper('<w:p><w:r><w:t>Title</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Student paragraph.</w:t></w:r></w:p><w:p><w:r><w:t>Introduction paragraph.</w:t></w:r></w:p>');
 
         (new PaperFormatter)->formatUsingReference($student, $reference);
 
         $xp = $this->xml($student);
         $body = '//w:p[w:r/w:t="Student paragraph."]';
         $this->assertSame('BodyText', $xp->evaluate('string('.$body.'/w:pPr/w:pStyle/@w:val)'));
+        $this->assertSame('360', $xp->evaluate('string('.$body.'/w:pPr/w:ind/@w:firstLine)'));
+        $this->assertSame('360', $xp->evaluate('string(//w:p[w:r/w:t="Introduction paragraph."]/w:pPr/w:ind/@w:firstLine)'));
         $this->assertSame('11906', $xp->evaluate('string(//w:pgSz/@w:w)'));
         $this->assertSame('1440', $xp->evaluate('string(//w:pgMar/@w:left)'));
         $zip = new ZipArchive; $zip->open($student); $styles = $zip->getFromName('word/styles.xml'); $zip->close();
