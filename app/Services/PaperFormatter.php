@@ -126,8 +126,8 @@ class PaperFormatter
     public function formatUsingReference(string $path, string $referencePath, array $rules = []): array
     {
         $referenceRules = $this->referenceRules($referencePath);
-        $paragraphsProcessed = $this->applyReferenceFormatting($path, $referencePath);
         $report = $this->format($path, array_merge($rules, $referenceRules));
+        $paragraphsProcessed = $this->applyReferenceFormatting($path, $referencePath);
         $report['paragraphs_processed'] = max($report['paragraphs_processed'], $paragraphsProcessed);
         $report['applied_rules'] = array_values(array_unique(array_merge($report['applied_rules'], ['Admin example paragraph styles'])));
         $report['note'] = 'Formatting was copied from the admin example paper while preserving the student document content.';
@@ -160,9 +160,12 @@ class PaperFormatter
             $processed = 0;
             foreach ($studentRoles as $role => $paragraphs) {
                 if (empty($referenceRoles[$role])) continue;
-                $source = $referenceRoles[$role][0];
-                foreach ($paragraphs as $target) {
-                    $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $runProperties);
+                $sources = $referenceRoles[$role];
+                $isTemplateHeading = $role === 'chapter' || str_starts_with($role, 'section:') || str_starts_with($role, 'topic');
+                foreach ($paragraphs as $index => $target) {
+                    $source = $sources[count($sources) === count($paragraphs) ? $index : 0];
+                    $copyHeadingText = $isTemplateHeading && count($sources) === count($paragraphs);
+                    $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $runProperties, $copyHeadingText);
                     $processed++;
                 }
             }
@@ -239,8 +242,16 @@ class PaperFormatter
         return (bool) preg_match('/\p{L}/u', $text);
     }
 
-    private function copyReferenceParagraph(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp, array $paragraphProperties, array $runProperties): void
+    private function copyReferenceParagraph(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp, array $paragraphProperties, array $runProperties, bool $copyHeadingText): void
     {
+        if ($copyHeadingText) {
+            $sourceText = $this->text($source);
+            $targetTexts = $target->getElementsByTagNameNS(self::W, 't');
+            if ($sourceText !== '' && $targetTexts->length) {
+                $targetTexts->item(0)->textContent = $sourceText;
+                for ($index = 1; $index < $targetTexts->length; $index++) $targetTexts->item($index)->textContent = '';
+            }
+        }
         $sourcePr = $referenceXp->query('./w:pPr', $source)->item(0);
         $targetPr = $studentXp->query('./w:pPr', $target)->item(0);
         if ($sourcePr || $targetPr) {
