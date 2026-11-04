@@ -131,6 +131,17 @@ class PaperFormatterTest extends TestCase
         $this->assertStringContainsString('w:after="300"', $styles);
     }
 
+    public function test_leading_tab_in_reference_is_applied_as_body_first_line_indent(): void
+    {
+        $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:tabs><w:tab w:val="left" w:pos="720"/></w:tabs></w:pPr><w:r><w:tab/></w:r><w:r><w:t>Reference body.</w:t></w:r></w:p>');
+        $student = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Student body.</w:t></w:r></w:p>');
+
+        $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+
+        $this->assertSame(0.5, $report['settings']['indentation']);
+        $this->assertSame('720', $this->xml($student)->evaluate('string(//w:p[w:r/w:t="Student body."]/w:pPr/w:ind/@w:firstLine)'));
+    }
+
     public function test_reference_uppercase_section_title_and_topic_heading_keep_distinct_styles(): void
     {
         $reference = $this->paper('<w:p><w:r><w:t>ADMIN SAMPLE TITLE</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="TemplateSectionTitle"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>THE PROBLEM AND ITS BACKGROUND</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="TemplateTopic"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Introduction</w:t></w:r></w:p><w:p><w:r><w:t>Reference body.</w:t></w:r></w:p>');

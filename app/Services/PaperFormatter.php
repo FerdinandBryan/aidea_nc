@@ -387,11 +387,19 @@ class PaperFormatter
                     break;
                 }
             }
+            $hasIndentation = false;
             foreach (array_merge([$paragraphProperties], $paragraphStyleProperties, [$normalParagraph, $defaultParagraph]) as $properties) {
                 if (!$properties) continue;
                 $propertyXPath = $properties->ownerDocument === $doc ? $xp : $stylesXp;
                 $value = $propertyXPath->evaluate('string(./w:ind/@w:firstLine)', $properties);
-                if (is_numeric($value) && (float) $value >= 0) { $rules[] = ['type' => 'indentation', 'value' => (float) $value / 1440]; break; }
+                if (is_numeric($value) && (float) $value >= 0) { $rules[] = ['type' => 'indentation', 'value' => (float) $value / 1440]; $hasIndentation = true; break; }
+            }
+            if (!$hasIndentation && $bodyParagraph) {
+                $firstContent = $xp->query('./w:r[1]/*[self::w:tab or self::w:t][1]', $bodyParagraph)->item(0);
+                if ($firstContent instanceof DOMElement && $firstContent->localName === 'tab') {
+                    $tabPosition = $xp->evaluate('string(./w:pPr/w:tabs/w:tab[@w:val="left" or not(@w:val)][1]/@w:pos)', $bodyParagraph);
+                    $rules[] = ['type' => 'indentation', 'value' => (is_numeric($tabPosition) && (float) $tabPosition > 0 ? (float) $tabPosition : 720) / 1440];
+                }
             }
             foreach (array_merge([$paragraphProperties], $paragraphStyleProperties, [$normalParagraph, $defaultParagraph]) as $properties) {
                 if (!$properties) continue;
