@@ -156,6 +156,9 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('THE PROBLEM AND ITS BACKGROUND', $xp->evaluate('string(//w:p[w:pPr/w:pStyle[@w:val="TemplateSectionTitle"]]//w:t)'));
         $this->assertSame('TemplateSectionTitle', $xp->evaluate('string(//w:p[w:r/w:t="THE PROBLEM AND ITS BACKGROUND"]/w:pPr/w:pStyle/@w:val)'));
         $this->assertSame('TemplateTopic', $xp->evaluate('string(//w:p[w:r/w:t="Introduction"]/w:pPr/w:pStyle/@w:val)'));
+        foreach (['CHAPTER 1', 'THE PROBLEM AND ITS BACKGROUND', 'Introduction'] as $heading) {
+            $this->assertSame('1', $xp->evaluate('string(count(//w:p[.//w:t="'.$heading.'"]/w:r/w:rPr/w:b[@w:val="1" or not(@w:val)]))'));
+        }
         $this->assertSame('1', $xp->evaluate('string(count(//w:p[w:r/w:t="Introduction"]/w:r/w:rPr/w:b))'));
         $this->assertSame('Student body.', $xp->evaluate('string(//w:p[w:r/w:t="Student body."]/w:r/w:t)'));
         $this->assertSame('USER THESIS TITLE', $xp->evaluate('string(//w:p[w:r/w:t="USER THESIS TITLE"]//w:t)'));

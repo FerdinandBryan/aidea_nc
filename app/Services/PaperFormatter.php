@@ -184,9 +184,13 @@ class PaperFormatter
                         }
                     }
                     if (!$source && $sources) $source = $sources[count($sources) === count($paragraphs) ? $index : 0];
-                    if (!$source) continue;
+                        if (!$source) {
+                            if ($isTemplateHeading) $this->boldHeadingParagraph($target, $studentXp);
+                            continue;
+                        }
                     $copyHeadingText = $isTemplateHeading && !$matchedText && count($sources) === count($paragraphs);
                     $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $runProperties, $copyHeadingText);
+                    if ($isTemplateHeading) $this->boldHeadingParagraph($target, $studentXp);
                     if ($role === 'body' && $referenceIndent !== null) {
                         $indent = $this->ensure($this->ensure($target, 'pPr', true), 'ind');
                         foreach (['hanging', 'hangingChars', 'firstLineChars'] as $key) $indent->removeAttributeNS(self::W, $key);
@@ -232,6 +236,15 @@ class PaperFormatter
             }
             return $processed;
         } finally { $studentZip->close(); $referenceZip->close(); }
+    }
+    private function boldHeadingParagraph(DOMElement $paragraph, DOMXPath $xp): void
+    {
+        foreach ($xp->query('./w:r[.//w:t]', $paragraph) as $run) {
+            if (!$run instanceof DOMElement) continue;
+            $runProperties = $this->ensure($run, 'rPr', true);
+            $this->attr($this->ensure($runProperties, 'b'), 'val', 1);
+            $this->attr($this->ensure($runProperties, 'bCs'), 'val', 1);
+        }
     }
 
     private function referenceParagraphRoles(DOMXPath $xp): array
