@@ -156,6 +156,7 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('THE PROBLEM AND ITS BACKGROUND', $xp->evaluate('string(//w:p[w:pPr/w:pStyle[@w:val="TemplateSectionTitle"]]//w:t)'));
         $this->assertSame('TemplateSectionTitle', $xp->evaluate('string(//w:p[w:r/w:t="THE PROBLEM AND ITS BACKGROUND"]/w:pPr/w:pStyle/@w:val)'));
         $this->assertSame('TemplateTopic', $xp->evaluate('string(//w:p[w:r/w:t="Introduction"]/w:pPr/w:pStyle/@w:val)'));
+        $this->assertSame('1', $xp->evaluate('string(count(//w:p[w:r/w:t="Introduction"]/w:r/w:rPr/w:b))'));
         $this->assertSame('Student body.', $xp->evaluate('string(//w:p[w:r/w:t="Student body."]/w:r/w:t)'));
         $this->assertSame('USER THESIS TITLE', $xp->evaluate('string(//w:p[w:r/w:t="USER THESIS TITLE"]//w:t)'));
     }
@@ -177,6 +178,24 @@ class PaperFormatterTest extends TestCase
         $stylesDoc = new DOMDocument; $this->assertTrue($stylesDoc->loadXML($styles));
         $stylesXp = new DOMXPath($stylesDoc); $stylesXp->registerNamespace('w', self::W);
         $this->assertSame('center', $stylesXp->evaluate('string(//w:style[@w:styleId="TemplateCenteredHeading"]/w:pPr/w:jc/@w:val)'));
+    }
+
+    public function test_bold_template_heading_matches_unstyled_student_heading_by_exact_text(): void
+    {
+        $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>Introduction</w:t></w:r></w:p><w:p><w:r><w:t>Reference body.</w:t></w:r></w:p>');
+        $zip = new ZipArchive; $zip->open($reference);
+        $zip->addFromString('word/styles.xml', '<w:styles xmlns:w="'.self::W.'"><w:style w:type="paragraph" w:styleId="Heading2"><w:pPr><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/></w:rPr></w:style></w:styles>');
+        $zip->close();
+        $student = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Introduction</w:t></w:r></w:p><w:p><w:r><w:t>Student body.</w:t></w:r></w:p>');
+
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+
+        $xp = $this->xml($student);
+        $this->assertSame('Heading2', $xp->evaluate('string(//w:p[w:r/w:t="Introduction"]/w:pPr/w:pStyle/@w:val)'));
+        $zip = new ZipArchive; $zip->open($student); $styles = $zip->getFromName('word/styles.xml'); $zip->close();
+        $stylesDoc = new DOMDocument; $this->assertTrue($stylesDoc->loadXML($styles));
+        $stylesXp = new DOMXPath($stylesDoc); $stylesXp->registerNamespace('w', self::W);
+        $this->assertSame('1', $stylesXp->evaluate('string(count(//w:style[@w:styleId="Heading2"]/w:rPr/w:b))'));
     }
 
     public function test_docx_uses_template_settings_and_chapter_has_a_real_page_break(): void

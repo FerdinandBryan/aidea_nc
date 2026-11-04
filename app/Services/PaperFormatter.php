@@ -155,23 +155,36 @@ class PaperFormatter
             $referenceXp = new DOMXPath($referenceDoc); $referenceXp->registerNamespace('w', self::W);
             $referenceRoles = $this->referenceParagraphRoles($referenceXp);
             $studentRoles = $this->referenceParagraphRoles($studentXp);
+            $referenceHeadings = [];
+            foreach ($referenceRoles as $referenceRole => $referenceParagraphs) {
+                if ($referenceRole !== 'chapter' && !str_starts_with($referenceRole, 'section:') && !str_starts_with($referenceRole, 'topic')) continue;
+                foreach ($referenceParagraphs as $referenceParagraph) {
+                    $key = mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($referenceParagraph)));
+                    if ($key !== '') $referenceHeadings[$key] = $referenceParagraph;
+                }
+            }
             $paragraphProperties = ['pStyle', 'keepNext', 'keepLines', 'widowControl', 'pBdr', 'shd', 'tabs', 'bidi', 'snapToGrid', 'spacing', 'ind', 'contextualSpacing', 'jc', 'textDirection', 'outlineLvl'];
             $runProperties = ['rStyle', 'rFonts', 'b', 'bCs', 'i', 'iCs', 'caps', 'smallCaps', 'color', 'spacing', 'sz', 'szCs', 'u', 'vertAlign', 'lang'];
             $referenceIndent = $this->settings($referenceRules)['indentation'];
             $processed = 0;
             foreach ($studentRoles as $role => $paragraphs) {
-                if (empty($referenceRoles[$role])) continue;
-                $sources = $referenceRoles[$role];
                 $isTemplateHeading = $role === 'chapter' || str_starts_with($role, 'section:') || str_starts_with($role, 'topic');
+                $sources = $referenceRoles[$role] ?? [];
+                if (!$sources && !$isTemplateHeading) continue;
                 foreach ($paragraphs as $index => $target) {
                     $targetText = mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($target)));
                     $source = null; $matchedText = false;
-                    foreach ($sources as $candidate) {
-                        if (mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($candidate))) === $targetText) {
-                            $source = $candidate; $matchedText = true; break;
+                    if ($isTemplateHeading && isset($referenceHeadings[$targetText])) {
+                        $source = $referenceHeadings[$targetText]; $matchedText = true;
+                    } else {
+                        foreach ($sources as $candidate) {
+                            if (mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($candidate))) === $targetText) {
+                                $source = $candidate; $matchedText = true; break;
+                            }
                         }
                     }
-                    if (!$source) $source = $sources[count($sources) === count($paragraphs) ? $index : 0];
+                    if (!$source && $sources) $source = $sources[count($sources) === count($paragraphs) ? $index : 0];
+                    if (!$source) continue;
                     $copyHeadingText = $isTemplateHeading && !$matchedText && count($sources) === count($paragraphs);
                     $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $runProperties, $copyHeadingText);
                     if ($role === 'body' && $referenceIndent !== null) {
