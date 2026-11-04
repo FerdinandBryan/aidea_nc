@@ -317,7 +317,7 @@ class PaperFormatter
                 if (!$paragraph instanceof DOMElement) continue;
                 $text = $this->text($paragraph);
                 if ($this->isChapter($text)) { $chapterSeen = true; continue; }
-                if ($text === '' || $this->isTopicHeading($paragraph, $xp)) continue;
+                if ($text === '' || $this->isReferenceTopicHeading($paragraph, $xp)) continue;
                 $candidates[] = $paragraph;
                 if ($chapterSeen) $afterChapter[] = $paragraph;
             }
