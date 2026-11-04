@@ -164,8 +164,15 @@ class PaperFormatter
                 $sources = $referenceRoles[$role];
                 $isTemplateHeading = $role === 'chapter' || str_starts_with($role, 'section:') || str_starts_with($role, 'topic');
                 foreach ($paragraphs as $index => $target) {
-                    $source = $sources[count($sources) === count($paragraphs) ? $index : 0];
-                    $copyHeadingText = $isTemplateHeading && count($sources) === count($paragraphs);
+                    $targetText = mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($target)));
+                    $source = null; $matchedText = false;
+                    foreach ($sources as $candidate) {
+                        if (mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($candidate))) === $targetText) {
+                            $source = $candidate; $matchedText = true; break;
+                        }
+                    }
+                    if (!$source) $source = $sources[count($sources) === count($paragraphs) ? $index : 0];
+                    $copyHeadingText = $isTemplateHeading && !$matchedText && count($sources) === count($paragraphs);
                     $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $runProperties, $copyHeadingText);
                     if ($role === 'body' && $referenceIndent !== null) {
                         $indent = $this->ensure($this->ensure($target, 'pPr', true), 'ind');

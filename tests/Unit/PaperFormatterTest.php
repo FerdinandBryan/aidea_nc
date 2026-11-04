@@ -160,6 +160,25 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('USER THESIS TITLE', $xp->evaluate('string(//w:p[w:r/w:t="USER THESIS TITLE"]//w:t)'));
     }
 
+    public function test_reference_heading_matches_its_exact_admin_style_when_role_counts_differ(): void
+    {
+        $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="TemplateRightHeading"/></w:pPr><w:r><w:t>OBJECTIVES</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="TemplateCenteredHeading"/></w:pPr><w:r><w:t>THE PROBLEM AND ITS BACKGROUND</w:t></w:r></w:p><w:p><w:r><w:t>Reference body.</w:t></w:r></w:p>');
+        $zip = new ZipArchive; $zip->open($reference);
+        $zip->addFromString('word/styles.xml', '<w:styles xmlns:w="'.self::W.'"><w:style w:type="paragraph" w:styleId="TemplateRightHeading"><w:pPr><w:jc w:val="right"/></w:pPr></w:style><w:style w:type="paragraph" w:styleId="TemplateCenteredHeading"><w:pPr><w:jc w:val="center"/></w:pPr></w:style></w:styles>');
+        $zip->close();
+        $student = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>THE PROBLEM AND ITS BACKGROUND</w:t></w:r></w:p><w:p><w:r><w:t>Student body.</w:t></w:r></w:p>');
+
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+
+        $xp = $this->xml($student);
+        $heading = '//w:p[w:r/w:t="THE PROBLEM AND ITS BACKGROUND"]';
+        $this->assertSame('TemplateCenteredHeading', $xp->evaluate('string('.$heading.'/w:pPr/w:pStyle/@w:val)'));
+        $zip = new ZipArchive; $zip->open($student); $styles = $zip->getFromName('word/styles.xml'); $zip->close();
+        $stylesDoc = new DOMDocument; $this->assertTrue($stylesDoc->loadXML($styles));
+        $stylesXp = new DOMXPath($stylesDoc); $stylesXp->registerNamespace('w', self::W);
+        $this->assertSame('center', $stylesXp->evaluate('string(//w:style[@w:styleId="TemplateCenteredHeading"]/w:pPr/w:jc/@w:val)'));
+    }
+
     public function test_docx_uses_template_settings_and_chapter_has_a_real_page_break(): void
     {
         $file = $this->paper('<w:p><w:r><w:t>Title</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Body</w:t></w:r></w:p><w:p><w:r><w:t>ABSTRACT</w:t></w:r></w:p><w:p><w:r><w:t>Abstract text</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>Table text</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr>');
