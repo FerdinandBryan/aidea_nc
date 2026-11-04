@@ -21,6 +21,9 @@ class GeminiPaperReviewController extends Controller
     {
         $data = $request->validate(['file' => ['bail', 'required', 'file', 'max:20480', new ValidWordDocument], 'template_id' => 'required|string|max:120']);
         $template = $templates->load($data['template_id']);
+        if ($templates->hasMissingDeclaredReference($template, $data['template_id'])) {
+            return response()->json(['message' => 'The admin DOCX reference is not stored on the server. Reopen the template, select its DOCX file again, and save it before fixing papers.'], 409);
+        }
         $path = null;
         try {
             $noRules = empty($template['effective_rules']);

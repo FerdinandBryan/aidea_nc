@@ -174,6 +174,22 @@ class PaperFormattingApiTest extends TestCase
         $this->assertStringContainsString('<w:t>Title</w:t>', $xml);
     }
 
+    public function test_missing_declared_admin_docx_returns_reupload_instruction_in_both_fix_paths(): void
+    {
+        Sanctum::actingAs(new User(['name' => 'Student']));
+        $template = [['id' => 'missing-reference-guard', 'active' => true, 'rules' => [], 'file' => ['name' => 'admin-example.docx']]];
+        $message = 'The admin DOCX reference is not stored on the server. Reopen the template, select its DOCX file again, and save it before fixing papers.';
+
+        $this->templates($template);
+        $this->post('/api/papers/fix', ['file' => $this->paper(), 'template_id' => 'missing-reference-guard'], ['Accept' => 'application/json'])
+            ->assertStatus(409)->assertJsonPath('message', $message);
+
+        $this->templates($template);
+        Http::preventStrayRequests();
+        $this->post('/api/papers/check-and-fix', ['file' => $this->paper(), 'template_id' => 'missing-reference-guard'], ['Accept' => 'application/json'])
+            ->assertStatus(409)->assertJsonPath('message', $message);
+    }
+
     public function test_empty_rules_use_the_uploaded_admin_docx_as_the_student_format(): void
     {
         $templateId = 'reference-layout-test';

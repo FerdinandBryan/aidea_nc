@@ -56,4 +56,11 @@ class AdminFormattingTemplate
         $path = $this->referenceStoragePath($id);
         return is_file($path) ? $path : null;
     }
+
+    public function hasMissingDeclaredReference(array $template, string $id): bool
+    {
+        $file = $template['file'] ?? null;
+        $name = is_array($file) ? (string) ($file['name'] ?? '') : '';
+        return strtolower(pathinfo($name, PATHINFO_EXTENSION)) === 'docx' && $this->referencePath($id) === null;
+    }
 }

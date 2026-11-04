@@ -37,6 +37,9 @@ class PaperFormattingController extends Controller
             ], 503);
         }
         $template = $templates->load($data['template_id']);
+        if ($templates->hasMissingDeclaredReference($template, $data['template_id'])) {
+            return response()->json(['message' => 'The admin DOCX reference is not stored on the server. Reopen the template, select its DOCX file again, and save it before fixing papers.'], 409);
+        }
         // Never accept a URL or rules supplied by the browser. Work on a private
         // copy and delete it after streaming, leaving the original unchanged.
         $directory = storage_path('app/private/paper-fixes');
