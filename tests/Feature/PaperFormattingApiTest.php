@@ -7,6 +7,7 @@ use App\Services\PaperFormatter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 use ZipArchive;
@@ -28,9 +29,11 @@ class PaperFormattingApiTest extends TestCase
 
     private array $files = [];
     private array $referenceFiles = [];
+    private bool $referenceDatabaseTransaction = false;
 
     protected function tearDown(): void
     {
+        if ($this->referenceDatabaseTransaction && DB::transactionLevel() > 0) DB::rollBack();
         foreach ($this->files as $file) @unlink($file);
         foreach ($this->referenceFiles as $file) @unlink($file);
         parent::tearDown();
@@ -51,6 +54,26 @@ class PaperFormattingApiTest extends TestCase
         DB::shouldReceive('table')->with('format_templates')->once()->andReturnSelf();
         DB::shouldReceive('orderBy')->with('id')->once()->andReturnSelf();
         DB::shouldReceive('first')->once()->andReturn((object) ['data' => json_encode($list)]);
+    }
+
+    private function beginReferenceDatabase(): void
+    {
+        if (!Schema::hasTable('format_templates')) Schema::create('format_templates', function ($table) {
+            $table->id(); $table->longText('data'); $table->timestamps();
+        });
+        if (!Schema::hasTable('format_template_reference_chunks')) Schema::create('format_template_reference_chunks', function ($table) {
+            $table->string('template_id', 120); $table->unsignedInteger('chunk_index'); $table->longText('chunk_data');
+            $table->char('sha256', 64); $table->unsignedBigInteger('file_size'); $table->primary(['template_id', 'chunk_index']);
+        });
+        DB::beginTransaction(); $this->referenceDatabaseTransaction = true;
+    }
+
+    private function persistTemplates(array $list): void
+    {
+        $json = json_encode(array_values($list));
+        $row = DB::table('format_templates')->orderBy('id')->first();
+        if ($row) DB::table('format_templates')->where('id', $row->id)->update(['data' => $json, 'updated_at' => now()]);
+        else DB::table('format_templates')->insert(['data' => $json, 'created_at' => now(), 'updated_at' => now()]);
     }
 
     public function test_authentication_is_required(): void
@@ -177,14 +200,15 @@ class PaperFormattingApiTest extends TestCase
     public function test_missing_declared_admin_docx_returns_reupload_instruction_in_both_fix_paths(): void
     {
         Sanctum::actingAs(new User(['name' => 'Student']));
+        $this->beginReferenceDatabase();
         $template = [['id' => 'missing-reference-guard', 'active' => true, 'rules' => [], 'file' => ['name' => 'admin-example.docx']]];
         $message = 'The admin DOCX reference is not stored on the server. Reopen the template, select its DOCX file again, and save it before fixing papers.';
 
-        $this->templates($template);
+        $this->persistTemplates($template);
         $this->post('/api/papers/fix', ['file' => $this->paper(), 'template_id' => 'missing-reference-guard'], ['Accept' => 'application/json'])
             ->assertStatus(409)->assertJsonPath('message', $message);
 
-        $this->templates($template);
+        $this->persistTemplates($template);
         Http::preventStrayRequests();
         $this->post('/api/papers/check-and-fix', ['file' => $this->paper(), 'template_id' => 'missing-reference-guard'], ['Accept' => 'application/json'])
             ->assertStatus(409)->assertJsonPath('message', $message);
@@ -193,6 +217,7 @@ class PaperFormattingApiTest extends TestCase
     public function test_admin_reference_accepts_docx_larger_than_twenty_megabytes(): void
     {
         $templateId = 'large-reference-test';
+        $this->beginReferenceDatabase();
         $largeReference = $this->paper();
         $zip = new ZipArchive; $this->assertTrue($zip->open($largeReference->getRealPath()) === true);
         $zip->addFromString('word/media/large.bin', str_repeat('x', 21 * 1024 * 1024));
@@ -202,7 +227,7 @@ class PaperFormattingApiTest extends TestCase
         $this->assertGreaterThan(20 * 1024 * 1024, filesize($largeReference->getRealPath()));
 
         Sanctum::actingAs(new User(['is_admin' => true]));
-        $this->templates([['id' => $templateId, 'active' => true]]);
+        $this->persistTemplates([['id' => $templateId, 'active' => true, 'file' => ['name' => 'large-reference.docx']]]);
         $this->post('/api/format-templates/'.$templateId.'/reference', ['file' => $largeReference], ['Accept' => 'application/json'])
             ->assertOk()->assertJsonPath('ok', true);
         $referencePath = (new \App\Services\AdminFormattingTemplate)->referenceStoragePath($templateId);
@@ -213,24 +238,33 @@ class PaperFormattingApiTest extends TestCase
     public function test_empty_rules_use_the_uploaded_admin_docx_as_the_student_format(): void
     {
         $templateId = 'reference-layout-test';
+        $this->beginReferenceDatabase();
         $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="TemplateHeading"/></w:pPr><w:r><w:t>THE PROBLEM AND ITS BACKGROUND</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>Introduction</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:line="360" w:lineRule="auto"/><w:ind w:firstLine="360"/><w:jc w:val="both"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial"/><w:sz w:val="20"/></w:rPr><w:t>Reference body.</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>');
         $referenceZip = new ZipArchive; $referenceZip->open($reference);
         $referenceZip->addFromString('word/styles.xml', '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="TemplateHeading"><w:pPr><w:jc w:val="center"/></w:pPr><w:rPr><w:b/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:pPr><w:jc w:val="left"/></w:pPr><w:rPr><w:b/></w:rPr></w:style></w:styles>');
         $referenceZip->close();
         Sanctum::actingAs(new User(['is_admin' => true]));
-        $this->templates([['id' => $templateId, 'active' => true]]);
+        $template = [['id' => $templateId, 'active' => true, 'file' => ['name' => 'admin-example.docx']]];
+        $this->persistTemplates($template);
         $beforeRevision = $this->getJson('/api/format-templates/'.$templateId.'/formatting')->assertOk()->json('revision');
-        $this->templates([['id' => $templateId, 'active' => true]]);
+        $this->persistTemplates($template);
         $this->post('/api/format-templates/'.$templateId.'/reference', ['file' => $reference], ['Accept' => 'application/json'])->assertOk();
         $referencePath = (new \App\Services\AdminFormattingTemplate)->referenceStoragePath($templateId);
         $this->referenceFiles[] = $referencePath;
         $this->assertFileExists($referencePath);
-        $this->templates([['id' => $templateId, 'active' => true]]);
+        @unlink($referencePath);
+        $this->persistTemplates($template);
+        $restoredPath = (new \App\Services\AdminFormattingTemplate)->referencePath($templateId);
+        $this->referenceFiles[] = $restoredPath;
+        $this->assertIsString($restoredPath);
+        $this->assertFileExists($restoredPath);
+        $this->assertSame(hash_file('sha256', $reference->getRealPath()), hash_file('sha256', $restoredPath));
+        $this->persistTemplates($template);
         $afterRevision = $this->getJson('/api/format-templates/'.$templateId.'/formatting')->assertOk()->json('revision');
         $this->assertNotSame($beforeRevision, $afterRevision);
 
         Sanctum::actingAs(new User(['name' => 'Student']));
-        $this->templates([['id' => $templateId, 'active' => true]]);
+        $this->persistTemplates($template);
         Http::preventStrayRequests();
         $response = $this->post('/api/papers/check-and-fix', [
             'file' => $this->paper('<w:p><w:r><w:t>Title</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:t>Student paragraph.</w:t></w:r></w:p>'),
@@ -258,14 +292,14 @@ class PaperFormattingApiTest extends TestCase
         $this->assertStringContainsString('w:w="11906"', $xml);
         $this->assertStringContainsString('w:left="1440"', $xml);
 
-        $this->templates([['id' => $templateId, 'active' => true]]);
+        $this->persistTemplates($template);
         $this->post('/api/papers/fix', [
             'file' => $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Direct fix paragraph.</w:t></w:r></w:p>'),
             'template_id' => $templateId, 'include_report' => 1,
         ], ['Accept' => 'application/json'])->assertOk()->assertJsonPath('report.settings.indentation', 0.25)
             ->assertJsonPath('report.settings.spacing', 1.5)->assertJsonPath('report.settings.font', 'Arial');
 
-        $this->templates([['id' => $templateId, 'active' => true, 'rules' => [['name' => 'Checklist', 'detail' => 'Required content is present.']]]]);
+        $this->persistTemplates([['id' => $templateId, 'active' => true, 'file' => ['name' => 'admin-example.docx'], 'rules' => [['name' => 'Checklist', 'detail' => 'Required content is present.']]]]);
         $this->post('/api/papers/fix', [
             'file' => $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Checklist paragraph.</w:t></w:r></w:p>'),
             'template_id' => $templateId, 'include_report' => 1,

@@ -38,10 +38,10 @@ class AdminFormattingTemplate
             $rules[] = ['name' => 'Admin setting: '.$name, 'type' => $types[$name], 'value' => $value];
         }
         $template['effective_rules'] = $rules;
-        $reference = $this->referencePath($id);
+        $referenceHash = $this->hasDeclaredReference($template) ? $this->referenceHash($id) : null;
         $template['revision'] = hash('sha256', json_encode([
             'rules' => $rules,
-            'reference' => $reference ? hash_file('sha256', $reference) : null,
+            'reference' => $referenceHash,
         ], JSON_UNESCAPED_UNICODE));
         return $template;
     }
@@ -54,13 +54,100 @@ class AdminFormattingTemplate
     public function referencePath(string $id): ?string
     {
         $path = $this->referenceStoragePath($id);
-        return is_file($path) ? $path : null;
+        $metadata = DB::table('format_template_reference_chunks')
+            ->where('template_id', $id)->orderBy('chunk_index')->first(['sha256', 'file_size']);
+        if (!$metadata) return is_file($path) ? $path : null;
+        if (is_file($path) && hash_file('sha256', $path) === $metadata->sha256) return $path;
+
+        $directory = dirname($path);
+        if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
+            throw new \RuntimeException('Could not create the private template cache directory.');
+        }
+        $temporary = $path.'.'.bin2hex(random_bytes(6)).'.tmp';
+        $handle = fopen($temporary, 'wb');
+        if ($handle === false) throw new \RuntimeException('Could not prepare the admin reference template.');
+        $hash = hash_init('sha256'); $size = 0;
+        try {
+            DB::table('format_template_reference_chunks')->where('template_id', $id)->orderBy('chunk_index')
+                ->chunk(16, function ($chunks) use ($handle, $hash, &$size) {
+                    foreach ($chunks as $chunk) {
+                        $contents = base64_decode($chunk->chunk_data, true);
+                        if ($contents === false) throw new \RuntimeException('The stored admin reference template is corrupted.');
+                        $length = strlen($contents); $written = 0;
+                        while ($written < $length) {
+                            $count = fwrite($handle, substr($contents, $written));
+                            if ($count === false || $count === 0) throw new \RuntimeException('Could not restore the admin reference template.');
+                            $written += $count;
+                        }
+                        hash_update($hash, $contents); $size += $length;
+                    }
+                });
+            if (!fflush($handle)) throw new \RuntimeException('Could not restore the admin reference template.');
+        } catch (\Throwable $e) {
+            fclose($handle); @unlink($temporary); throw $e;
+        }
+        fclose($handle);
+        if ($size !== (int) $metadata->file_size || hash_final($hash) !== $metadata->sha256) {
+            @unlink($temporary);
+            throw new \RuntimeException('The stored admin reference template failed integrity verification.');
+        }
+        @unlink($path);
+        if (!rename($temporary, $path)) { @unlink($temporary); throw new \RuntimeException('Could not cache the admin reference template.'); }
+        @chmod($path, 0600);
+        return $path;
+    }
+
+    public function saveReference(string $id, string $sourcePath): void
+    {
+        $size = filesize($sourcePath);
+        $hash = hash_file('sha256', $sourcePath);
+        if ($size === false || $hash === false || $size > 50 * 1024 * 1024) {
+            throw new \RuntimeException('The admin reference template exceeds the 50 MB limit.');
+        }
+        $source = fopen($sourcePath, 'rb');
+        if ($source === false) throw new \RuntimeException('Could not read the admin reference template.');
+        try {
+            DB::transaction(function () use ($id, $source, $hash, $size) {
+                DB::table('format_template_reference_chunks')->where('template_id', $id)->delete();
+                $index = 0;
+                while (!feof($source)) {
+                    $contents = fread($source, 512 * 1024);
+                    if ($contents === false) throw new \RuntimeException('Could not read the admin reference template.');
+                    if ($contents === '') break;
+                    DB::table('format_template_reference_chunks')->insert([
+                        'template_id' => $id,
+                        'chunk_index' => $index++,
+                        'chunk_data' => base64_encode($contents),
+                        'sha256' => $hash,
+                        'file_size' => $size,
+                    ]);
+                }
+            });
+        } finally { fclose($source); }
+        $path = $this->referenceStoragePath($id);
+        $directory = dirname($path);
+        if (!is_dir($directory)) @mkdir($directory, 0700, true);
+        if (is_dir($directory) && @copy($sourcePath, $path)) @chmod($path, 0600);
+    }
+
+    public function referenceHash(string $id): ?string
+    {
+        $metadata = DB::table('format_template_reference_chunks')
+            ->where('template_id', $id)->orderBy('chunk_index')->first(['sha256']);
+        if ($metadata) return $metadata->sha256;
+        $path = $this->referenceStoragePath($id);
+        return is_file($path) ? hash_file('sha256', $path) : null;
+    }
+
+    public function hasDeclaredReference(array $template): bool
+    {
+        $file = $template['file'] ?? null;
+        $name = is_array($file) ? (string) ($file['name'] ?? '') : '';
+        return strtolower(pathinfo($name, PATHINFO_EXTENSION)) === 'docx';
     }
 
     public function hasMissingDeclaredReference(array $template, string $id): bool
     {
-        $file = $template['file'] ?? null;
-        $name = is_array($file) ? (string) ($file['name'] ?? '') : '';
-        return strtolower(pathinfo($name, PATHINFO_EXTENSION)) === 'docx' && $this->referencePath($id) === null;
+        return $this->hasDeclaredReference($template) && $this->referenceHash($id) === null;
     }
 }
