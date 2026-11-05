@@ -12,7 +12,7 @@ class AdminFormattingTemplateController extends Controller
     public function storeReference(string $templateId, Request $request, AdminFormattingTemplate $templates)
     {
         $data = $request->validate([
-            'file' => ['bail', 'required', 'file', 'max:20480', new ValidWordDocument],
+            'file' => ['bail', 'required', 'file', 'max:51200', new ValidWordDocument],
         ]);
         $templates->load($templateId);
         $path = $templates->referenceStoragePath($templateId);

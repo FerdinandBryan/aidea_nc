@@ -190,6 +190,26 @@ class PaperFormattingApiTest extends TestCase
             ->assertStatus(409)->assertJsonPath('message', $message);
     }
 
+    public function test_admin_reference_accepts_docx_larger_than_twenty_megabytes(): void
+    {
+        $templateId = 'large-reference-test';
+        $largeReference = $this->paper();
+        $zip = new ZipArchive; $this->assertTrue($zip->open($largeReference->getRealPath()) === true);
+        $zip->addFromString('word/media/large.bin', str_repeat('x', 21 * 1024 * 1024));
+        $zip->setCompressionName('word/media/large.bin', ZipArchive::CM_STORE);
+        $zip->close();
+        clearstatcache(true, $largeReference->getRealPath());
+        $this->assertGreaterThan(20 * 1024 * 1024, filesize($largeReference->getRealPath()));
+
+        Sanctum::actingAs(new User(['is_admin' => true]));
+        $this->templates([['id' => $templateId, 'active' => true]]);
+        $this->post('/api/format-templates/'.$templateId.'/reference', ['file' => $largeReference], ['Accept' => 'application/json'])
+            ->assertOk()->assertJsonPath('ok', true);
+        $referencePath = (new \App\Services\AdminFormattingTemplate)->referenceStoragePath($templateId);
+        $this->referenceFiles[] = $referencePath;
+        $this->assertFileExists($referencePath);
+    }
+
     public function test_empty_rules_use_the_uploaded_admin_docx_as_the_student_format(): void
     {
         $templateId = 'reference-layout-test';
