@@ -213,6 +213,7 @@ class PaperFormatter
                         }
                     $copyHeadingText = $isTemplateHeading && !$matchedText && count($sources) === count($paragraphs);
                     $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $runProperties, $copyHeadingText);
+                    if ($isTemplateHeading) $this->copyReferenceHeadingGap($source, $target, $referenceXp, $studentXp);
                     if ($isTemplateHeading) $this->boldHeadingParagraph($target, $studentXp);
                     if ($role === 'body' && $referenceIndent !== null) {
                         $indent = $this->ensure($this->ensure($target, 'pPr', true), 'ind');
@@ -268,6 +269,48 @@ class PaperFormatter
             $this->attr($this->ensure($runProperties, 'b'), 'val', 1);
             $this->attr($this->ensure($runProperties, 'bCs'), 'val', 1);
         }
+    }
+
+    /** Blank paragraphs are layout in a Word template, outside the heading's pPr. */
+    private function copyReferenceHeadingGap(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp): void
+    {
+        $isBlank = function ($node, DOMXPath $xp): bool {
+            return $node instanceof DOMElement && $node->namespaceURI === self::W && $node->localName === 'p'
+                && $this->text($node) === ''
+                && !$xp->query('.//w:drawing | .//w:pict | .//w:object | .//w:br | .//w:sectPr | .//w:fldChar | .//w:bookmarkStart | ./w:pPr/w:pageBreakBefore', $node)->length;
+        };
+        $previousElement = static function ($node) {
+            $previous = $node->previousSibling;
+            while ($previous && !$previous instanceof DOMElement) $previous = $previous->previousSibling;
+            return $previous;
+        };
+        $blanks = []; $previous = $previousElement($source);
+        while ($isBlank($previous, $referenceXp)) {
+            array_unshift($blanks, $previous);
+            $previous = $previousElement($previous);
+        }
+        // Do not reproduce leading page padding as a section gap.
+        if (!$previous instanceof DOMElement) return;
+        if (!$blanks) {
+            $instruction = $this->text($previous);
+            if (preg_match('/\b(one|two|three|four|five|\d+)\s*(?:\(\s*\d+\s*\))?\s+blank\s+lines?\s+before\s+(?:(?:the|next|each|every)\s+)*(?:section\s+)?(?:heading|header|title)\b/i', $instruction, $match)) {
+                $words = ['one' => 1, 'two' => 2, 'three' => 3, 'four' => 4, 'five' => 5];
+                $lines = $words[strtolower($match[1])] ?? (int) $match[1];
+                if ($lines >= 0 && $lines <= 5) {
+                    $spacing = $this->ensure($this->ensure($target, 'pPr', true), 'spacing');
+                    $this->attr($spacing, 'before', 0);
+                    $this->attr($spacing, 'beforeLines', $lines * 100);
+                    $this->attr($spacing, 'beforeAutospacing', 0);
+                }
+            }
+            return;
+        }
+        $previousTarget = $previousElement($target);
+        while ($isBlank($previousTarget, $studentXp)) {
+            $remove = $previousTarget; $previousTarget = $previousElement($remove);
+            $remove->parentNode->removeChild($remove);
+        }
+        foreach ($blanks as $blank) $target->parentNode->insertBefore($target->ownerDocument->importNode($blank, true), $target);
     }
 
     private function referenceParagraphRoles(DOMXPath $xp): array

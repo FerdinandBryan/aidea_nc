@@ -112,6 +112,32 @@ class PaperFormatterTest extends TestCase
         $this->assertStringContainsString('w:before="600"', $styles);
     }
 
+    public function test_section_gap_copies_blank_paragraphs_from_each_reference_without_accumulating(): void
+    {
+        foreach ([0, 1, 2] as $count) {
+            $blank = '<w:p><w:pPr><w:spacing w:line="480" w:lineRule="auto"/></w:pPr></w:p>';
+            $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Reference body.</w:t></w:r></w:p>'.str_repeat($blank, $count).'<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Conceptual Framework</w:t></w:r></w:p>');
+            $student = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Student body.</w:t></w:r></w:p><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Conceptual Framework</w:t></w:r></w:p>');
+            $formatter = new PaperFormatter;
+            for ($pass = 0; $pass < 2; $pass++) {
+                $formatter->formatUsingReference($student, $reference);
+                $xp = $this->xml($student);
+                $this->assertEquals($count, $xp->evaluate('count(/w:document/w:body/w:p[not(.//w:t) and w:pPr/w:spacing[@w:line="480"]])'));
+                $this->assertSame('Student body.', $xp->evaluate('string(//w:p[.//w:t="Student body."]//w:t)'));
+            }
+        }
+    }
+
+    public function test_section_gap_reads_the_reference_instruction_when_no_blank_paragraph_is_present(): void
+    {
+        foreach (['one (1)' => 100, 'two (2)' => 200] as $number => $expected) {
+            $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>[Leave '.$number.' blank line before the next section heading.]</w:t></w:r></w:p><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Conceptual Framework</w:t></w:r></w:p>');
+            $student = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Student body.</w:t></w:r></w:p><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Conceptual Framework</w:t></w:r></w:p>');
+            (new PaperFormatter)->formatUsingReference($student, $reference);
+            $this->assertSame((string) $expected, $this->xml($student)->evaluate('string(//w:p[.//w:t="Conceptual Framework"]/w:pPr/w:spacing/@w:beforeLines)'));
+        }
+    }
+
     public function test_reference_heading_spacing_is_not_overridden_by_general_rules(): void
     {
         $reference = $this->paper('<w:p><w:pPr><w:pStyle w:val="TemplateChapter"/></w:pPr><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Reference body.</w:t></w:r></w:p>');
