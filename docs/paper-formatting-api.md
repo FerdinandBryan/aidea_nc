@@ -47,6 +47,12 @@ When the selected template has an uploaded DOCX reference, that document is
 the formatting source. The formatter copies its paragraph/run properties,
 inherited styles, heading gaps, page-break properties and page geometry.
 Custom styles with inherited outline levels work without chapter labels.
+Page starts stored in leading runs, empty break paragraphs or preceding section
+boundaries are transferred to the matching paragraph. Page-break properties
+are materialized as equivalent leading run breaks for the browser renderer.
+Combined chapter labels/titles can match separate student paragraphs without
+adding a second page break. The preview reserves the following paragraph with
+a keep-with-next heading when that paragraph fits within a printable page.
 Heading text and structure select the source paragraph; body paragraphs use
 the matching section's sample where available. Student titles and content
 are preserved. Checklist-only cover placement, chapter breaks and appendix
@@ -56,6 +62,7 @@ The report includes `template_mapping` and lists ambiguous or unmatched
 paragraphs under `manual_review_rules`. It also identifies preserved tables,
 embedded objects, headers/footers and templates with multiple sections that
 need layout review. This is not a pixel-identical rendering guarantee.
+Missing template sections are reported; their placeholder text is not inserted.
 PDF/DOC reference files receive a validation error asking for an editable
 DOCX, rather than silently using checklist rules as a replacement layout.
 

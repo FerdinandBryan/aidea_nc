@@ -112,6 +112,43 @@ class PaperFormatterTest extends TestCase
         $this->assertStringContainsString('w:before="600"', $styles);
     }
 
+    public function test_section_boundary_before_combined_template_chapter_is_copied_to_separate_student_chapter(): void
+    {
+        foreach (['nextPage' => '1', 'continuous' => ''] as $sectionType => $expected) {
+            $reference = $this->paper('<w:p><w:r><w:t>TABLE OF CONTENTS</w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr><w:r><w:t>Last contents entry</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>CHAPTER 1</w:t><w:br/><w:t>CUSTOM CHAPTER TITLE</w:t></w:r></w:p><w:p><w:r><w:t>Reference body.</w:t></w:r></w:p><w:sectPr><w:type w:val="'.$sectionType.'"/></w:sectPr>');
+            $zip = new ZipArchive; $zip->open($reference);
+            $zip->addFromString('word/styles.xml', '<w:styles xmlns:w="'.self::W.'"><w:style w:type="paragraph" w:styleId="Heading1"><w:pPr><w:keepNext/><w:spacing w:before="480"/></w:pPr></w:style></w:styles>'); $zip->close();
+            $student = $this->paper('<w:p><w:r><w:t>Student cover</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>CUSTOM CHAPTER TITLE</w:t></w:r></w:p><w:p><w:r><w:t>Own paragraph.</w:t></w:r></w:p>');
+            (new PaperFormatter)->formatUsingReference($student, $reference);
+            $xp = $this->xml($student);
+            $this->assertSame('Heading1', $xp->evaluate('string(//w:p[.//w:t="CHAPTER 1"]/w:pPr/w:pStyle/@w:val)'));
+            $this->assertEquals($expected === '1' ? 1 : 0, $xp->evaluate('count(//w:p[.//w:t="CHAPTER 1"]/w:r/w:br[@w:type="page"])'));
+            $this->assertSame('0', $xp->evaluate('string(//w:p[.//w:t="CUSTOM CHAPTER TITLE"]/w:pPr/w:pageBreakBefore/@w:val)'));
+            $this->assertSame('0', $xp->evaluate('string(//w:p[.//w:t="CUSTOM CHAPTER TITLE"]/w:pPr/w:spacing/@w:before)'));
+            $this->assertEquals(1, $xp->evaluate('count(//w:p[.//w:t="CUSTOM CHAPTER TITLE"]/w:pPr/w:keepNext)'));
+        }
+    }
+
+    public function test_template_page_breaks_in_runs_and_empty_paragraphs_are_not_lost(): void
+    {
+        foreach (['<w:p><w:r><w:br w:type="page"/></w:r></w:p>' => '', '' => '<w:br w:type="page"/>'] as $preceding => $leading) {
+            $reference = $this->paper('<w:p><w:r><w:t>Prior section.</w:t></w:r></w:p>'.$preceding.'<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r>'.$leading.'<w:t>Custom next section</w:t></w:r></w:p><w:p><w:r><w:t>Example body.</w:t></w:r></w:p>');
+            $student = $this->paper('<w:p><w:r><w:t>Prior content.</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Custom next section</w:t></w:r></w:p><w:p><w:r><w:t>Own body.</w:t></w:r></w:p>');
+            (new PaperFormatter)->formatUsingReference($student, $reference);
+            $this->assertEquals(1, $this->xml($student)->evaluate('count(//w:p[.//w:t="Custom next section"]/w:r/w:br[@w:type="page"])'));
+        }
+    }
+
+    public function test_missing_template_sections_are_reported_without_inserting_placeholder_content(): void
+    {
+        $reference = $this->paper('<w:p><w:r><w:t>Template title</w:t></w:r></w:p><w:p><w:pPr><w:pageBreakBefore/></w:pPr><w:r><w:t>APPROVAL SHEET</w:t></w:r></w:p><w:p><w:r><w:t>[Approval text goes here.]</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p>');
+        $student = $this->paper('<w:p><w:r><w:t>My title</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p>');
+        $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+        $this->assertTrue($report['manual_review_required']);
+        $this->assertStringContainsString('Missing template section: APPROVAL SHEET', implode(' ', $report['manual_review_rules']));
+        $this->assertEquals(0, $this->xml($student)->evaluate('count(//w:t[contains(.,"Approval text") or .="APPROVAL SHEET"])'));
+    }
+
     public function test_custom_inherited_heading_styles_work_without_chapters_and_keep_student_titles(): void
     {
         foreach ([360, 840] as $gap) {

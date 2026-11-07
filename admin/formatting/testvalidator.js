@@ -2507,7 +2507,9 @@ async function _dvGenerateFixedPdf() {
                     j++;
                     var captionText = Array.from(kids[j].getElementsByTagNameNS(W, 't')).map(function (t) { return t.textContent; }).join('').trim();
                     var graphicBlock = kids[j].localName === 'tbl' || kids[j].getElementsByTagNameNS(W, 'drawing').length || kids[j].getElementsByTagNameNS(W, 'pict').length || kids[j].getElementsByTagNameNS(W, 'object').length;
-                    bottom = (graphicBlock || keepWithNext(kids[j]) || blankParagraph(kids[j]) || /^Figure\s*\d+(?:\.\d+)*\s*[.:-]/i.test(captionText)) ? next.bottom :
+                    // The renderer moves whole paragraphs, so reserve the whole
+                    // following paragraph whenever it fits on a printable page.
+                    bottom = (next.bottom - next.top <= contentH || graphicBlock || keepWithNext(kids[j]) || blankParagraph(kids[j]) || /^Figure\s*\d+(?:\.\d+)*\s*[.:-]/i.test(captionText)) ? next.bottom :
                         Math.min(next.bottom, next.top + next.leadHeight);
                 }
                 return bottom;

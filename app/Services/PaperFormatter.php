@@ -187,7 +187,14 @@ class PaperFormatter
             foreach ($referenceRoles as $referenceRole => $referenceParagraphs) {
                 if ($referenceRole !== 'chapter' && !str_starts_with($referenceRole, 'section:') && !str_starts_with($referenceRole, 'topic')) continue;
                 foreach ($referenceParagraphs as $referenceParagraph) {
-                    foreach ($this->referenceHeadingKeys($this->text($referenceParagraph)) as $key) {
+                    $keys = $this->referenceHeadingKeys($this->text($referenceParagraph));
+                    if ($referenceRole === 'chapter') {
+                        $keys = array_merge($keys, $this->referenceHeadingKeys($this->paragraphFirstLine($referenceParagraph)));
+                        $continuation = $this->chapterContinuation($referenceParagraph);
+                        if ($continuation !== '') $keys = array_merge($keys, $this->referenceHeadingKeys($continuation));
+                        $keys = array_unique($keys);
+                    }
+                    foreach ($keys as $key) {
                         if (!array_key_exists($key, $referenceHeadings)) $referenceHeadings[$key] = $referenceParagraph;
                         elseif ($referenceHeadings[$key] !== $referenceParagraph) $referenceHeadings[$key] = null;
                     }
@@ -198,6 +205,11 @@ class PaperFormatter
             $runProperties = ['rStyle', 'rFonts', 'b', 'bCs', 'i', 'iCs', 'caps', 'smallCaps', 'color', 'spacing', 'sz', 'szCs', 'u', 'vertAlign', 'lang'];
             $referenceIndent = $this->settings($referenceRules)['indentation'];
             $processed = 0; $warnings = []; $mapping = [];
+            foreach ($referenceRoles as $role => $paragraphs) {
+                if (str_starts_with($role, 'section:') && !isset($studentRoles[$role])) {
+                    $warnings[] = 'Missing template section: '.substr($role, strlen('section:')).'. Add its content to the paper; formatting does not invent missing sections.';
+                }
+            }
             foreach ($studentRoles as $role => $paragraphs) {
                 $sources = $referenceRoles[$role] ?? [];
                 $uniformSources = $sources && count(array_unique(array_map(fn ($candidate) => $this->referenceFormatSignature($candidate, $referenceXp), $sources))) === 1;
@@ -235,6 +247,19 @@ class PaperFormatter
                             $pr->replaceChild($studentDoc->importNode($inherited, true), $this->ensure($pr, $propertyName));
                         }
                     }
+                    $continuation = $this->chapterContinuation($source);
+                    $isContinuation = $continuation !== '' && $targetText === mb_strtolower(preg_replace('/\s+/u', ' ', $continuation));
+                    if ($isContinuation) {
+                        // A line inside the template's combined heading is not a second page start.
+                        $pr = $this->ensure($target, 'pPr', true);
+                        $this->attr($this->ensure($pr, 'pageBreakBefore'), 'val', 0);
+                        $spacing = $this->ensure($pr, 'spacing');
+                        $this->attr($spacing, 'before', 0); $this->attr($spacing, 'beforeLines', 0);
+                    } elseif ($this->referenceStartsPage($source, $referenceXp)) {
+                        $this->attr($this->ensure($this->ensure($target, 'pPr', true), 'pageBreakBefore'), 'val', 1);
+                    }
+                    $before = $studentXp->query('./w:pPr/w:pageBreakBefore', $target)->item(0);
+                    if ($before && !in_array(strtolower($before->getAttributeNS(self::W, 'val')), ['0', 'false', 'off'], true)) $this->materializePageStart($target, $studentXp);
                     $this->copyReferenceHeadingGap($source, $target, $referenceXp, $studentXp, $referenceStylesXp);
                     $mapping[] = ['paragraph' => $this->text($target), 'template_paragraph' => $this->text($source), 'match' => $matchedText ? 'heading-text' : 'structure'];
                     if ($role === 'body' && $referenceIndent !== null && !$referenceXp->query('./w:pPr/w:ind', $source)->length) {
@@ -456,13 +481,64 @@ class PaperFormatter
     private function isChapterParagraph(DOMElement $paragraph): bool
     {
         if ($this->isChapter($this->text($paragraph))) return true;
+        return $this->isChapter($this->paragraphFirstLine($paragraph));
+    }
+
+    private function paragraphFirstLine(DOMElement $paragraph): string
+    {
         // Word can store a chapter label and its title in one paragraph with a line break.
         $firstLine = '';
         foreach ($paragraph->getElementsByTagNameNS(self::W, '*') as $node) {
             if ($node->localName === 'br' || $node->localName === 'cr') break;
             if ($node->localName === 't') $firstLine .= $node->textContent;
         }
-        return $this->isChapter($firstLine);
+        return trim($firstLine);
+    }
+
+    private function chapterContinuation(DOMElement $paragraph): string
+    {
+        $firstLine = $this->paragraphFirstLine($paragraph);
+        return $this->isChapter($firstLine) ? trim(mb_substr($this->text($paragraph), mb_strlen($firstLine))) : '';
+    }
+
+    private function referenceStartsPage(DOMElement $source, DOMXPath $xp): bool
+    {
+        foreach ($xp->query('.//w:br | .//w:t', $source) as $node) {
+            if ($node->localName === 't' && trim($node->textContent) !== '') break;
+            if ($node->localName === 'br' && $node->getAttributeNS(self::W, 'type') === 'page') return true;
+        }
+        for ($previous = $source->previousSibling; $previous; $previous = $previous->previousSibling) {
+            if (!$previous instanceof DOMElement) continue;
+            if ($previous->localName !== 'p') return false;
+            if ($xp->query('./w:pPr/w:sectPr', $previous)->length) {
+                // A section boundary is stored on the paragraph ending the prior section.
+                $nextSection = $xp->query('following::w:sectPr[1]', $previous)->item(0);
+                $type = $nextSection ? $xp->evaluate('string(./w:type/@w:val)', $nextSection) : '';
+                return !in_array($type, ['continuous', 'nextColumn'], true);
+            }
+            foreach (array_reverse(iterator_to_array($xp->query('.//w:br | .//w:t', $previous))) as $node) {
+                if ($node->localName === 't' && trim($node->textContent) !== '') return false;
+                if ($node->localName === 'br' && $node->getAttributeNS(self::W, 'type') === 'page') return true;
+            }
+            if ($xp->query('.//w:drawing | .//w:pict | .//w:object', $previous)->length) return false;
+        }
+        return false;
+    }
+
+    private function materializePageStart(DOMElement $paragraph, DOMXPath $xp): void
+    {
+        // docx-preview does not split on pageBreakBefore. Use an equivalent
+        // leading run break so Word, preview and download share the boundary.
+        $pr = $this->ensure($paragraph, 'pPr', true);
+        $this->attr($this->ensure($pr, 'pageBreakBefore'), 'val', 0);
+        foreach ($xp->query('.//w:br | .//w:t', $paragraph) as $node) {
+            if ($node->localName === 't' && trim($node->textContent) !== '') break;
+            if ($node->localName === 'br' && $node->getAttributeNS(self::W, 'type') === 'page') return;
+        }
+        $run = $paragraph->ownerDocument->createElementNS(self::W, 'w:r');
+        $break = $paragraph->ownerDocument->createElementNS(self::W, 'w:br');
+        $this->attr($break, 'type', 'page'); $run->appendChild($break);
+        $paragraph->insertBefore($run, $pr->nextSibling);
     }
 
     private function isReferenceTopicHeading(DOMElement $paragraph, DOMXPath $xp): bool
