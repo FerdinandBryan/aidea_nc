@@ -14,6 +14,42 @@ use ZipArchive;
 
 class PaperFormattingApiTest extends TestCase
 {
+    public function test_both_fix_endpoints_use_a_chapterless_reference_without_replacing_student_titles(): void
+    {
+        foreach (['/api/papers/fix', '/api/papers/check-and-fix'] as $endpoint) {
+            Sanctum::actingAs(new User(['name' => 'Student']));
+            $reference = $this->paper('<w:p><w:pPr><w:pStyle w:val="Heading1"/><w:spacing w:before="720"/><w:pageBreakBefore w:val="0"/></w:pPr><w:r><w:rPr><w:b w:val="0"/></w:rPr><w:t>Example project heading</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:line="300"/></w:pPr><w:r><w:t>Example content.</w:t></w:r></w:p>');
+            $templates = \Mockery::mock(\App\Services\AdminFormattingTemplate::class);
+            $templates->shouldReceive('load')->once()->with('custom')->andReturn(['id' => 'custom', 'name' => 'Custom document', 'effective_rules' => [], 'revision' => 'custom-revision']);
+            $templates->shouldReceive('requireEditableReference')->once();
+            $templates->shouldReceive('hasMissingDeclaredReference')->once()->andReturnFalse();
+            $templates->shouldReceive('hasDeclaredReference')->once()->andReturnTrue();
+            $templates->shouldReceive('referencePath')->once()->with('custom')->andReturn($reference->getRealPath());
+            $this->app->instance(\App\Services\AdminFormattingTemplate::class, $templates);
+            $student = $this->paper('<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>My original heading</w:t></w:r></w:p><w:p><w:r><w:t>My content.</w:t></w:r></w:p>');
+            $response = $this->post($endpoint, ['file' => $student, 'template_id' => 'custom', 'include_report' => '1'], ['Accept' => 'application/json'])->assertOk();
+            $path = tempnam(sys_get_temp_dir(), 'custom_reference_'); $this->files[] = $path;
+            file_put_contents($path, base64_decode($response->json('document_base64'), true));
+            $zip = new ZipArchive; $zip->open($path); $xml = $zip->getFromName('word/document.xml'); $zip->close();
+            $this->assertStringContainsString('My original heading', $xml);
+            $this->assertStringNotContainsString('Example project heading', $xml);
+            $this->assertStringContainsString('w:before="720"', $xml);
+            $this->assertStringContainsString('w:line="300"', $xml);
+            $this->assertStringContainsString('w:b w:val="0"', $xml);
+            $this->assertNotEmpty($response->json('report.template_mapping'));
+        }
+    }
+
+    public function test_non_docx_reference_is_rejected_instead_of_silently_using_checklist_layout(): void
+    {
+        foreach (['/api/papers/fix', '/api/papers/check-and-fix'] as $endpoint) {
+            Sanctum::actingAs(new User(['name' => 'Student']));
+            $this->templates([['id' => 'pdf-reference', 'active' => true, 'file' => ['name' => 'example.pdf'], 'rules' => [['type' => 'spacing', 'value' => 2]]]]);
+            $this->post($endpoint, ['file' => $this->paper(), 'template_id' => 'pdf-reference'], ['Accept' => 'application/json'])
+                ->assertStatus(422)->assertJsonValidationErrors('template_id');
+        }
+    }
+
     public function test_missing_required_section_overrides_an_assumed_ai_pass(): void
     {
         Sanctum::actingAs(new User(['name' => 'Student'])); config(['services.gemini.key' => 'test-server-key']);

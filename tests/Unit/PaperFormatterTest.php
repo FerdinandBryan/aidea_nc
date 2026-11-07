@@ -112,6 +112,64 @@ class PaperFormatterTest extends TestCase
         $this->assertStringContainsString('w:before="600"', $styles);
     }
 
+    public function test_custom_inherited_heading_styles_work_without_chapters_and_keep_student_titles(): void
+    {
+        foreach ([360, 840] as $gap) {
+            $reference = $this->paper('<w:p><w:pPr><w:pStyle w:val="CustomSection"/></w:pPr><w:r><w:t>Sample section title</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="CustomBody"/></w:pPr><w:r><w:t>Sample paragraph.</w:t></w:r></w:p>');
+            $zip = new ZipArchive; $zip->open($reference);
+            $zip->addFromString('word/styles.xml', '<w:styles xmlns:w="'.self::W.'"><w:style w:type="paragraph" w:styleId="SectionBase"><w:pPr><w:outlineLvl w:val="0"/><w:spacing w:before="'.$gap.'" w:after="160"/><w:pageBreakBefore w:val="1"/></w:pPr><w:rPr><w:b w:val="0"/><w:i/><w:sz w:val="30"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="CustomSection"><w:basedOn w:val="SectionBase"/></w:style><w:style w:type="paragraph" w:styleId="CustomBody"><w:pPr><w:spacing w:line="300"/></w:pPr></w:style></w:styles>'); $zip->close();
+            $student = $this->paper('<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>My original title</w:t></w:r></w:p><w:p><w:r><w:t>My own paragraph.</w:t></w:r></w:p>');
+            $service = new PaperFormatter; $report = $service->formatUsingReference($student, $reference, $this->rules());
+            $xp = $this->xml($student);
+            $this->assertSame('CustomSection', $xp->evaluate('string(//w:p[.//w:t="My original title"]/w:pPr/w:pStyle/@w:val)'));
+            $this->assertEquals(0, $xp->evaluate('count(//w:p[.//w:t="My original title"]/w:r/w:rPr/w:b)'));
+            $this->assertSame('CustomBody', $xp->evaluate('string(//w:p[.//w:t="My own paragraph."]/w:pPr/w:pStyle/@w:val)'));
+            $this->assertContains('Sample section title', $service->referenceHeadings($reference));
+            $this->assertFalse($report['manual_review_required']);
+            $zip = new ZipArchive; $zip->open($student); $styles = $zip->getFromName('word/styles.xml'); $zip->close();
+            $this->assertStringContainsString('w:before="'.$gap.'"', $styles);
+            $this->assertStringContainsString('w:pageBreakBefore w:val="1"', $styles);
+        }
+    }
+
+    public function test_reference_mode_does_not_impose_appendix_typography_or_chapter_page_breaks(): void
+    {
+        $reference = $this->paper('<w:p><w:pPr><w:pageBreakBefore w:val="0"/></w:pPr><w:r><w:rPr><w:b w:val="0"/><w:sz w:val="22"/></w:rPr><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Reference body.</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:sz w:val="26"/><w:b w:val="0"/></w:rPr><w:t>APPENDICES</w:t></w:r></w:p>');
+        $student = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Own body.</w:t></w:r></w:p><w:p><w:r><w:t>APPENDICES</w:t></w:r></w:p>');
+        (new PaperFormatter)->formatUsingReference($student, $reference, $this->rules());
+        $xp = $this->xml($student);
+        $this->assertEquals(0, $xp->evaluate('count(//w:br[@w:type="page"])'));
+        $this->assertSame('0', $xp->evaluate('string(//w:p[.//w:t="CHAPTER 1"]/w:pPr/w:pageBreakBefore/@w:val)'));
+        $this->assertSame('26', $xp->evaluate('string(//w:p[.//w:t="APPENDICES"]/w:r/w:rPr/w:sz/@w:val)'));
+        $this->assertSame('0', $xp->evaluate('string(//w:p[.//w:t="APPENDICES"]/w:r/w:rPr/w:b/@w:val)'));
+        $this->assertSame('left', $xp->evaluate('string(//w:p[.//w:t="APPENDICES"]/w:pPr/w:jc/@w:val)'));
+    }
+
+    public function test_reference_body_formatting_follows_the_matching_section_and_copies_surrounding_gaps(): void
+    {
+        $heading = static fn($title) => '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>'.$title.'</w:t></w:r></w:p>';
+        $reference = $this->paper($heading('First custom topic').'<w:p><w:pPr><w:spacing w:line="240"/><w:ind w:firstLine="300"/></w:pPr><w:r><w:t>First example.</w:t></w:r></w:p>'.$heading('Second custom topic').'<w:p><w:pPr><w:spacing w:line="360"/></w:pPr></w:p><w:p><w:pPr><w:spacing w:line="480"/><w:ind w:firstLine="900"/></w:pPr><w:r><w:t>Second example.</w:t></w:r></w:p>');
+        $student = $this->paper($heading('First custom topic').'<w:p/><w:p><w:r><w:t>My first content.</w:t></w:r></w:p>'.$heading('Second custom topic').'<w:p><w:r><w:t>My second content.</w:t></w:r></w:p>');
+        for ($pass = 0; $pass < 2; $pass++) {
+            (new PaperFormatter)->formatUsingReference($student, $reference);
+            $xp = $this->xml($student);
+            $this->assertSame('240', $xp->evaluate('string(//w:p[.//w:t="My first content."]/w:pPr/w:spacing/@w:line)'));
+            $this->assertSame('900', $xp->evaluate('string(//w:p[.//w:t="My second content."]/w:pPr/w:ind/@w:firstLine)'));
+            $this->assertSame('480', $xp->evaluate('string(//w:p[.//w:t="My second content."]/w:pPr/w:spacing/@w:line)'));
+            $this->assertEquals(1, $xp->evaluate('count(/w:document/w:body/w:p[not(.//w:t)])'));
+        }
+    }
+
+    public function test_unmatched_template_structure_is_reported_and_not_renamed(): void
+    {
+        $reference = $this->paper('<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Example heading</w:t></w:r></w:p><w:p><w:r><w:t>Reference body.</w:t></w:r></w:p>');
+        $student = $this->paper('<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t>Unmatched subsection</w:t></w:r></w:p>');
+        $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+        $this->assertTrue($report['manual_review_required']);
+        $this->assertStringContainsString('Unmatched subsection', implode(' ', $report['manual_review_rules']));
+        $this->assertSame('Unmatched subsection', $this->xml($student)->evaluate('string(//w:p//w:t)'));
+    }
+
     public function test_combined_reference_chapter_and_annotated_heading_keep_the_template_spacing(): void
     {
         foreach ([480, 720] as $gap) {
@@ -199,10 +257,10 @@ class PaperFormatterTest extends TestCase
         (new PaperFormatter)->formatUsingReference($student, $reference);
 
         $xp = $this->xml($student);
-        $this->assertSame('THE PROBLEM AND ITS BACKGROUND', $xp->evaluate('string(//w:p[w:pPr/w:pStyle[@w:val="TemplateSectionTitle"]]//w:t)'));
-        $this->assertSame('TemplateSectionTitle', $xp->evaluate('string(//w:p[w:r/w:t="THE PROBLEM AND ITS BACKGROUND"]/w:pPr/w:pStyle/@w:val)'));
+        $this->assertSame('USER SECTION TITLE', $xp->evaluate('string(//w:p[w:pPr/w:pStyle[@w:val="TemplateSectionTitle"]]//w:t)'));
+        $this->assertSame('TemplateSectionTitle', $xp->evaluate('string(//w:p[w:r/w:t="USER SECTION TITLE"]/w:pPr/w:pStyle/@w:val)'));
         $this->assertSame('TemplateTopic', $xp->evaluate('string(//w:p[w:r/w:t="Introduction"]/w:pPr/w:pStyle/@w:val)'));
-        foreach (['CHAPTER 1', 'THE PROBLEM AND ITS BACKGROUND', 'Introduction'] as $heading) {
+        foreach (['USER SECTION TITLE', 'Introduction'] as $heading) {
             $this->assertSame('1', $xp->evaluate('string(count(//w:p[.//w:t="'.$heading.'"]/w:r/w:rPr/w:b[@w:val="1" or not(@w:val)]))'));
         }
         $this->assertSame('1', $xp->evaluate('string(count(//w:p[w:r/w:t="Introduction"]/w:r/w:rPr/w:b))'));

@@ -126,12 +126,16 @@ class PaperFormatter
     public function formatUsingReference(string $path, string $referencePath, array $rules = []): array
     {
         $referenceRules = $this->referenceRules($referencePath);
-        $report = $this->format($path, array_merge($rules, $referenceRules));
-        $paragraphsProcessed = $this->applyReferenceFormatting($path, $referencePath, $referenceRules);
-        $report['paragraphs_processed'] = max($report['paragraphs_processed'], $paragraphsProcessed);
-        $report['applied_rules'] = array_values(array_unique(array_merge($report['applied_rules'], ['Admin example paragraph styles'])));
-        $report['note'] = 'Formatting was copied from the admin example paper while preserving the student document content.';
-        return $report;
+        // A reference document must not pass through the checklist-only layout,
+        // which imposes chapter breaks, cover positioning and appendix typography.
+        $result = $this->applyReferenceFormatting($path, $referencePath, $referenceRules);
+        return ['settings' => $this->settings($referenceRules),
+            'paragraphs_processed' => $result['processed'],
+            'applied_rules' => ['Selected DOCX paragraph styles', 'Selected DOCX page layout'],
+            'manual_review_rules' => $result['warnings'],
+            'manual_review_required' => count($result['warnings']) > 0,
+            'template_mapping' => $result['mapping'],
+            'note' => 'Formatting was copied from the selected DOCX template. Student text and embedded objects were preserved; unmatched structures are listed for review.'];
     }
 
     public function referenceHeadings(string $path): array
@@ -145,7 +149,7 @@ class PaperFormatter
             if (!@$doc->loadXML($xml, LIBXML_NONET)) throw new InvalidArgumentException('The admin reference template contains invalid document XML.');
             $xp = new DOMXPath($doc); $xp->registerNamespace('w', self::W);
             $headings = [];
-            foreach ($this->referenceParagraphRoles($xp) as $role => $paragraphs) {
+            foreach ($this->referenceParagraphRoles($xp, $this->packageStyles($zip)) as $role => $paragraphs) {
                 if ($role !== 'chapter' && !str_starts_with($role, 'section:') && !str_starts_with($role, 'topic')) continue;
                 foreach ($paragraphs as $paragraph) {
                     $text = $this->text($paragraph);
@@ -157,7 +161,7 @@ class PaperFormatter
         } finally { $zip->close(); }
     }
 
-    private function applyReferenceFormatting(string $path, string $referencePath, array $referenceRules): int
+    private function applyReferenceFormatting(string $path, string $referencePath, array $referenceRules): array
     {
         $studentZip = new ZipArchive; $referenceZip = new ZipArchive;
         if ($studentZip->open($path) !== true || $referenceZip->open($referencePath) !== true) {
@@ -176,8 +180,9 @@ class PaperFormatter
             }
             $studentXp = new DOMXPath($studentDoc); $studentXp->registerNamespace('w', self::W);
             $referenceXp = new DOMXPath($referenceDoc); $referenceXp->registerNamespace('w', self::W);
-            $referenceRoles = $this->referenceParagraphRoles($referenceXp);
-            $studentRoles = $this->referenceParagraphRoles($studentXp);
+            $referenceStylesXp = $this->packageStyles($referenceZip);
+            $referenceRoles = $this->referenceParagraphRoles($referenceXp, $referenceStylesXp);
+            $studentRoles = $this->referenceParagraphRoles($studentXp, $this->packageStyles($studentZip));
             $referenceHeadings = [];
             foreach ($referenceRoles as $referenceRole => $referenceParagraphs) {
                 if ($referenceRole !== 'chapter' && !str_starts_with($referenceRole, 'section:') && !str_starts_with($referenceRole, 'topic')) continue;
@@ -188,18 +193,22 @@ class PaperFormatter
                     }
                 }
             }
-            $paragraphProperties = ['pStyle', 'keepNext', 'keepLines', 'widowControl', 'pBdr', 'shd', 'tabs', 'bidi', 'snapToGrid', 'spacing', 'ind', 'contextualSpacing', 'jc', 'textDirection', 'outlineLvl'];
+            $sectionBodies = $this->referenceSectionBodies($referenceXp, $referenceHeadings, $referenceRoles['body'] ?? []);
+            $paragraphProperties = ['pStyle', 'keepNext', 'keepLines', 'pageBreakBefore', 'widowControl', 'pBdr', 'shd', 'tabs', 'bidi', 'snapToGrid', 'spacing', 'ind', 'contextualSpacing', 'jc', 'textDirection', 'outlineLvl'];
             $runProperties = ['rStyle', 'rFonts', 'b', 'bCs', 'i', 'iCs', 'caps', 'smallCaps', 'color', 'spacing', 'sz', 'szCs', 'u', 'vertAlign', 'lang'];
             $referenceIndent = $this->settings($referenceRules)['indentation'];
-            $processed = 0;
+            $processed = 0; $warnings = []; $mapping = [];
             foreach ($studentRoles as $role => $paragraphs) {
-                $isTemplateHeading = $role === 'chapter' || str_starts_with($role, 'section:') || str_starts_with($role, 'topic');
                 $sources = $referenceRoles[$role] ?? [];
-                if (!$sources && !$isTemplateHeading) continue;
+                $uniformSources = $sources && count(array_unique(array_map(fn ($candidate) => $this->referenceFormatSignature($candidate, $referenceXp), $sources))) === 1;
                 foreach ($paragraphs as $index => $target) {
+                    if ($studentXp->query('ancestor::w:tbl | .//w:drawing | .//w:pict | .//w:object', $target)->length) {
+                        $warnings[] = 'Tables and embedded-object layout were preserved and require review against the selected template.';
+                        continue;
+                    }
                     $targetText = mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($target)));
                     $source = null; $matchedText = false;
-                    if ($isTemplateHeading && isset($referenceHeadings[$targetText])) {
+                    if (isset($referenceHeadings[$targetText])) {
                         $source = $referenceHeadings[$targetText]; $matchedText = true;
                     } else {
                         foreach ($sources as $candidate) {
@@ -208,21 +217,48 @@ class PaperFormatter
                             }
                         }
                     }
-                    if (!$source && $sources) $source = $sources[count($sources) === count($paragraphs) ? $index : 0];
-                        if (!$source) {
-                            if ($isTemplateHeading) $this->boldHeadingParagraph($target, $studentXp);
-                            continue;
+                    if (!$source && $role === 'body') $source = $this->sectionBodySource($target, $sectionBodies);
+                    if (!$source && $sources) {
+                        if (count($sources) === count($paragraphs)) $source = $sources[$index];
+                        elseif ($uniformSources) $source = $sources[0];
+                    }
+                    if (!$source) {
+                        $warnings[] = 'No template paragraph matched: '.mb_substr($this->text($target), 0, 100);
+                        continue;
+                    }
+                    $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $runProperties);
+                    foreach (['keepNext', 'keepLines', 'pageBreakBefore', 'outlineLvl'] as $propertyName) {
+                        if ($referenceXp->query('./w:pPr/w:'.$propertyName, $source)->length) continue;
+                        $inherited = $this->inheritedParagraphProperty($source, $referenceXp, $referenceStylesXp, $propertyName);
+                        if ($inherited) {
+                            $pr = $this->ensure($target, 'pPr', true);
+                            $pr->replaceChild($studentDoc->importNode($inherited, true), $this->ensure($pr, $propertyName));
                         }
-                    $copyHeadingText = $isTemplateHeading && $role !== 'chapter' && !$matchedText && count($sources) === count($paragraphs);
-                    $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $runProperties, $copyHeadingText);
-                    if ($isTemplateHeading) $this->copyReferenceHeadingGap($source, $target, $referenceXp, $studentXp);
-                    if ($isTemplateHeading) $this->boldHeadingParagraph($target, $studentXp);
-                    if ($role === 'body' && $referenceIndent !== null) {
+                    }
+                    $this->copyReferenceHeadingGap($source, $target, $referenceXp, $studentXp, $referenceStylesXp);
+                    $mapping[] = ['paragraph' => $this->text($target), 'template_paragraph' => $this->text($source), 'match' => $matchedText ? 'heading-text' : 'structure'];
+                    if ($role === 'body' && $referenceIndent !== null && !$referenceXp->query('./w:pPr/w:ind', $source)->length) {
                         $indent = $this->ensure($this->ensure($target, 'pPr', true), 'ind');
                         foreach (['hanging', 'hangingChars', 'firstLineChars'] as $key) $indent->removeAttributeNS(self::W, $key);
-                        $this->attr($indent, 'firstLine', round($referenceIndent * 1440));
+                        $inheritedIndent = $this->inheritedParagraphProperty($source, $referenceXp, $referenceStylesXp, 'ind');
+                        $firstLine = $inheritedIndent?->getAttributeNS(self::W, 'firstLine');
+                        $this->attr($indent, 'firstLine', is_numeric($firstLine) ? $firstLine : round($referenceIndent * 1440));
                     }
                     $processed++;
+                }
+            }
+            $referenceSection = $referenceXp->query('//w:sectPr')->item($referenceXp->query('//w:sectPr')->length - 1);
+            if ($referenceSection instanceof DOMElement) {
+                $studentSections = iterator_to_array($studentXp->query('//w:sectPr'));
+                if (!$studentSections) $studentSections[] = $this->ensure($studentDoc->documentElement->getElementsByTagNameNS(self::W, 'body')->item(0), 'sectPr');
+                if ($referenceXp->query('//w:sectPr')->length > 1) $warnings[] = 'The template has multiple sections. The final section page layout was applied; section-specific headers, footers and layout require review.';
+                if ($referenceXp->query('//w:headerReference | //w:footerReference')->length) $warnings[] = 'Existing headers and footers were preserved. Compare them with the template headers and footers.';
+                foreach ($studentSections as $section) {
+                    foreach (['pgSz', 'pgMar', 'pgBorders', 'cols', 'vAlign', 'docGrid'] as $name) {
+                        foreach (iterator_to_array($studentXp->query('./w:'.$name, $section)) as $old) $section->removeChild($old);
+                        $property = $referenceXp->query('./w:'.$name, $referenceSection)->item(0);
+                        if ($property) $section->replaceChild($studentDoc->importNode($property, true), $this->ensure($section, $name));
+                    }
                 }
             }
             $studentZip->addFromString('word/document.xml', $studentDoc->saveXML());
@@ -260,26 +296,16 @@ class PaperFormatter
                     $studentZip->addFromString('word/styles.xml', $studentStyles->saveXML());
                 }
             }
-            return $processed;
+            return ['processed' => $processed, 'warnings' => array_values(array_unique($warnings)), 'mapping' => $mapping];
         } finally { $studentZip->close(); $referenceZip->close(); }
     }
-    private function boldHeadingParagraph(DOMElement $paragraph, DOMXPath $xp): void
-    {
-        foreach ($xp->query('./w:r[.//w:t]', $paragraph) as $run) {
-            if (!$run instanceof DOMElement) continue;
-            $runProperties = $this->ensure($run, 'rPr', true);
-            $this->attr($this->ensure($runProperties, 'b'), 'val', 1);
-            $this->attr($this->ensure($runProperties, 'bCs'), 'val', 1);
-        }
-    }
-
     /** Blank paragraphs are layout in a Word template, outside the heading's pPr. */
-    private function copyReferenceHeadingGap(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp): void
+    private function copyReferenceHeadingGap(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp, ?DOMXPath $stylesXp = null): void
     {
         $isBlank = function ($node, DOMXPath $xp): bool {
             return $node instanceof DOMElement && $node->namespaceURI === self::W && $node->localName === 'p'
                 && $this->text($node) === ''
-                && !$xp->query('.//w:drawing | .//w:pict | .//w:object | .//w:br | .//w:sectPr | .//w:fldChar | .//w:bookmarkStart | ./w:pPr/w:pageBreakBefore', $node)->length;
+                && !$xp->query('.//w:drawing | .//w:pict | .//w:object | .//w:br | .//w:sectPr | .//w:fldChar | .//w:bookmarkStart | .//w:bookmarkEnd | ./w:pPr/w:pageBreakBefore', $node)->length;
         };
         $previousElement = static function ($node) {
             $previous = $node->previousSibling;
@@ -293,9 +319,15 @@ class PaperFormatter
         }
         // Do not reproduce leading page padding as a section gap.
         if (!$previous instanceof DOMElement) return;
+        $previousTarget = $previousElement($target);
+        while ($isBlank($previousTarget, $studentXp)) {
+            $remove = $previousTarget; $previousTarget = $previousElement($remove);
+            $remove->parentNode->removeChild($remove);
+        }
         if (!$blanks) {
             // The template's actual paragraph gap takes precedence over its prompts.
-            if ($referenceXp->query('./w:pPr/w:spacing[@w:before or @w:beforeLines]', $source)->length) return;
+            $inherited = $this->inheritedParagraphProperty($source, $referenceXp, $stylesXp, 'spacing');
+            if ($referenceXp->query('./w:pPr/w:spacing[@w:before or @w:beforeLines]', $source)->length || ($inherited && ($inherited->hasAttributeNS(self::W, 'before') || $inherited->hasAttributeNS(self::W, 'beforeLines')))) return;
             $instruction = $this->text($previous);
             if (preg_match('/\b(one|two|three|four|five|\d+)\s*(?:\(\s*\d+\s*\))?\s+blank\s+lines?\s+before\s+(?:(?:the|next|each|every)\s+)*(?:section\s+)?(?:heading|header|title)\b/i', $instruction, $match)) {
                 $words = ['one' => 1, 'two' => 2, 'three' => 3, 'four' => 4, 'five' => 5];
@@ -309,15 +341,10 @@ class PaperFormatter
             }
             return;
         }
-        $previousTarget = $previousElement($target);
-        while ($isBlank($previousTarget, $studentXp)) {
-            $remove = $previousTarget; $previousTarget = $previousElement($remove);
-            $remove->parentNode->removeChild($remove);
-        }
         foreach ($blanks as $blank) $target->parentNode->insertBefore($target->ownerDocument->importNode($blank, true), $target);
     }
 
-    private function referenceParagraphRoles(DOMXPath $xp): array
+    private function referenceParagraphRoles(DOMXPath $xp, ?DOMXPath $stylesXp = null): array
     {
         $roles = []; $zone = 'cover'; $coverIndex = 0;
         foreach ($xp->query('/w:document/w:body//w:p[not(ancestor::w:txbxContent)]') as $paragraph) {
@@ -325,16 +352,21 @@ class PaperFormatter
             $text = $this->text($paragraph);
             if ($text === '') continue;
             $upper = strtoupper($text);
+            $outline = $xp->query('./w:pPr/w:outlineLvl', $paragraph)->item(0) ?? $this->inheritedParagraphProperty($paragraph, $xp, $stylesXp, 'outlineLvl');
+            $styleLevel = $outline instanceof DOMElement ? $outline->getAttributeNS(self::W, 'val') : null;
             if ($this->isChapterParagraph($paragraph)) { $role = 'chapter'; $zone = 'body'; }
             elseif (in_array($upper, ['ABSTRACT', 'APPROVAL SHEET', 'ACKNOWLEDGEMENT', 'ACKNOWLEDGEMENTS', 'TABLE OF CONTENTS', 'LIST OF TABLES', 'LIST OF FIGURES', 'LIST OF APPENDICES', 'REFERENCES', 'APPENDICES'], true)) {
                 $role = 'section:'.$upper;
                 $zone = $upper === 'ABSTRACT' ? 'abstract' : ($upper === 'REFERENCES' ? 'references' : 'body');
-            } elseif ($zone === 'cover') $role = 'cover:'.($coverIndex++);
+            } elseif (is_numeric($styleLevel) && (int) $styleLevel < 9) {
+                $role = 'topic:'.((int) $styleLevel + 1); $zone = 'body';
+            } elseif ($zone === 'cover' && !preg_match('/^Heading[ _-]?\d+$/i', $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph))) $role = 'cover:'.($coverIndex++);
             elseif ($this->isReferenceTopicHeading($paragraph, $xp)) {
                 $style = $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph);
                 $outline = $xp->evaluate('string(./w:pPr/w:outlineLvl/@w:val)', $paragraph);
                 $level = preg_match('/heading[ _-]?(\d+)/i', $style, $match) ? $match[1] : (is_numeric($outline) && $outline < 9 ? (string) ((int) $outline + 1) : '');
                 $role = $level !== '' ? 'topic:'.$level : (preg_match('/\p{L}/u', $text) && $text === mb_strtoupper($text) ? 'topic:uppercase' : 'topic');
+                $zone = 'body';
             } elseif ($zone === 'abstract') $role = 'abstract:body';
             elseif ($zone === 'references') $role = 'references:entry';
             else $role = 'body';
@@ -358,6 +390,69 @@ class PaperFormatter
         return array_values(array_unique($keys));
     }
 
+    private function packageStyles(ZipArchive $zip): ?DOMXPath
+    {
+        $xml = $zip->getFromName('word/styles.xml');
+        if ($xml === false || stripos($xml, '<!DOCTYPE') !== false) return null;
+        $doc = new DOMDocument;
+        if (!@$doc->loadXML($xml, LIBXML_NONET) || $doc->documentElement?->namespaceURI !== self::W) return null;
+        $xp = new DOMXPath($doc); $xp->registerNamespace('w', self::W);
+        return $xp;
+    }
+
+    private function referenceFormatSignature(DOMElement $paragraph, DOMXPath $xp): string
+    {
+        $parts = [];
+        foreach ($xp->query('./w:pPr | ./w:r[.//w:t][1]/w:rPr', $paragraph) as $property) $parts[] = $property->C14N();
+        return implode('|', $parts);
+    }
+
+    private function inheritedParagraphProperty(DOMElement $paragraph, DOMXPath $xp, ?DOMXPath $styles, string $name): ?DOMElement
+    {
+        if (!$styles) return null;
+        $id = $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph);
+        if ($id === '') $id = $styles->evaluate('string(/w:styles/w:style[@w:type="paragraph" and (@w:default="1" or @w:default="true")]/@w:styleId)');
+        $seen = [];
+        while ($id !== '' && !isset($seen[$id])) {
+            $seen[$id] = true; $style = null;
+            foreach ($styles->query('/w:styles/w:style') as $candidate) {
+                if ($candidate->getAttributeNS(self::W, 'styleId') === $id) { $style = $candidate; break; }
+            }
+            if (!$style) break;
+            $property = $styles->query('./w:pPr/w:'.$name, $style)->item(0);
+            if ($property instanceof DOMElement) return $property;
+            $id = $styles->evaluate('string(./w:basedOn/@w:val)', $style);
+        }
+        $property = $styles->query('/w:styles/w:docDefaults/w:pPrDefault/w:pPr/w:'.$name)->item(0);
+        return $property instanceof DOMElement ? $property : null;
+    }
+
+    private function referenceSectionBodies(DOMXPath $xp, array $headings, array $bodyParagraphs): array
+    {
+        $bodyNodes = []; $headingKeys = []; $sources = []; $currentKeys = [];
+        foreach ($bodyParagraphs as $paragraph) $bodyNodes[spl_object_id($paragraph)] = true;
+        foreach ($headings as $key => $heading) if ($heading) $headingKeys[spl_object_id($heading)][] = $key;
+        foreach ($xp->query('/w:document/w:body/w:p') as $paragraph) {
+            $id = spl_object_id($paragraph);
+            if (isset($headingKeys[$id])) $currentKeys = $headingKeys[$id];
+            elseif ($currentKeys && isset($bodyNodes[$id]) && !$xp->query('.//w:drawing | .//w:pict | .//w:object', $paragraph)->length) {
+                foreach ($currentKeys as $key) $sources[$key] = $paragraph;
+                $currentKeys = [];
+            }
+        }
+        return $sources;
+    }
+
+    private function sectionBodySource(DOMElement $target, array $sources): ?DOMElement
+    {
+        for ($previous = $target->previousSibling; $previous; $previous = $previous->previousSibling) {
+            if (!$previous instanceof DOMElement || $previous->localName !== 'p') continue;
+            $key = mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($previous)));
+            if (isset($sources[$key])) return $sources[$key];
+        }
+        return null;
+    }
+
     private function isChapterParagraph(DOMElement $paragraph): bool
     {
         if ($this->isChapter($this->text($paragraph))) return true;
@@ -378,16 +473,8 @@ class PaperFormatter
         return (bool) preg_match('/\p{L}/u', $text);
     }
 
-    private function copyReferenceParagraph(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp, array $paragraphProperties, array $runProperties, bool $copyHeadingText): void
+    private function copyReferenceParagraph(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp, array $paragraphProperties, array $runProperties): void
     {
-        if ($copyHeadingText) {
-            $sourceText = $this->text($source);
-            $targetTexts = $target->getElementsByTagNameNS(self::W, 't');
-            if ($sourceText !== '' && $targetTexts->length) {
-                $targetTexts->item(0)->textContent = $sourceText;
-                for ($index = 1; $index < $targetTexts->length; $index++) $targetTexts->item($index)->textContent = '';
-            }
-        }
         $sourcePr = $referenceXp->query('./w:pPr', $source)->item(0);
         $targetPr = $studentXp->query('./w:pPr', $target)->item(0);
         if ($sourcePr || $targetPr) {
@@ -1136,7 +1223,7 @@ class PaperFormatter
         $orders = [
             'pPr' => ['pStyle','keepNext','keepLines','pageBreakBefore','framePr','widowControl','numPr','pBdr','shd','tabs','snapToGrid','spacing','ind','contextualSpacing','jc','outlineLvl','rPr','sectPr'],
             'rPr' => ['rStyle','rFonts','b','bCs','i','iCs','caps','smallCaps','color','spacing','sz','szCs','highlight','u','vertAlign','lang'],
-            'sectPr' => ['headerReference','footerReference','type','pgSz','pgMar','pgNumType','cols','vAlign','titlePg','docGrid'],
+            'sectPr' => ['headerReference','footerReference','type','pgSz','pgMar','pgBorders','pgNumType','cols','vAlign','titlePg','docGrid'],
         ];
         $ref = $first ? $parent->firstChild : null;
         $order = $orders[$parent->localName] ?? [];

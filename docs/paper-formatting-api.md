@@ -43,7 +43,23 @@ The preview displays this report and decodes the same file used for download.
 This reports recognized rule coverage, not a guarantee that every natural-language
 criterion or every rendered page has been independently verified.
 
-Supported rules include font, font size, line spacing, abstract spacing,
+When the selected template has an uploaded DOCX reference, that document is
+the formatting source. The formatter copies its paragraph/run properties,
+inherited styles, heading gaps, page-break properties and page geometry.
+Custom styles with inherited outline levels work without chapter labels.
+Heading text and structure select the source paragraph; body paragraphs use
+the matching section's sample where available. Student titles and content
+are preserved. Checklist-only cover placement, chapter breaks and appendix
+typography are not applied over a DOCX reference.
+
+The report includes `template_mapping` and lists ambiguous or unmatched
+paragraphs under `manual_review_rules`. It also identifies preserved tables,
+embedded objects, headers/footers and templates with multiple sections that
+need layout review. This is not a pixel-identical rendering guarantee.
+PDF/DOC reference files receive a validation error asking for an editable
+DOCX, rather than silently using checklist rules as a replacement layout.
+
+For templates without an attached reference, supported rules include font, font size, line spacing, abstract spacing,
 margins, alignment, indentation, hanging reference indents, and the special
 References/Appendices headings. Explicit rule `type`/`value` settings take
 precedence over recognized descriptions. Paper size defaults to short bond
@@ -53,8 +69,8 @@ date receives additional space between groups without changing line spacing.
 Its vertical layout is estimated from text length; Word's rendering can vary.
 
 Content criteria (citation accuracy, required argumentation, word counts and
-section completeness) need review. An attached template reference document
-is not treated as a replacement for the template's written rules. Existing
+section completeness) need review. Written checklist criteria remain part of
+the content review; the attached DOCX controls reference formatting. Existing
 pagination headers are preserved rather than rebuilt.
 
 The browser API client captures the template ID when the format check runs.

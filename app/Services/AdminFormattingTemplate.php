@@ -146,6 +146,14 @@ class AdminFormattingTemplate
         return strtolower(pathinfo($name, PATHINFO_EXTENSION)) === 'docx';
     }
 
+    public function requireEditableReference(array $template): void
+    {
+        $name = is_array($template['file'] ?? null) ? (string) ($template['file']['name'] ?? '') : '';
+        if ($name !== '' && strtolower(pathinfo($name, PATHINFO_EXTENSION)) !== 'docx') {
+            throw ValidationException::withMessages(['template_id' => 'To copy this template layout, upload its editable Word DOCX reference. PDF and DOC references cannot supply editable paragraph styles.']);
+        }
+    }
+
     public function hasMissingDeclaredReference(array $template, string $id): bool
     {
         return $this->hasDeclaredReference($template) && $this->referenceHash($id) === null;
