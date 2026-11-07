@@ -182,8 +182,10 @@ class PaperFormatter
             foreach ($referenceRoles as $referenceRole => $referenceParagraphs) {
                 if ($referenceRole !== 'chapter' && !str_starts_with($referenceRole, 'section:') && !str_starts_with($referenceRole, 'topic')) continue;
                 foreach ($referenceParagraphs as $referenceParagraph) {
-                    $key = mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($referenceParagraph)));
-                    if ($key !== '') $referenceHeadings[$key] = $referenceParagraph;
+                    foreach ($this->referenceHeadingKeys($this->text($referenceParagraph)) as $key) {
+                        if (!array_key_exists($key, $referenceHeadings)) $referenceHeadings[$key] = $referenceParagraph;
+                        elseif ($referenceHeadings[$key] !== $referenceParagraph) $referenceHeadings[$key] = null;
+                    }
                 }
             }
             $paragraphProperties = ['pStyle', 'keepNext', 'keepLines', 'widowControl', 'pBdr', 'shd', 'tabs', 'bidi', 'snapToGrid', 'spacing', 'ind', 'contextualSpacing', 'jc', 'textDirection', 'outlineLvl'];
@@ -211,7 +213,7 @@ class PaperFormatter
                             if ($isTemplateHeading) $this->boldHeadingParagraph($target, $studentXp);
                             continue;
                         }
-                    $copyHeadingText = $isTemplateHeading && !$matchedText && count($sources) === count($paragraphs);
+                    $copyHeadingText = $isTemplateHeading && $role !== 'chapter' && !$matchedText && count($sources) === count($paragraphs);
                     $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $runProperties, $copyHeadingText);
                     if ($isTemplateHeading) $this->copyReferenceHeadingGap($source, $target, $referenceXp, $studentXp);
                     if ($isTemplateHeading) $this->boldHeadingParagraph($target, $studentXp);
@@ -292,6 +294,8 @@ class PaperFormatter
         // Do not reproduce leading page padding as a section gap.
         if (!$previous instanceof DOMElement) return;
         if (!$blanks) {
+            // The template's actual paragraph gap takes precedence over its prompts.
+            if ($referenceXp->query('./w:pPr/w:spacing[@w:before or @w:beforeLines]', $source)->length) return;
             $instruction = $this->text($previous);
             if (preg_match('/\b(one|two|three|four|five|\d+)\s*(?:\(\s*\d+\s*\))?\s+blank\s+lines?\s+before\s+(?:(?:the|next|each|every)\s+)*(?:section\s+)?(?:heading|header|title)\b/i', $instruction, $match)) {
                 $words = ['one' => 1, 'two' => 2, 'three' => 3, 'four' => 4, 'five' => 5];
@@ -321,7 +325,7 @@ class PaperFormatter
             $text = $this->text($paragraph);
             if ($text === '') continue;
             $upper = strtoupper($text);
-            if ($this->isChapter($text)) { $role = 'chapter'; $zone = 'body'; }
+            if ($this->isChapterParagraph($paragraph)) { $role = 'chapter'; $zone = 'body'; }
             elseif (in_array($upper, ['ABSTRACT', 'APPROVAL SHEET', 'ACKNOWLEDGEMENT', 'ACKNOWLEDGEMENTS', 'TABLE OF CONTENTS', 'LIST OF TABLES', 'LIST OF FIGURES', 'LIST OF APPENDICES', 'REFERENCES', 'APPENDICES'], true)) {
                 $role = 'section:'.$upper;
                 $zone = $upper === 'ABSTRACT' ? 'abstract' : ($upper === 'REFERENCES' ? 'references' : 'body');
@@ -337,6 +341,33 @@ class PaperFormatter
             $roles[$role][] = $paragraph;
         }
         return $roles;
+    }
+
+    private function referenceHeadingKeys(string $text): array
+    {
+        $normalize = static fn (string $value) => mb_strtolower(trim(preg_replace('/\s+/u', ' ', $value)));
+        $keys = [$normalize($text)];
+        // Optional research-type annotations belong to the template, not the student's title.
+        if (preg_match('/\([^()]+\)/u', $text)) {
+            $withoutAnnotations = preg_replace('/\([^()]*\)/u', '', $text);
+            foreach (preg_split('/\s+or\s+/iu', $withoutAnnotations) as $alternative) {
+                $key = $normalize($alternative);
+                if ($key !== '') $keys[] = $key;
+            }
+        }
+        return array_values(array_unique($keys));
+    }
+
+    private function isChapterParagraph(DOMElement $paragraph): bool
+    {
+        if ($this->isChapter($this->text($paragraph))) return true;
+        // Word can store a chapter label and its title in one paragraph with a line break.
+        $firstLine = '';
+        foreach ($paragraph->getElementsByTagNameNS(self::W, '*') as $node) {
+            if ($node->localName === 'br' || $node->localName === 'cr') break;
+            if ($node->localName === 't') $firstLine .= $node->textContent;
+        }
+        return $this->isChapter($firstLine);
     }
 
     private function isReferenceTopicHeading(DOMElement $paragraph, DOMXPath $xp): bool
@@ -415,7 +446,7 @@ class PaperFormatter
             foreach ($xp->query('/w:document/w:body/w:p') as $paragraph) {
                 if (!$paragraph instanceof DOMElement) continue;
                 $text = $this->text($paragraph);
-                if ($this->isChapter($text)) { $chapterSeen = true; continue; }
+                if ($this->isChapterParagraph($paragraph)) { $chapterSeen = true; continue; }
                 if ($text === '' || $this->isReferenceTopicHeading($paragraph, $xp)) continue;
                 $candidates[] = $paragraph;
                 if ($chapterSeen) $afterChapter[] = $paragraph;

@@ -112,6 +112,26 @@ class PaperFormatterTest extends TestCase
         $this->assertStringContainsString('w:before="600"', $styles);
     }
 
+    public function test_combined_reference_chapter_and_annotated_heading_keep_the_template_spacing(): void
+    {
+        foreach ([480, 720] as $gap) {
+            $reference = $this->paper('<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>CHAPTER 1</w:t><w:br/><w:t>THE PROBLEM AND ITS BACKGROUND</w:t></w:r></w:p><w:p><w:r><w:t>Reference introduction.</w:t></w:r></w:p><w:p><w:r><w:t>[Leave one (1) blank line before the next section heading.]</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Heading2"/><w:spacing w:before="'.$gap.'"/><w:ind w:firstLine="0"/></w:pPr><w:r><w:t>Theoretical Framework (Quantitative Research) or Philosophical Underpinning (Qualitative Research)</w:t></w:r></w:p><w:p><w:r><w:t>Reference theory.</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Heading2"/><w:spacing w:before="'.$gap.'"/></w:pPr><w:r><w:t>Conceptual Framework</w:t></w:r></w:p><w:p><w:r><w:t>Reference paradigm.</w:t></w:r></w:p>');
+            $student = $this->paper('<w:p><w:r><w:t>Student title</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Student introduction.</w:t></w:r></w:p><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Theoretical Framework</w:t></w:r></w:p><w:p><w:r><w:t>Student theory.</w:t></w:r></w:p><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Conceptual Framework</w:t></w:r></w:p><w:p><w:r><w:t>Student paradigm.</w:t></w:r></w:p>');
+            $service = new PaperFormatter;
+            $service->formatUsingReference($student, $reference, $this->rules());
+            $xp = $this->xml($student);
+            foreach (['Theoretical Framework', 'Conceptual Framework'] as $heading) {
+                $path = '//w:p[.//w:t="'.$heading.'"]';
+                $this->assertSame('Heading2', $xp->evaluate('string('.$path.'/w:pPr/w:pStyle/@w:val)'));
+                $this->assertSame((string) $gap, $xp->evaluate('string('.$path.'/w:pPr/w:spacing/@w:before)'));
+                $this->assertSame('', $xp->evaluate('string('.$path.'/w:pPr/w:spacing/@w:beforeLines)'));
+            }
+            $this->assertSame('CHAPTER 1', $xp->evaluate('string(//w:p[.//w:t="CHAPTER 1"]//w:t)'));
+            $this->assertSame('Student title', $xp->evaluate('string(/w:document/w:body/w:p[1]//w:t)'));
+            $this->assertContains('Conceptual Framework', $service->referenceHeadings($reference));
+        }
+    }
+
     public function test_section_gap_copies_blank_paragraphs_from_each_reference_without_accumulating(): void
     {
         foreach ([0, 1, 2] as $count) {
