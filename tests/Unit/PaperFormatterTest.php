@@ -112,6 +112,43 @@ class PaperFormatterTest extends TestCase
         $this->assertStringContainsString('w:before="600"', $styles);
     }
 
+    public function test_heading_word_variations_copy_the_template_alignment_spacing_and_section_body(): void
+    {
+        foreach ([
+            ['Synthesis of the Reviewed Related Literature and Studies', 'Synthesis of the Review and Related Literature and Studies', 480],
+            ['Analysis of Collected Records', 'Analysis of the Collected Record', 840],
+        ] as [$templateTitle, $studentTitle, $gap]) {
+            $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 2</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:before="100"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Other distinct heading</w:t></w:r></w:p><w:p><w:r><w:t>First example.</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:line="480"/></w:pPr></w:p><w:p><w:pPr><w:spacing w:before="'.$gap.'"/><w:ind w:left="0" w:firstLine="0"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>'.$templateTitle.'</w:t></w:r></w:p><w:p><w:pPr><w:ind w:firstLine="900"/></w:pPr><w:r><w:t>Section example body.</w:t></w:r></w:p>');
+            $student = $this->paper('<w:p><w:r><w:t>CHAPTER 2</w:t></w:r></w:p><w:p><w:pPr><w:ind w:left="720" w:firstLine="720"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>'.$studentTitle.'</w:t></w:r></w:p><w:p><w:r><w:t>Own section content.</w:t></w:r></w:p>');
+            $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+            $xp = $this->xml($student); $heading = '//w:p[.//w:t="'.$studentTitle.'"]';
+            $this->assertSame('0', $xp->evaluate('string('.$heading.'/w:pPr/w:ind/@w:left)'));
+            $this->assertSame('0', $xp->evaluate('string('.$heading.'/w:pPr/w:ind/@w:firstLine)'));
+            $this->assertSame((string) $gap, $xp->evaluate('string('.$heading.'/w:pPr/w:spacing/@w:before)'));
+            $this->assertEquals(1, $xp->evaluate('count('.$heading.'/preceding-sibling::w:p[1][not(.//w:t)])'));
+            $this->assertSame('900', $xp->evaluate('string(//w:p[.//w:t="Own section content."]/w:pPr/w:ind/@w:firstLine)'));
+            $this->assertContains('heading-words', array_column($report['template_mapping'], 'match'));
+        }
+    }
+
+    public function test_contents_entries_do_not_compete_with_real_heading_matches(): void
+    {
+        $reference = $this->paper('<w:p><w:r><w:t>TABLE OF CONTENTS</w:t></w:r></w:p><w:p><w:pPr><w:tabs><w:tab w:leader="dot" w:pos="8000"/></w:tabs><w:ind w:left="1200"/></w:pPr><w:r><w:t>Analysis of the Collected Records</w:t><w:tab/><w:t>00</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 2</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:before="700"/><w:ind w:left="0"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Analysis of Collected Records</w:t></w:r></w:p>');
+        $student = $this->paper('<w:p><w:r><w:t>CHAPTER 2</w:t></w:r></w:p><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Analysis of the Collected Record</w:t></w:r></w:p>');
+        $service = new PaperFormatter; $service->formatUsingReference($student, $reference);
+        $this->assertSame('700', $this->xml($student)->evaluate('string(//w:p[.//w:t="Analysis of the Collected Record"]/w:pPr/w:spacing/@w:before)'));
+        $this->assertNotContains('Analysis of the Collected Records00', $service->referenceHeadings($reference));
+    }
+
+    public function test_ambiguous_similar_headings_are_reported_instead_of_choosing_a_layout(): void
+    {
+        $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 2</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:before="400"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Analysis of Collected Records</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:before="900"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Analysis of the Collected Records</w:t></w:r></w:p>');
+        $student = $this->paper('<w:p><w:r><w:t>CHAPTER 2</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:before="200"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Analysis of the Collected Record</w:t></w:r></w:p>');
+        $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+        $this->assertTrue($report['manual_review_required']);
+        $this->assertSame('200', $this->xml($student)->evaluate('string(//w:p[.//w:t="Analysis of the Collected Record"]/w:pPr/w:spacing/@w:before)'));
+    }
+
     public function test_section_boundary_before_combined_template_chapter_is_copied_to_separate_student_chapter(): void
     {
         foreach (['nextPage' => '1', 'continuous' => ''] as $sectionType => $expected) {

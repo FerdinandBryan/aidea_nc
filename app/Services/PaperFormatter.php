@@ -201,6 +201,7 @@ class PaperFormatter
                 }
             }
             $sectionBodies = $this->referenceSectionBodies($referenceXp, $referenceHeadings, $referenceRoles['body'] ?? []);
+            $headingProfiles = $this->headingProfiles($referenceHeadings);
             $paragraphProperties = ['pStyle', 'keepNext', 'keepLines', 'pageBreakBefore', 'widowControl', 'pBdr', 'shd', 'tabs', 'bidi', 'snapToGrid', 'spacing', 'ind', 'contextualSpacing', 'jc', 'textDirection', 'outlineLvl'];
             $runProperties = ['rStyle', 'rFonts', 'b', 'bCs', 'i', 'iCs', 'caps', 'smallCaps', 'color', 'spacing', 'sz', 'szCs', 'u', 'vertAlign', 'lang'];
             $referenceIndent = $this->settings($referenceRules)['indentation'];
@@ -219,7 +220,7 @@ class PaperFormatter
                         continue;
                     }
                     $targetText = mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($target)));
-                    $source = null; $matchedText = false;
+                    $source = null; $matchedText = false; $matchedWords = false;
                     if (isset($referenceHeadings[$targetText])) {
                         $source = $referenceHeadings[$targetText]; $matchedText = true;
                     } else {
@@ -229,7 +230,11 @@ class PaperFormatter
                             }
                         }
                     }
-                    if (!$source && $role === 'body') $source = $this->sectionBodySource($target, $sectionBodies);
+                    if (!$source && ($role === 'chapter' || str_starts_with($role, 'topic') || str_starts_with($role, 'section:'))) {
+                        $source = $this->similarReferenceHeading($targetText, $headingProfiles);
+                        $matchedWords = $source !== null;
+                    }
+                    if (!$source && $role === 'body') $source = $this->sectionBodySource($target, $sectionBodies, $headingProfiles);
                     if (!$source && $sources) {
                         if (count($sources) === count($paragraphs)) $source = $sources[$index];
                         elseif ($uniformSources) $source = $sources[0];
@@ -261,7 +266,7 @@ class PaperFormatter
                     $before = $studentXp->query('./w:pPr/w:pageBreakBefore', $target)->item(0);
                     if ($before && !in_array(strtolower($before->getAttributeNS(self::W, 'val')), ['0', 'false', 'off'], true)) $this->materializePageStart($target, $studentXp);
                     $this->copyReferenceHeadingGap($source, $target, $referenceXp, $studentXp, $referenceStylesXp);
-                    $mapping[] = ['paragraph' => $this->text($target), 'template_paragraph' => $this->text($source), 'match' => $matchedText ? 'heading-text' : 'structure'];
+                    $mapping[] = ['paragraph' => $this->text($target), 'template_paragraph' => $this->text($source), 'match' => $matchedText ? 'heading-text' : ($matchedWords ? 'heading-words' : 'structure')];
                     if ($role === 'body' && $referenceIndent !== null && !$referenceXp->query('./w:pPr/w:ind', $source)->length) {
                         $indent = $this->ensure($this->ensure($target, 'pPr', true), 'ind');
                         foreach (['hanging', 'hangingChars', 'firstLineChars'] as $key) $indent->removeAttributeNS(self::W, $key);
@@ -383,6 +388,8 @@ class PaperFormatter
             elseif (in_array($upper, ['ABSTRACT', 'APPROVAL SHEET', 'ACKNOWLEDGEMENT', 'ACKNOWLEDGEMENTS', 'TABLE OF CONTENTS', 'LIST OF TABLES', 'LIST OF FIGURES', 'LIST OF APPENDICES', 'REFERENCES', 'APPENDICES'], true)) {
                 $role = 'section:'.$upper;
                 $zone = $upper === 'ABSTRACT' ? 'abstract' : ($upper === 'REFERENCES' ? 'references' : 'body');
+            } elseif ($xp->query('./w:pPr/w:tabs/w:tab[@w:leader="dot"]', $paragraph)->length || preg_match('/^TOC\d*$/i', $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph))) {
+                $role = 'contents:entry';
             } elseif (is_numeric($styleLevel) && (int) $styleLevel < 9) {
                 $role = 'topic:'.((int) $styleLevel + 1); $zone = 'body';
             } elseif ($zone === 'cover' && !preg_match('/^Heading[ _-]?\d+$/i', $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph))) $role = 'cover:'.($coverIndex++);
@@ -423,6 +430,49 @@ class PaperFormatter
         if (!@$doc->loadXML($xml, LIBXML_NONET) || $doc->documentElement?->namespaceURI !== self::W) return null;
         $xp = new DOMXPath($doc); $xp->registerNamespace('w', self::W);
         return $xp;
+    }
+
+    private function headingWords(string $text): array
+    {
+        preg_match_all('/\p{L}+/u', mb_strtolower($text), $matches);
+        $words = [];
+        foreach ($matches[0] as $word) {
+            if (in_array($word, ['a', 'an', 'the', 'of', 'and', 'or', 'in', 'on', 'for', 'to'], true)) continue;
+            if (mb_strlen($word) > 4) $word = preg_replace('/ies$/', 'y', $word);
+            if (mb_strlen($word) > 4) $word = preg_replace('/(?:ed|s)$/', '', $word);
+            $words[$word] = true;
+        }
+        return array_keys($words);
+    }
+
+    private function headingProfiles(array $headings): array
+    {
+        $profiles = [];
+        foreach ($headings as $key => $heading) {
+            if (!$heading || str_contains($key, '[')) continue;
+            $words = $this->headingWords($key);
+            if (count($words) >= 3) $profiles[] = ['source' => $heading, 'words' => $words];
+        }
+        return $profiles;
+    }
+
+    private function similarReferenceHeading(string $text, array $profiles): ?DOMElement
+    {
+        if (mb_strlen($text) > 140 || str_contains($text, '[')) return null;
+        $words = $this->headingWords($text);
+        if (count($words) < 3) return null;
+        $scores = []; $sources = [];
+        foreach ($profiles as $profile) {
+            $intersection = count(array_intersect($words, $profile['words']));
+            $union = count(array_unique(array_merge($words, $profile['words'])));
+            $score = $union ? $intersection / $union : 0;
+            $id = spl_object_id($profile['source']);
+            $scores[$id] = max($scores[$id] ?? 0, $score); $sources[$id] = $profile['source'];
+        }
+        arsort($scores);
+        $ids = array_keys($scores);
+        if (!$ids || $scores[$ids[0]] < 0.8 || (isset($ids[1]) && $scores[$ids[0]] - $scores[$ids[1]] < 0.15)) return null;
+        return $sources[$ids[0]];
     }
 
     private function referenceFormatSignature(DOMElement $paragraph, DOMXPath $xp): string
@@ -468,12 +518,17 @@ class PaperFormatter
         return $sources;
     }
 
-    private function sectionBodySource(DOMElement $target, array $sources): ?DOMElement
+    private function sectionBodySource(DOMElement $target, array $sources, array $headingProfiles = []): ?DOMElement
     {
         for ($previous = $target->previousSibling; $previous; $previous = $previous->previousSibling) {
             if (!$previous instanceof DOMElement || $previous->localName !== 'p') continue;
             $key = mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($previous)));
             if (isset($sources[$key])) return $sources[$key];
+            $heading = $this->similarReferenceHeading($key, $headingProfiles);
+            if ($heading) {
+                $sourceKey = mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($heading)));
+                return $sources[$sourceKey] ?? null;
+            }
         }
         return null;
     }

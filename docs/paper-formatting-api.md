@@ -57,6 +57,11 @@ Heading text and structure select the source paragraph; body paragraphs use
 the matching section's sample where available. Student titles and content
 are preserved. Checklist-only cover placement, chapter breaks and appendix
 typography are not applied over a DOCX reference.
+Minor heading-word variations can match a unique template heading using
+normalized word overlap. At least three significant words, strong overlap,
+and a clear lead over competing headings are required. Ambiguous matches
+remain for review. Dot-leader and TOC-style entries are excluded from heading
+matching so they cannot supply a section's typography or indentation.
 
 The report includes `template_mapping` and lists ambiguous or unmatched
 paragraphs under `manual_review_rules`. It also identifies preserved tables,
