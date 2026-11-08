@@ -183,7 +183,9 @@ class PaperFormatter
             $referenceStylesXp = $this->packageStyles($referenceZip);
             $referenceRoles = $this->referenceParagraphRoles($referenceXp, $referenceStylesXp);
             $studentRoles = $this->referenceParagraphRoles($studentXp, $this->packageStyles($studentZip));
-            $referenceHeadings = [];
+            $referenceContexts = $this->paragraphChapterContexts($referenceXp);
+            $studentContexts = $this->paragraphChapterContexts($studentXp);
+            $referenceHeadings = []; $scopedHeadings = [];
             foreach ($referenceRoles as $referenceRole => $referenceParagraphs) {
                 if ($referenceRole !== 'chapter' && !str_starts_with($referenceRole, 'section:') && !str_starts_with($referenceRole, 'topic')) continue;
                 foreach ($referenceParagraphs as $referenceParagraph) {
@@ -197,11 +199,23 @@ class PaperFormatter
                     foreach ($keys as $key) {
                         if (!array_key_exists($key, $referenceHeadings)) $referenceHeadings[$key] = $referenceParagraph;
                         elseif ($referenceHeadings[$key] !== $referenceParagraph) $referenceHeadings[$key] = null;
+                        $chapter = $referenceContexts[spl_object_id($referenceParagraph)] ?? '';
+                        if (!array_key_exists($key, $scopedHeadings[$chapter] ?? [])) $scopedHeadings[$chapter][$key] = $referenceParagraph;
+                        elseif ($scopedHeadings[$chapter][$key] !== $referenceParagraph) $scopedHeadings[$chapter][$key] = null;
                     }
                 }
             }
             $sectionBodies = $this->referenceSectionBodies($referenceXp, $referenceHeadings, $referenceRoles['body'] ?? []);
             $headingProfiles = $this->headingProfiles($referenceHeadings);
+            $scopedProfiles = []; $repeatedHeadings = [];
+            foreach ($scopedHeadings as $chapter => $headings) {
+                $scopedProfiles[$chapter] = $this->headingProfiles($headings);
+                $examples = [];
+                foreach ($headings as $heading) {
+                    if ($heading && preg_match('/^\[[^\[\]\r\n]+\]$/u', $this->text($heading)) && $this->isTopicHeading($heading, $referenceXp)) $examples[spl_object_id($heading)] = $heading;
+                }
+                if (count($examples) >= 2 && count(array_unique(array_map(fn ($example) => $this->referenceFormatSignature($example, $referenceXp), $examples))) === 1) $repeatedHeadings[$chapter] = reset($examples);
+            }
             $paragraphProperties = ['pStyle', 'keepNext', 'keepLines', 'pageBreakBefore', 'widowControl', 'pBdr', 'shd', 'tabs', 'bidi', 'snapToGrid', 'spacing', 'ind', 'contextualSpacing', 'jc', 'textDirection', 'outlineLvl'];
             $runProperties = ['rStyle', 'rFonts', 'b', 'bCs', 'i', 'iCs', 'caps', 'smallCaps', 'color', 'spacing', 'sz', 'szCs', 'u', 'vertAlign', 'lang'];
             $referenceIndent = $this->settings($referenceRules)['indentation'];
@@ -215,14 +229,17 @@ class PaperFormatter
                 $sources = $referenceRoles[$role] ?? [];
                 $uniformSources = $sources && count(array_unique(array_map(fn ($candidate) => $this->referenceFormatSignature($candidate, $referenceXp), $sources))) === 1;
                 foreach ($paragraphs as $index => $target) {
+                    $chapter = $studentContexts[spl_object_id($target)] ?? '';
+                    $matchingHeadings = $scopedHeadings[$chapter] ?? $scopedHeadings[''] ?? $referenceHeadings;
+                    $matchingProfiles = $scopedProfiles[$chapter] ?? $scopedProfiles[''] ?? $headingProfiles;
                     if ($studentXp->query('ancestor::w:tbl | .//w:drawing | .//w:pict | .//w:object', $target)->length) {
                         $warnings[] = 'Tables and embedded-object layout were preserved and require review against the selected template.';
                         continue;
                     }
                     $targetText = mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($target)));
-                    $source = null; $matchedText = false; $matchedWords = false;
-                    if (isset($referenceHeadings[$targetText])) {
-                        $source = $referenceHeadings[$targetText]; $matchedText = true;
+                    $source = null; $matchedText = false; $matchedWords = false; $matchedExample = false;
+                    if (isset($matchingHeadings[$targetText])) {
+                        $source = $matchingHeadings[$targetText]; $matchedText = true;
                     } else {
                         foreach ($sources as $candidate) {
                             if (mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($candidate))) === $targetText) {
@@ -231,10 +248,13 @@ class PaperFormatter
                         }
                     }
                     if (!$source && ($role === 'chapter' || str_starts_with($role, 'topic') || str_starts_with($role, 'section:'))) {
-                        $source = $this->similarReferenceHeading($targetText, $headingProfiles);
+                        $source = $this->similarReferenceHeading($targetText, $matchingProfiles);
                         $matchedWords = $source !== null;
                     }
-                    if (!$source && $role === 'body') $source = $this->sectionBodySource($target, $sectionBodies, $headingProfiles);
+                    if (!$source && str_starts_with($role, 'topic') && $this->isTopicHeading($target, $studentXp) && isset($repeatedHeadings[$chapter])) {
+                        $source = $repeatedHeadings[$chapter]; $matchedExample = true;
+                    }
+                    if (!$source && $role === 'body') $source = $this->sectionBodySource($target, $sectionBodies, $matchingProfiles);
                     if (!$source && $sources) {
                         if (count($sources) === count($paragraphs)) $source = $sources[$index];
                         elseif ($uniformSources) $source = $sources[0];
@@ -266,7 +286,7 @@ class PaperFormatter
                     $before = $studentXp->query('./w:pPr/w:pageBreakBefore', $target)->item(0);
                     if ($before && !in_array(strtolower($before->getAttributeNS(self::W, 'val')), ['0', 'false', 'off'], true)) $this->materializePageStart($target, $studentXp);
                     $this->copyReferenceHeadingGap($source, $target, $referenceXp, $studentXp, $referenceStylesXp);
-                    $mapping[] = ['paragraph' => $this->text($target), 'template_paragraph' => $this->text($source), 'match' => $matchedText ? 'heading-text' : ($matchedWords ? 'heading-words' : 'structure')];
+                    $mapping[] = ['paragraph' => $this->text($target), 'template_paragraph' => $this->text($source), 'match' => $matchedText ? 'heading-text' : ($matchedWords ? 'heading-words' : ($matchedExample ? 'chapter-heading-example' : 'structure'))];
                     if ($role === 'body' && $referenceIndent !== null && !$referenceXp->query('./w:pPr/w:ind', $source)->length) {
                         $indent = $this->ensure($this->ensure($target, 'pPr', true), 'ind');
                         foreach (['hanging', 'hangingChars', 'firstLineChars'] as $key) $indent->removeAttributeNS(self::W, $key);
@@ -412,7 +432,7 @@ class PaperFormatter
         $normalize = static fn (string $value) => mb_strtolower(trim(preg_replace('/\s+/u', ' ', $value)));
         $keys = [$normalize($text)];
         // Optional research-type annotations belong to the template, not the student's title.
-        if (preg_match('/\([^()]+\)/u', $text)) {
+        if (!str_contains($text, '[')) {
             $withoutAnnotations = preg_replace('/\([^()]*\)/u', '', $text);
             foreach (preg_split('/\s+or\s+/iu', $withoutAnnotations) as $alternative) {
                 $key = $normalize($alternative);
@@ -430,6 +450,16 @@ class PaperFormatter
         if (!@$doc->loadXML($xml, LIBXML_NONET) || $doc->documentElement?->namespaceURI !== self::W) return null;
         $xp = new DOMXPath($doc); $xp->registerNamespace('w', self::W);
         return $xp;
+    }
+
+    private function paragraphChapterContexts(DOMXPath $xp): array
+    {
+        $contexts = []; $chapter = '';
+        foreach ($xp->query('/w:document/w:body//w:p[not(ancestor::w:txbxContent)]') as $paragraph) {
+            if ($this->isChapterParagraph($paragraph)) $chapter = mb_strtolower(preg_replace('/\s+/u', ' ', $this->paragraphFirstLine($paragraph)));
+            $contexts[spl_object_id($paragraph)] = $chapter;
+        }
+        return $contexts;
     }
 
     private function headingWords(string $text): array
@@ -544,7 +574,10 @@ class PaperFormatter
         // Word can store a chapter label and its title in one paragraph with a line break.
         $firstLine = '';
         foreach ($paragraph->getElementsByTagNameNS(self::W, '*') as $node) {
-            if ($node->localName === 'br' || $node->localName === 'cr') break;
+            if ($node->localName === 'br' || $node->localName === 'cr') {
+                if ($firstLine !== '') break;
+                continue;
+            }
             if ($node->localName === 't') $firstLine .= $node->textContent;
         }
         return trim($firstLine);
@@ -600,6 +633,7 @@ class PaperFormatter
     {
         if ($this->isTopicHeading($paragraph, $xp)) return true;
         $text = $this->text($paragraph);
+        if (str_starts_with($text, '[')) return false;
         if ($text === '' || mb_strlen($text) > 140 || preg_match('/[.!?;:]$/u', $text) || $xp->query('./w:pPr/w:numPr', $paragraph)->length) return false;
         return (bool) preg_match('/\p{L}/u', $text);
     }

@@ -2434,6 +2434,7 @@ async function _dvGenerateFixedPdf() {
         var doc = new DOMParser().parseFromString(await xf.async('string'), 'application/xml');
         var body = doc.getElementsByTagNameNS(W, 'body')[0];
         if (!body) return blob;
+        var normalizedLineGaps = false;
 
         /* drop Word's old page markers; we compute our own */
         Array.from(doc.getElementsByTagNameNS(W, 'lastRenderedPageBreak')).forEach(function (n) { n.parentNode.removeChild(n); });
@@ -2473,6 +2474,22 @@ async function _dvGenerateFixedPdf() {
                 var artTop = art.getBoundingClientRect().top;
                 Array.from(art.children).forEach(function (ch) {
                     var r = ch.getBoundingClientRect(), cs = getComputedStyle(ch);
+                    var source = kids[items.length], props = source && source.localName === 'p' && kid(source, 'pPr');
+                    var spacing = props && kid(props, 'spacing'), lineHeight = parseFloat(cs.lineHeight);
+                    // The renderer ignores Word's beforeLines/afterLines units.
+                    // Convert them using this paragraph's measured line height.
+                    if (spacing && Number.isFinite(lineHeight) && lineHeight > 0) {
+                        ['before', 'after'].forEach(function (side) {
+                            var value = wAttr(spacing, side + 'Lines');
+                            if (value == null || value === '' || !Number.isFinite(Number(value)) || /^(1|true|on)$/i.test(wAttr(spacing, side + 'Autospacing') || '')) return;
+                            var gap = Number(value) / 100 * lineHeight;
+                            spacing.setAttributeNS(W, 'w:' + side, String(Math.round(gap * 15)));
+                            spacing.removeAttributeNS(W, side + 'Lines');
+                            ch.style[side === 'before' ? 'marginTop' : 'marginBottom'] = gap + 'px';
+                            normalizedLineGaps = true;
+                        });
+                        r = ch.getBoundingClientRect();
+                    }
                     var visualBottom = r.bottom;
                     ch.querySelectorAll('img,svg').forEach(function (graphic) {
                         visualBottom = Math.max(visualBottom, graphic.getBoundingClientRect().bottom);
@@ -2532,7 +2549,7 @@ async function _dvGenerateFixedPdf() {
                 }
             });
             console.log('[Validator] paginate: inserted', breaks, 'page breaks');
-            if (!breaks) return blob;
+            if (!breaks && !normalizedLineGaps) return blob;
         } finally {
             box.parentNode.removeChild(box);
         }

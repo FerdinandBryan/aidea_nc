@@ -62,6 +62,13 @@ normalized word overlap. At least three significant words, strong overlap,
 and a clear lead over competing headings are required. Ambiguous matches
 remain for review. Dot-leader and TOC-style entries are excluded from heading
 matching so they cannot supply a section's typography or indentation.
+Template headings written as alternatives using `or` can match either student
+title. Matching is scoped to the corresponding chapter. Two or more bold,
+bracketed heading examples with identical formatting can supply that chapter's
+repeatable heading style for researcher-defined topics; inconsistent examples
+require review. Bracketed instructions are not treated as heading examples.
+In browser previews, line-based paragraph gaps are converted using the rendered
+paragraph's measured line height, including documents needing no extra page breaks.
 
 The report includes `template_mapping` and lists ambiguous or unmatched
 paragraphs under `manual_review_rules`. It also identifies preserved tables,

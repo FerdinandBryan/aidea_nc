@@ -112,6 +112,54 @@ class PaperFormatterTest extends TestCase
         $this->assertStringContainsString('w:before="600"', $styles);
     }
 
+    public function test_template_or_alternatives_match_short_student_headings(): void
+    {
+        foreach ([['Hypothesis or Hypotheses', 'Hypothesis'], ['Methods or Materials', 'Materials']] as [$templateTitle, $studentTitle]) {
+            $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Heading2"/><w:spacing w:before="600"/><w:ind w:firstLine="0"/></w:pPr><w:r><w:t>'.$templateTitle.'</w:t></w:r></w:p>');
+            $student = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>'.$studentTitle.'</w:t></w:r></w:p>');
+            $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+            $xp = $this->xml($student);
+            $this->assertSame('Heading2', $xp->evaluate('string(//w:p[.//w:t="'.$studentTitle.'"]/w:pPr/w:pStyle/@w:val)'));
+            $this->assertSame('600', $xp->evaluate('string(//w:p[.//w:t="'.$studentTitle.'"]/w:pPr/w:spacing/@w:before)'));
+            $this->assertContains('heading-text', array_column($report['template_mapping'], 'match'));
+        }
+    }
+
+    public function test_repeatable_placeholder_heading_examples_are_scoped_to_their_chapter(): void
+    {
+        $example = static fn ($title) => '<w:p><w:pPr><w:ind w:firstLine="0"/><w:jc w:val="both"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>['.$title.']</w:t></w:r></w:p>';
+        $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:ind w:firstLine="300"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>First chapter topic</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 2</w:t></w:r></w:p><w:p><w:r><w:t>[Leave one (1) blank line before the next section heading.]</w:t></w:r></w:p>'.$example('First category label').'<w:p><w:r><w:t>Example body.</w:t></w:r></w:p>'.$example('Additional category label'));
+        $student = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>My first chapter topic</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 2</w:t></w:r></w:p><w:p><w:pPr><w:ind w:firstLine="720"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Reading Development</w:t></w:r></w:p><w:p><w:r><w:t>My paragraph.</w:t></w:r></w:p><w:p><w:pPr><w:ind w:firstLine="720"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Storytelling Activities</w:t></w:r></w:p>');
+        $service = new PaperFormatter; $report = $service->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        foreach (['Reading Development', 'Storytelling Activities'] as $title) {
+            $path = '//w:p[.//w:t="'.$title.'"]';
+            $this->assertSame('0', $xp->evaluate('string('.$path.'/w:pPr/w:ind/@w:firstLine)'));
+            $this->assertSame('100', $xp->evaluate('string('.$path.'/w:pPr/w:spacing/@w:beforeLines)'));
+        }
+        $this->assertEquals(2, count(array_filter($report['template_mapping'], fn ($item) => $item['match'] === 'chapter-heading-example')));
+        $this->assertNotContains('[Leave one (1) blank line before the next section heading.]', $service->referenceHeadings($reference));
+    }
+
+    public function test_same_heading_in_different_chapters_uses_its_local_template_style(): void
+    {
+        $heading = static fn ($gap) => '<w:p><w:pPr><w:spacing w:before="'.$gap.'"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Shared heading</w:t></w:r></w:p>';
+        $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p>'.$heading(300).'<w:p><w:r><w:t>CHAPTER 2</w:t></w:r></w:p>'.$heading(800));
+        $student = $this->paper('<w:p><w:r><w:t>CHAPTER 2</w:t></w:r></w:p>'.$heading(100));
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $this->assertSame('800', $this->xml($student)->evaluate('string(//w:p[.//w:t="Shared heading"]/w:pPr/w:spacing/@w:before)'));
+    }
+
+    public function test_inconsistent_placeholder_examples_require_review(): void
+    {
+        $example = static fn ($label, $gap) => '<w:p><w:pPr><w:spacing w:before="'.$gap.'"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>['.$label.']</w:t></w:r></w:p>';
+        $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 2</w:t></w:r></w:p>'.$example('First category', 300).$example('Second category', 900));
+        $student = $this->paper('<w:p><w:r><w:t>CHAPTER 2</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:before="100"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>My custom category</w:t></w:r></w:p>');
+        $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+        $this->assertTrue($report['manual_review_required']);
+        $this->assertSame('100', $this->xml($student)->evaluate('string(//w:p[.//w:t="My custom category"]/w:pPr/w:spacing/@w:before)'));
+    }
+
     public function test_heading_word_variations_copy_the_template_alignment_spacing_and_section_body(): void
     {
         foreach ([
