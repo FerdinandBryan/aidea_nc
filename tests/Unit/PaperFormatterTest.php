@@ -133,6 +133,31 @@ class PaperFormatterTest extends TestCase
         }
     }
 
+    public function test_appendix_labels_follow_matched_template_titles_and_not_existing_letters(): void
+    {
+        $p = static fn ($text) => '<w:p><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
+        foreach (['M', 'D'] as $vitaeLetter) {
+            $reference = $this->paper($p('APPENDICES').$p('Appendix A').$p('Permission Letter').$p('Appendix '.$vitaeLetter).$p('Curriculum Vitae'));
+            $student = $this->paper($p('APPENDICES').$p('Appendix '.$vitaeLetter).$p('Permission Letter').$p('Original letter content.').$p('Appendix A').$p('Curriculum Vitae').'<w:p><w:r><w:drawing/></w:r></w:p>'.$p('Original vitae content.'));
+            $service = new PaperFormatter;
+            $report = $service->formatUsingReference($student, $reference);
+            $xp = $this->xml($student);
+            $this->assertSame('Appendix A', $xp->evaluate('string(//w:p[w:r/w:t="Permission Letter"]/preceding-sibling::w:p[normalize-space(.) != ""][1]/w:r/w:t)'));
+            $this->assertSame('Appendix '.$vitaeLetter, $xp->evaluate('string(//w:p[w:r/w:t="Curriculum Vitae"]/preceding-sibling::w:p[normalize-space(.) != ""][1]/w:r/w:t)'));
+            $this->assertCount(2, array_filter($report['template_mapping'], fn ($entry) => $entry['match'] === 'appendix-title-label'));
+            $this->assertSame(1, $xp->query('//w:drawing')->length);
+            $this->assertSame(1, $xp->query('//w:t[.="Original vitae content."]')->length);
+            $second = $service->formatUsingReference($student, $reference);
+            $this->assertCount(0, array_filter($second['template_mapping'], fn ($entry) => $entry['match'] === 'appendix-title-label'));
+        }
+        $reference = $this->paper($p('APPENDICES').$p('Appendix M').$p('Curriculum Vitae').$p('Appendix R').$p('Research Profile'));
+        $student = $this->paper($p('APPENDICES').$p('Appendix I').$p('Curriculum Vitae').$p('Appendix M').$p('Unmatched Supporting Material').$p('Appendix Q').$p('Research Profile'));
+        $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+        $this->assertSame(1, $this->xml($student)->query('//w:t[.="Appendix I"]')->length);
+        $this->assertSame(1, $this->xml($student)->query('//w:t[.="Appendix R"]')->length);
+        $this->assertNotEmpty(array_filter($report['manual_review_rules'], fn ($warning) => str_contains($warning, 'duplicate labels')));
+    }
+
     public function test_empty_rules_apply_layout_from_the_admin_reference_docx(): void
     {
         $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="BodyText"/></w:pPr><w:r><w:t>Reference body.</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>');

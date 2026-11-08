@@ -183,6 +183,7 @@ class PaperFormatter
             $referenceStylesXp = $this->packageStyles($referenceZip);
             $referenceRoles = $this->referenceParagraphRoles($referenceXp, $referenceStylesXp);
             $studentRoles = $this->referenceParagraphRoles($studentXp, $this->packageStyles($studentZip));
+            $appendixLabels = $this->alignAppendixLabels($referenceRoles, $studentRoles, $referenceXp, $studentXp);
             $formFooters = $this->appendixFormFooters($referenceRoles, $studentRoles, $referenceXp, $studentXp);
             $formStarts = [];
             foreach ($referenceRoles['appendix:title'] ?? [] as $title) {
@@ -238,6 +239,8 @@ class PaperFormatter
             $runProperties = ['rStyle', 'rFonts', 'b', 'bCs', 'i', 'iCs', 'caps', 'smallCaps', 'color', 'spacing', 'sz', 'szCs', 'u', 'vertAlign', 'lang'];
             $referenceIndent = $this->settings($referenceRules)['indentation'];
             $processed = $cover['processed']; $warnings = $cover['warnings']; $mapping = $cover['mapping'];
+            $warnings = array_merge($warnings, $appendixLabels['warnings']);
+            $mapping = array_merge($mapping, $appendixLabels['mapping']);
             foreach ($referenceRoles as $role => $paragraphs) {
                 if (str_starts_with($role, 'section:') && !isset($studentRoles[$role])) {
                     $warnings[] = 'Missing template section: '.substr($role, strlen('section:')).'. Add its content to the paper; formatting does not invent missing sections.';
@@ -477,6 +480,63 @@ class PaperFormatter
             $roles[$role][] = $paragraph;
         }
         return $roles;
+    }
+
+    /** Labels belong to the template title, not to the student's existing letter. */
+    private function alignAppendixLabels(array $referenceRoles, array $studentRoles, DOMXPath $referenceXp, DOMXPath $studentXp): array
+    {
+        $normalize = static fn (string $text) => mb_strtolower(trim(preg_replace('/\s+/u', ' ', $text)));
+        $blocks = function (array $roles, DOMXPath $xp) use ($normalize): array {
+            $titles = [];
+            foreach ($roles['appendix:title'] ?? [] as $title) $titles[spl_object_id($title)] = $title;
+            $blocks = [];
+            foreach ($roles['appendix:label'] ?? [] as $label) {
+                for ($next = $label->nextSibling; $next; $next = $next->nextSibling) {
+                    if (!$next instanceof DOMElement) continue;
+                    if ($next->localName !== 'p') break;
+                    if ($this->text($next) === '') continue;
+                    if (isset($titles[spl_object_id($next)])) $blocks[] = ['label' => $label, 'title' => $normalize($this->text($next))];
+                    break;
+                }
+            }
+            return $blocks;
+        };
+        $reference = [];
+        foreach ($blocks($referenceRoles, $referenceXp) as $block) {
+            $key = $block['title'];
+            $reference[$key] = array_key_exists($key, $reference) ? null : $this->text($block['label']);
+        }
+        $student = $blocks($studentRoles, $studentXp); $proposals = []; $warnings = []; $mapping = [];
+        foreach ($student as $block) {
+            $destination = $reference[$block['title']] ?? null;
+            if ($destination !== null) $proposals[spl_object_id($block['label'])] = $destination;
+        }
+        // Calculate all destinations before editing, so swapped labels are safe.
+        do {
+            $destinations = []; $blocked = [];
+            foreach ($studentRoles['appendix:label'] ?? [] as $label) {
+                $key = $normalize($proposals[spl_object_id($label)] ?? $this->text($label));
+                $destinations[$key][] = $label;
+            }
+            foreach ($destinations as $labels) {
+                if (count($labels) < 2) continue;
+                foreach ($labels as $label) {
+                    $id = spl_object_id($label);
+                    if (isset($proposals[$id]) && $normalize($proposals[$id]) !== $normalize($this->text($label))) $blocked[] = $id;
+                }
+            }
+            foreach ($blocked as $id) unset($proposals[$id]);
+            if ($blocked) $warnings[] = 'Appendix labels require review: some title-based corrections would leave duplicate labels. Resolve unmatched or repeated appendix titles before renumbering those appendices.';
+        } while ($blocked);
+        foreach ($student as $block) {
+            $label = $block['label']; $destination = $proposals[spl_object_id($label)] ?? null;
+            if ($destination === null || $normalize($destination) === $normalize($this->text($label))) continue;
+            $old = $this->text($label); $nodes = iterator_to_array($studentXp->query('.//w:t', $label));
+            foreach ($nodes as $index => $node) $node->textContent = $index === 0 ? $destination : '';
+            $mapping[] = ['paragraph' => $destination, 'template_paragraph' => $destination, 'match' => 'appendix-title-label', 'previous_label' => $old, 'appendix_title' => $block['title']];
+        }
+        if ($mapping) $warnings[] = 'Appendix labels were corrected by matching their titles to the template. Review appendix cross-references and the list of appendices; those text references were preserved.';
+        return ['warnings' => array_values(array_unique($warnings)), 'mapping' => $mapping];
     }
 
     /** Match a template form's placeholder name plus literal role, without naming the role in code. */
