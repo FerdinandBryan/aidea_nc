@@ -261,19 +261,32 @@ class PaperFormatter
                     if (!$source && $role === 'body') $source = $this->sectionBodySource($target, $sectionBodies, $matchingProfiles);
                     if (!$source && $sources) {
                         if (count($sources) === count($paragraphs)) $source = $sources[$index];
-                        elseif ($uniformSources) $source = $sources[0];
+                        elseif ($uniformSources) $source = $sources[min($index, count($sources) - 1)];
                     }
                     if (!$source) {
                         $warnings[] = 'No template paragraph matched: '.mb_substr($this->text($target), 0, 100);
                         continue;
                     }
-                    $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $runProperties);
+                    // Citation emphasis identifies titles within an entry, not the whole entry.
+                    $entryRunProperties = $role === 'references:entry' ? array_values(array_diff($runProperties, ['b', 'bCs', 'i', 'iCs', 'u'])) : $runProperties;
+                    $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $entryRunProperties);
                     foreach (['keepNext', 'keepLines', 'pageBreakBefore', 'outlineLvl'] as $propertyName) {
                         if ($referenceXp->query('./w:pPr/w:'.$propertyName, $source)->length) continue;
                         $inherited = $this->inheritedParagraphProperty($source, $referenceXp, $referenceStylesXp, $propertyName);
                         if ($inherited) {
                             $pr = $this->ensure($target, 'pPr', true);
                             $pr->replaceChild($studentDoc->importNode($inherited, true), $this->ensure($pr, $propertyName));
+                        }
+                    }
+                    $reusedFirstEntry = $role === 'references:entry' && $index > 0 && $source === ($sources[0] ?? null) && !$matchedText;
+                    $startsPage = !$reusedFirstEntry && $this->referenceStartsPage($source, $referenceXp);
+                    if ($role === 'references:entry' && $index > 0 && !$startsPage) {
+                        // A template's first entry may follow its own divider page.
+                        // That boundary must not repeat for every citation or survive a reformat.
+                        $this->attr($this->ensure($this->ensure($target, 'pPr', true), 'pageBreakBefore'), 'val', 0);
+                        foreach (iterator_to_array($studentXp->query('.//w:br | .//w:t', $target)) as $node) {
+                            if ($node->localName === 't' && trim($node->textContent) !== '') break;
+                            if ($node->localName === 'br' && $node->getAttributeNS(self::W, 'type') === 'page') $node->parentNode->removeChild($node);
                         }
                     }
                     $continuation = $this->chapterContinuation($source);
@@ -284,7 +297,7 @@ class PaperFormatter
                         $this->attr($this->ensure($pr, 'pageBreakBefore'), 'val', 0);
                         $spacing = $this->ensure($pr, 'spacing');
                         $this->attr($spacing, 'before', 0); $this->attr($spacing, 'beforeLines', 0);
-                    } elseif ($this->referenceStartsPage($source, $referenceXp)) {
+                    } elseif ($startsPage) {
                         $this->attr($this->ensure($this->ensure($target, 'pPr', true), 'pageBreakBefore'), 'val', 1);
                     }
                     $before = $studentXp->query('./w:pPr/w:pageBreakBefore', $target)->item(0);
@@ -400,7 +413,7 @@ class PaperFormatter
 
     private function referenceParagraphRoles(DOMXPath $xp, ?DOMXPath $stylesXp = null): array
     {
-        $roles = []; $zone = 'cover'; $coverIndex = 0;
+        $roles = []; $zone = 'cover'; $coverIndex = 0; $appendixTitlePending = false;
         foreach ($xp->query('/w:document/w:body//w:p[not(ancestor::w:txbxContent)]') as $paragraph) {
             if (!$paragraph instanceof DOMElement) continue;
             $text = $this->text($paragraph);
@@ -411,9 +424,19 @@ class PaperFormatter
             if ($this->isChapterParagraph($paragraph)) { $role = 'chapter'; $zone = 'body'; }
             elseif (in_array($upper, ['ABSTRACT', 'APPROVAL SHEET', 'ACKNOWLEDGEMENT', 'ACKNOWLEDGEMENTS', 'TABLE OF CONTENTS', 'LIST OF TABLES', 'LIST OF FIGURES', 'LIST OF APPENDICES', 'REFERENCES', 'APPENDICES'], true)) {
                 $role = 'section:'.$upper;
-                $zone = $upper === 'ABSTRACT' ? 'abstract' : ($upper === 'REFERENCES' ? 'references' : 'body');
+                $zone = match ($upper) { 'ABSTRACT' => 'abstract', 'REFERENCES' => 'references', 'APPENDICES' => 'appendices', default => 'body' };
+                $appendixTitlePending = false;
             } elseif ($xp->query('./w:pPr/w:tabs/w:tab[@w:leader="dot"]', $paragraph)->length || preg_match('/^TOC\d*$/i', $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph))) {
                 $role = 'contents:entry';
+            } elseif ($this->isAppendixHeader($paragraph, $xp)) {
+                $role = 'appendix:label'; $zone = 'appendices';
+                $appendixTitlePending = (bool) preg_match('/^APPENDIX\s+[A-Z]$/i', $text);
+            } elseif ($zone === 'appendices' && $appendixTitlePending && !$xp->query('ancestor::w:tbl | .//w:drawing | .//w:pict | .//w:object', $paragraph)->length) {
+                $role = 'appendix:title'; $appendixTitlePending = false;
+            } elseif ($zone === 'references') {
+                // Format captions in an instructional template are not bibliography entries.
+                // Keep the zone intact even for a short URL, bold entry or Heading-style entry.
+                $role = preg_match('/^\[[^\[\]\r\n]+\]$/u', $text) && $this->isTopicHeading($paragraph, $xp) ? 'references:guide' : 'references:entry';
             } elseif (is_numeric($styleLevel) && (int) $styleLevel < 9) {
                 $role = 'topic:'.((int) $styleLevel + 1); $zone = 'body';
             } elseif ($zone === 'cover' && !preg_match('/^Heading[ _-]?\d+$/i', $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph))) $role = 'cover:'.($coverIndex++);
@@ -422,7 +445,7 @@ class PaperFormatter
                 $outline = $xp->evaluate('string(./w:pPr/w:outlineLvl/@w:val)', $paragraph);
                 $level = preg_match('/heading[ _-]?(\d+)/i', $style, $match) ? $match[1] : (is_numeric($outline) && $outline < 9 ? (string) ((int) $outline + 1) : '');
                 $role = $level !== '' ? 'topic:'.$level : (preg_match('/\p{L}/u', $text) && $text === mb_strtoupper($text) ? 'topic:uppercase' : 'topic');
-                $zone = 'body';
+                if ($zone !== 'appendices') $zone = 'body';
             } elseif ($zone === 'abstract') $role = 'abstract:body';
             elseif ($zone === 'references') $role = 'references:entry';
             else $role = 'body';

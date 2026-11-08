@@ -70,6 +70,36 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('720', $this->xml($file)->evaluate('string(//w:p[w:r/w:t="Body paragraph."]/w:pPr/w:ind/@w:firstLine)'));
     }
 
+    public function test_reference_entries_and_appendix_slots_follow_each_selected_template(): void
+    {
+        foreach (['240', '360'] as $line) {
+            $entry = '<w:pPr><w:spacing w:line="'.$line.'"/><w:ind w:left="720" w:hanging="720"/><w:jc w:val="left"/></w:pPr>';
+            $label = '<w:pPr><w:pageBreakBefore/><w:spacing w:line="'.$line.'"/><w:jc w:val="center"/></w:pPr>';
+            $title = '<w:pPr><w:spacing w:after="'.$line.'"/><w:ind w:firstLine="0"/><w:jc w:val="center"/></w:pPr>';
+            $reference = $this->paper('<w:p><w:r><w:t>REFERENCES</w:t></w:r></w:p><w:p><w:r><w:br w:type="page"/></w:r></w:p><w:p>'.$entry.'<w:r><w:t>[List cited sources.]</w:t></w:r></w:p><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>[Journal article format]</w:t></w:r></w:p><w:p>'.$entry.'<w:r><w:t>[Author]. ([Year]). [Title]. [URL]</w:t></w:r></w:p><w:p><w:r><w:t>APPENDICES</w:t></w:r></w:p><w:p>'.$label.'<w:r><w:t>Appendix A</w:t></w:r></w:p><w:p>'.$title.'<w:r><w:rPr><w:b/></w:rPr><w:t>[Supporting document title]</w:t></w:r></w:p>');
+            $student = $this->paper('<w:p><w:r><w:t>REFERENCES</w:t></w:r></w:p><w:p><w:r><w:t>Author (2026). </w:t></w:r><w:r><w:rPr><w:i/></w:rPr><w:t>Book title.</w:t></w:r></w:p><w:p><w:r><w:br w:type="page"/><w:t>https://example.org/source</w:t></w:r></w:p><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Short reference</w:t></w:r></w:p><w:p><w:r><w:t>APPENDICES</w:t></w:r></w:p><w:p><w:r><w:t>Appendix A</w:t></w:r></w:p><w:p><w:r><w:t>Worksheets</w:t></w:r></w:p><w:p><w:r><w:t>Appendix B</w:t></w:r></w:p><w:p><w:r><w:t>Documentation</w:t></w:r></w:p><w:p><w:r><w:drawing/></w:r></w:p>');
+            $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+            $xp = $this->xml($student);
+            foreach (['Author (2026). ', 'https://example.org/source', 'Short reference'] as $text) {
+                $p = '//w:p[w:r/w:t="'.$text.'"]';
+                $this->assertSame($line, $xp->evaluate('string('.$p.'/w:pPr/w:spacing/@w:line)'));
+                $this->assertSame('720', $xp->evaluate('string('.$p.'/w:pPr/w:ind/@w:hanging)'));
+            }
+            $this->assertSame(1, $xp->query('//w:r[w:t="Book title."]/w:rPr/w:i')->length);
+            $this->assertSame(1, $xp->query('//w:p[w:r/w:t="Author (2026). "]//w:br[@w:type="page"]')->length);
+            $this->assertSame(0, $xp->query('//w:p[w:r/w:t="https://example.org/source"]//w:br[@w:type="page"]')->length);
+            $this->assertSame(0, $xp->query('//w:p[w:r/w:t="Short reference"]//w:br[@w:type="page"]')->length);
+            foreach (['Worksheets', 'Documentation'] as $text) {
+                $p = '//w:p[w:r/w:t="'.$text.'"]';
+                $this->assertSame('center', $xp->evaluate('string('.$p.'/w:pPr/w:jc/@w:val)'));
+                $this->assertSame($line, $xp->evaluate('string('.$p.'/w:pPr/w:spacing/@w:after)'));
+            }
+            $this->assertSame(1, $xp->query('//w:p[w:r/w:t="Appendix B"]//w:br[@w:type="page"]')->length);
+            $this->assertSame(1, $xp->query('//w:drawing')->length);
+            $this->assertNotContains('No template paragraph matched: Documentation', $report['manual_review_rules']);
+        }
+    }
+
     public function test_empty_rules_apply_layout_from_the_admin_reference_docx(): void
     {
         $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="BodyText"/></w:pPr><w:r><w:t>Reference body.</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>');
