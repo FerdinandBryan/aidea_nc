@@ -183,6 +183,20 @@ class PaperFormatter
             $referenceStylesXp = $this->packageStyles($referenceZip);
             $referenceRoles = $this->referenceParagraphRoles($referenceXp, $referenceStylesXp);
             $studentRoles = $this->referenceParagraphRoles($studentXp, $this->packageStyles($studentZip));
+            $formFooters = $this->appendixFormFooters($referenceRoles, $studentRoles, $referenceXp, $studentXp);
+            $formStarts = [];
+            foreach ($referenceRoles['appendix:title'] ?? [] as $title) {
+                for ($next = $title->nextSibling; $next; $next = $next->nextSibling) {
+                    if (!$next instanceof DOMElement) continue;
+                    // A form can place a photograph table between its title and fields.
+                    if ($next->localName === 'tbl') continue;
+                    if ($next->localName !== 'p') break;
+                    if ($this->text($next) === '') continue;
+                    $key = 'appendix:heading:'.mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($next)));
+                    if (in_array($next, $referenceRoles[$key] ?? [], true)) $formStarts[$key] = true;
+                    break;
+                }
+            }
             $cover = (new TemplateCoverFormatter)->apply($studentXp, $referenceXp, $studentRoles, $referenceRoles);
             if ($cover['applied']) {
                 foreach (array_keys($studentRoles) as $role) if (str_starts_with($role, 'cover:')) unset($studentRoles[$role]);
@@ -236,15 +250,17 @@ class PaperFormatter
                     $chapter = $studentContexts[spl_object_id($target)] ?? '';
                     $matchingHeadings = $scopedHeadings[$chapter] ?? $scopedHeadings[''] ?? $referenceHeadings;
                     $matchingProfiles = $scopedProfiles[$chapter] ?? $scopedProfiles[''] ?? $headingProfiles;
-                    if ($studentXp->query('ancestor::w:tbl | .//w:drawing | .//w:pict | .//w:object', $target)->length) {
+                    $appendixHeading = $role === 'appendix:title' || str_starts_with($role, 'appendix:heading:');
+                    if ($studentXp->query('ancestor::w:tbl', $target)->length || (!$appendixHeading && $studentXp->query('.//w:drawing | .//w:pict | .//w:object', $target)->length)) {
                         $warnings[] = 'Tables and embedded-object layout were preserved and require review against the selected template.';
                         continue;
                     }
                     $targetText = mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($target)));
-                    $source = null; $matchedText = false; $matchedWords = false; $matchedExample = false;
-                    if (isset($matchingHeadings[$targetText])) {
+                    $footer = $formFooters[spl_object_id($target)] ?? null;
+                    $source = $footer['source'] ?? null; $matchedText = false; $matchedWords = false; $matchedExample = false;
+                    if (!$source && isset($matchingHeadings[$targetText])) {
                         $source = $matchingHeadings[$targetText]; $matchedText = true;
-                    } else {
+                    } elseif (!$source) {
                         foreach ($sources as $candidate) {
                             if (mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($candidate))) === $targetText) {
                                 $source = $candidate; $matchedText = true; break;
@@ -280,6 +296,7 @@ class PaperFormatter
                     }
                     $reusedFirstEntry = $role === 'references:entry' && $index > 0 && $source === ($sources[0] ?? null) && !$matchedText;
                     $startsPage = !$reusedFirstEntry && $this->referenceStartsPage($source, $referenceXp);
+                    if ($index > 0 && isset($formStarts[$role]) && count($sources) === 1) $startsPage = true;
                     if ($role === 'references:entry' && $index > 0 && !$startsPage) {
                         // A template's first entry may follow its own divider page.
                         // That boundary must not repeat for every citation or survive a reformat.
@@ -302,7 +319,7 @@ class PaperFormatter
                     }
                     $before = $studentXp->query('./w:pPr/w:pageBreakBefore', $target)->item(0);
                     if ($before && !in_array(strtolower($before->getAttributeNS(self::W, 'val')), ['0', 'false', 'off'], true)) $this->materializePageStart($target, $studentXp);
-                    $this->copyReferenceHeadingGap($source, $target, $referenceXp, $studentXp, $referenceStylesXp);
+                    if (!($footer['continuation'] ?? false)) $this->copyReferenceHeadingGap($source, $target, $referenceXp, $studentXp, $referenceStylesXp);
                     $mapping[] = ['paragraph' => $this->text($target), 'template_paragraph' => $this->text($source), 'match' => $matchedText ? 'heading-text' : ($matchedWords ? 'heading-words' : ($matchedExample ? 'chapter-heading-example' : 'structure'))];
                     if ($role === 'body' && $referenceIndent !== null && !$referenceXp->query('./w:pPr/w:ind', $source)->length) {
                         $indent = $this->ensure($this->ensure($target, 'pPr', true), 'ind');
@@ -413,7 +430,7 @@ class PaperFormatter
 
     private function referenceParagraphRoles(DOMXPath $xp, ?DOMXPath $stylesXp = null): array
     {
-        $roles = []; $zone = 'cover'; $coverIndex = 0; $appendixTitlePending = false;
+        $roles = []; $zone = 'cover'; $coverIndex = 0; $appendixTitlePending = false; $appendixSection = '';
         foreach ($xp->query('/w:document/w:body//w:p[not(ancestor::w:txbxContent)]') as $paragraph) {
             if (!$paragraph instanceof DOMElement) continue;
             $text = $this->text($paragraph);
@@ -430,9 +447,17 @@ class PaperFormatter
                 $role = 'contents:entry';
             } elseif ($this->isAppendixHeader($paragraph, $xp)) {
                 $role = 'appendix:label'; $zone = 'appendices';
+                $appendixSection = '';
                 $appendixTitlePending = (bool) preg_match('/^APPENDIX\s+[A-Z]$/i', $text);
-            } elseif ($zone === 'appendices' && $appendixTitlePending && !$xp->query('ancestor::w:tbl | .//w:drawing | .//w:pict | .//w:object', $paragraph)->length) {
+            } elseif ($zone === 'appendices' && $appendixTitlePending && !$xp->query('ancestor::w:tbl', $paragraph)->length) {
                 $role = 'appendix:title'; $appendixTitlePending = false;
+            } elseif ($zone === 'appendices') {
+                // Form values are often short lines. Only actual heading formatting
+                // establishes a subsection; values inherit that subsection's sample.
+                if ($this->isTopicHeading($paragraph, $xp) || (is_numeric($styleLevel) && (int) $styleLevel < 9)) {
+                    $appendixSection = mb_strtolower(preg_replace('/\s+/u', ' ', $text));
+                    $role = 'appendix:heading:'.$appendixSection;
+                } else $role = 'appendix:body:'.$appendixSection;
             } elseif ($zone === 'references') {
                 // Format captions in an instructional template are not bibliography entries.
                 // Keep the zone intact even for a short URL, bold entry or Heading-style entry.
@@ -452,6 +477,47 @@ class PaperFormatter
             $roles[$role][] = $paragraph;
         }
         return $roles;
+    }
+
+    /** Match a template form's placeholder name plus literal role, without naming the role in code. */
+    private function appendixFormFooters(array $referenceRoles, array $studentRoles, DOMXPath $referenceXp, DOMXPath $studentXp): array
+    {
+        $samples = [];
+        foreach ($referenceRoles as $role => $paragraphs) {
+            if (!str_starts_with($role, 'appendix:body:') && !str_starts_with($role, 'appendix:heading:')) continue;
+            foreach ($paragraphs as $paragraph) {
+                $lines = [''];
+                foreach ($referenceXp->query('.//w:t | .//w:br | .//w:cr', $paragraph) as $node) {
+                    if ($node->localName === 't') $lines[count($lines) - 1] .= $node->textContent;
+                    else $lines[] = '';
+                }
+                $lines = array_values(array_filter(array_map('trim', $lines), fn ($line) => $line !== ''));
+                if (count($lines) !== 2 || !preg_match('/^\[[^\[\]]+\]$/u', $lines[0]) || str_contains($lines[1], '[') || mb_strlen($lines[1]) < 5) continue;
+                $key = mb_strtolower($lines[1]);
+                $samples[$key] = array_key_exists($key, $samples) ? null : $paragraph;
+            }
+        }
+        $matches = [];
+        foreach ($studentRoles as $role => $paragraphs) {
+            if (!str_starts_with($role, 'appendix:body:') && !str_starts_with($role, 'appendix:heading:')) continue;
+            foreach ($paragraphs as $paragraph) {
+                $text = mb_strtolower($this->text($paragraph));
+                foreach ($samples as $label => $source) {
+                    if (!$source || !preg_match('/^'.preg_quote($label, '/').'(?:\s|:|$)/u', $text)) continue;
+                    $matches[spl_object_id($paragraph)] = ['source' => $source, 'continuation' => true];
+                    for ($previous = $paragraph->previousSibling; $previous; $previous = $previous->previousSibling) {
+                        if (!$previous instanceof DOMElement || $previous->localName !== 'p') break;
+                        if ($studentXp->query('.//w:drawing | .//w:pict | .//w:object', $previous)->length) break;
+                        $previousText = $this->text($previous);
+                        if ($previousText === '') continue;
+                        $headingRole = 'appendix:heading:'.mb_strtolower(preg_replace('/\s+/u', ' ', $previousText));
+                        if (!str_contains($previousText, ':') && !isset($referenceRoles[$headingRole])) $matches[spl_object_id($previous)] = ['source' => $source, 'continuation' => false];
+                        break;
+                    }
+                }
+            }
+        }
+        return $matches;
     }
 
     private function referenceHeadingKeys(string $text): array

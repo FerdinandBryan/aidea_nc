@@ -100,6 +100,39 @@ class PaperFormatterTest extends TestCase
         }
     }
 
+    public function test_appendix_forms_map_split_values_and_repeated_people_to_the_template(): void
+    {
+        foreach (['240', '360'] as $line) {
+            $heading = '<w:pPr><w:keepNext/><w:jc w:val="left"/><w:spacing w:line="'.$line.'"/></w:pPr>';
+            $field = '<w:pPr><w:jc w:val="left"/><w:spacing w:line="'.$line.'"/><w:ind w:firstLine="0"/></w:pPr>';
+            $reference = $this->paper('<w:p><w:r><w:t>APPENDICES</w:t></w:r></w:p><w:p><w:r><w:t>Appendix M</w:t></w:r></w:p><w:p><w:r><w:t>Curriculum Vitae</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>[Photograph]</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p>'.$heading.'<w:r><w:rPr><w:b/></w:rPr><w:t>PERSONAL DETAILS</w:t></w:r></w:p><w:p>'.$field.'<w:r><w:t>Name: [Name]</w:t><w:br/><w:t>Address: [Address]</w:t></w:r></w:p><w:p>'.$heading.'<w:r><w:rPr><w:b/></w:rPr><w:t>TRAINING</w:t></w:r></w:p><w:p>'.$field.'<w:r><w:t>School: [School]</w:t><w:br/><w:t>Program: [Program]</w:t></w:r></w:p><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>[FULL NAME]</w:t><w:br/><w:t>Participant</w:t></w:r></w:p>');
+            $people = '';
+            foreach (['One', 'Two'] as $person) {
+                $people .= '<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>PERSONAL DETAILS</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val="both"/></w:pPr><w:r><w:t>Name: '.$person.'</w:t></w:r></w:p><w:p><w:r><w:t>Address: Original address '.$person.'</w:t></w:r></w:p><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>TRAINING</w:t></w:r></w:p><w:p><w:r><w:t>School: Original school '.$person.'</w:t></w:r></w:p><w:p><w:r><w:t>Program: Original program '.$person.'</w:t></w:r></w:p><w:p><w:r><w:t>PERSON '.$person.'</w:t></w:r></w:p><w:p><w:r><w:t>Participant Signature: ___</w:t></w:r></w:p>';
+            }
+            $student = $this->paper('<w:p><w:r><w:t>APPENDICES</w:t></w:r></w:p><w:p><w:r><w:t>Appendix I</w:t></w:r></w:p><w:p><w:r><w:drawing/></w:r><w:r><w:t>Curriculum Vitae</w:t></w:r></w:p>'.$people);
+            $service = new PaperFormatter;
+            // Reapplying must retain the same form mapping and page boundaries.
+            for ($pass = 0; $pass < 2; $pass++) {
+                $report = $service->formatUsingReference($student, $reference);
+                $xp = $this->xml($student);
+                foreach (['One', 'Two'] as $person) {
+                    foreach (['Name: '.$person, 'Address: Original address '.$person, 'School: Original school '.$person, 'Program: Original program '.$person] as $text) {
+                        $p = '//w:p[w:r/w:t="'.$text.'"]';
+                        $this->assertSame($line, $xp->evaluate('string('.$p.'/w:pPr/w:spacing/@w:line)'));
+                        $this->assertSame('left', $xp->evaluate('string('.$p.'/w:pPr/w:jc/@w:val)'));
+                        $this->assertSame('0', $xp->evaluate('string('.$p.'/w:pPr/w:ind/@w:firstLine)'));
+                        $this->assertNotContains('No template paragraph matched: '.$text, $report['manual_review_rules']);
+                    }
+                    $this->assertSame(1, $xp->query('//w:p[w:r/w:t="PERSON '.$person.'"]/w:r/w:rPr/w:b')->length);
+                }
+                $this->assertSame(1, $xp->query('//w:p[w:r/w:t="PERSONAL DETAILS"][2]//w:br[@w:type="page"]')->length);
+                $this->assertSame(0, $xp->query('//w:t[contains(., "[FULL NAME]")]')->length);
+                $this->assertSame(1, $xp->query('//w:drawing')->length);
+            }
+        }
+    }
+
     public function test_empty_rules_apply_layout_from_the_admin_reference_docx(): void
     {
         $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="BodyText"/></w:pPr><w:r><w:t>Reference body.</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>');
