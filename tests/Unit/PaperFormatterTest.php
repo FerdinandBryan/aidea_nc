@@ -112,6 +112,48 @@ class PaperFormatterTest extends TestCase
         $this->assertStringContainsString('w:before="600"', $styles);
     }
 
+    public function test_cover_blocks_follow_template_slots_instead_of_student_paragraph_numbers(): void
+    {
+        $p = static fn ($text, $bold = false, $align = 'center') => '<w:p><w:pPr><w:spacing w:line="240" w:after="0"/><w:jc w:val="'.$align.'"/></w:pPr><w:r><w:rPr>'.($bold ? '<w:b/>' : '').'</w:rPr><w:t>'.$text.'</w:t></w:r></w:p>';
+        $blank = '<w:p><w:pPr><w:spacing w:line="240"/></w:pPr></w:p>';
+        foreach ([1, 3] as $gap) {
+            $reference = $this->paper(str_repeat($blank, $gap).$p('[Project title]', true).str_repeat($blank, $gap).$p('Prepared for').$p('Faculty [Division]').str_repeat($blank, $gap).$p('Submitted in fulfillment').$p('[Program]').str_repeat($blank, $gap).$p('by').$blank.$p('[Author 1]', true).$p('[Author 2]', true).$p('[Author 3]', true).$p('[Author 4]', true).$p('[Author 5]', true).str_repeat($blank, $gap).$p('[Month Year]').'<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p>');
+            $student = $this->paper($p('FIRST TITLE LINE', true).$p('SECOND TITLE LINE', true).$p('THIRD TITLE LINE', true).$blank.$p('Submitted in fulfillment').$p('My degree program').$blank.$p('by').$p('Researcher A', true).$p('Researcher B', true).$p('Researcher C', true).$p('November 2026', false, 'both').'<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>My original body content.</w:t></w:r></w:p>');
+            for ($pass = 0; $pass < 2; $pass++) {
+                $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+                $xp = $this->xml($student);
+                $title = '//w:p[.//w:t="FIRST TITLE LINE"]';
+                $this->assertEquals(3, $xp->evaluate('count('.$title.'/w:r/w:t)'));
+                $this->assertEquals(2, $xp->evaluate('count('.$title.'/w:r/w:br)'));
+                $this->assertEquals(3, $xp->evaluate('count('.$title.'/w:r/w:rPr/w:b)'));
+                $this->assertEquals(1, $xp->evaluate('count(//w:p[.//w:t="Prepared for"])'));
+                $this->assertEquals(1, $xp->evaluate('count(//w:p[.//w:t="My degree program"])'));
+                $this->assertEquals(0, $xp->evaluate('count(//w:t[.="[Project title]" or contains(.,"[Author")])'));
+                $this->assertEquals($this->xml($reference)->evaluate('count(//w:p[.//w:t="[Month Year]"]/preceding-sibling::w:p)'), $xp->evaluate('count(//w:p[.//w:t="November 2026"]/preceding-sibling::w:p)'));
+                $this->assertStringContainsString('Unfilled template cover field: [Division]', implode(' ', $report['manual_review_rules']));
+                $this->assertSame('My original body content.', $xp->evaluate('string(//w:p[.//w:t="My original body content."]//w:t)'));
+                $this->assertContains('cover-block', array_column($report['template_mapping'], 'match'));
+                $this->assertSame('center', $xp->evaluate('string(//w:p[.//w:t="November 2026"]/w:pPr/w:jc/@w:val)'));
+            }
+        }
+    }
+
+    public function test_cover_preserves_authors_beyond_the_template_example_count(): void
+    {
+        $p = static fn ($text, $bold = false) => '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr>'.($bold ? '<w:b/>' : '').'</w:rPr><w:t>'.$text.'</w:t></w:r></w:p>';
+        $sourceNames = ''; $studentNames = '';
+        foreach (range(1, 5) as $i) $sourceNames .= $p('[Name '.$i.']', true);
+        foreach (range(1, 6) as $i) $studentNames .= $p('Writer '.$i, true);
+        $reference = $this->paper($p('[Title]', true).'<w:p/>'.$p('by').'<w:p/>'.$sourceNames.'<w:p/>'.$p('[Date]').'<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p>');
+        $student = $this->paper($p('My research title', true).'<w:p/>'.$p('by').$studentNames.$p('November 2026').'<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p>');
+        for ($pass = 0; $pass < 2; $pass++) {
+            (new PaperFormatter)->formatUsingReference($student, $reference);
+            $xp = $this->xml($student);
+            foreach (range(1, 6) as $i) $this->assertEquals(1, $xp->evaluate('count(//w:t[.="Writer '.$i.'"])'));
+            $this->assertEquals(1, $xp->evaluate('count(//w:t[.="November 2026"])'));
+        }
+    }
+
     public function test_template_or_alternatives_match_short_student_headings(): void
     {
         foreach ([['Hypothesis or Hypotheses', 'Hypothesis'], ['Methods or Materials', 'Materials']] as [$templateTitle, $studentTitle]) {

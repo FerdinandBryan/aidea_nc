@@ -62,6 +62,15 @@ normalized word overlap. At least three significant words, strong overlap,
 and a clear lead over competing headings are required. Ambiguous matches
 remain for review. Dot-leader and TOC-style entries are excluded from heading
 matching so they cannot supply a section's typography or indentation.
+Paragraph-based covers are filled by content blocks rather than paragraph
+indices. Shared text anchors and formatting identify the title, submission
+statement, author and date blocks; the template's blank paragraphs and fixed
+text are retained. Multi-paragraph student titles can fill a single template
+title paragraph. Student names, degree text and date replace variable examples,
+and extra names are retained. Remaining template placeholders are reported
+for completion. Ambiguous covers or covers containing graphics/fields retain
+their content and require review rather than silently losing student text.
+
 Template headings written as alternatives using `or` can match either student
 title. Matching is scoped to the corresponding chapter. Two or more bold,
 bracketed heading examples with identical formatting can supply that chapter's

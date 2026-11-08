@@ -183,6 +183,10 @@ class PaperFormatter
             $referenceStylesXp = $this->packageStyles($referenceZip);
             $referenceRoles = $this->referenceParagraphRoles($referenceXp, $referenceStylesXp);
             $studentRoles = $this->referenceParagraphRoles($studentXp, $this->packageStyles($studentZip));
+            $cover = (new TemplateCoverFormatter)->apply($studentXp, $referenceXp, $studentRoles, $referenceRoles);
+            if ($cover['applied']) {
+                foreach (array_keys($studentRoles) as $role) if (str_starts_with($role, 'cover:')) unset($studentRoles[$role]);
+            }
             $referenceContexts = $this->paragraphChapterContexts($referenceXp);
             $studentContexts = $this->paragraphChapterContexts($studentXp);
             $referenceHeadings = []; $scopedHeadings = [];
@@ -219,7 +223,7 @@ class PaperFormatter
             $paragraphProperties = ['pStyle', 'keepNext', 'keepLines', 'pageBreakBefore', 'widowControl', 'pBdr', 'shd', 'tabs', 'bidi', 'snapToGrid', 'spacing', 'ind', 'contextualSpacing', 'jc', 'textDirection', 'outlineLvl'];
             $runProperties = ['rStyle', 'rFonts', 'b', 'bCs', 'i', 'iCs', 'caps', 'smallCaps', 'color', 'spacing', 'sz', 'szCs', 'u', 'vertAlign', 'lang'];
             $referenceIndent = $this->settings($referenceRules)['indentation'];
-            $processed = 0; $warnings = []; $mapping = [];
+            $processed = $cover['processed']; $warnings = $cover['warnings']; $mapping = $cover['mapping'];
             foreach ($referenceRoles as $role => $paragraphs) {
                 if (str_starts_with($role, 'section:') && !isset($studentRoles[$role])) {
                     $warnings[] = 'Missing template section: '.substr($role, strlen('section:')).'. Add its content to the paper; formatting does not invent missing sections.';
