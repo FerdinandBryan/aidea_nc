@@ -334,6 +334,10 @@ class PaperFormatter
                     $processed++;
                 }
             }
+            $emptyAppendices = $this->insertEmptyTemplateAppendices($appendixLabels['template_entries'], $referenceXp, $studentXp, $paragraphProperties, $runProperties);
+            $processed += $emptyAppendices['processed'];
+            $warnings = array_merge($warnings, $emptyAppendices['warnings']);
+            $mapping = array_merge($mapping, $emptyAppendices['mapping']);
             $referenceSection = $referenceXp->query('//w:sectPr')->item($referenceXp->query('//w:sectPr')->length - 1);
             if ($referenceSection instanceof DOMElement) {
                 $studentSections = iterator_to_array($studentXp->query('//w:sectPr'));
@@ -501,7 +505,7 @@ class PaperFormatter
             }
             return $blocks;
         };
-        $reference = [];
+        $reference = []; $referenceEntries = [];
         foreach ($blocks($referenceRoles, $referenceXp) as $ordinal => $block) {
             $key = $block['title'];
             $description = '';
@@ -511,7 +515,8 @@ class PaperFormatter
                 if (mb_strlen($description) > 2000) break;
             }
             $block['description'] = $description;
-            $reference[$key] = array_key_exists($key, $reference) ? null : [...$block, 'ordinal' => $ordinal];
+            $entry = [...$block, 'ordinal' => $ordinal]; $referenceEntries[] = $entry;
+            $reference[$key] = array_key_exists($key, $reference) ? null : $entry;
         }
         $student = $blocks($studentRoles, $studentXp); $proposals = []; $warnings = []; $mapping = []; $sources = []; $matches = [];
         foreach ($student as $block) {
@@ -553,7 +558,7 @@ class PaperFormatter
             if (!$match) {
                 // Optional supporting-document slots accept the student's actual title.
                 // The current letter can identify such a slot, but never a named document.
-                foreach ($reference as $candidate) {
+                foreach ($referenceEntries as $candidate) {
                     if ($candidate && str_contains($this->text($candidate['title_node']), '[')
                         && $normalize($this->text($candidate['label'])) === $normalize($this->text($block['label']))) {
                         $match = $candidate; break;
@@ -570,7 +575,7 @@ class PaperFormatter
         // Keep existing optional-slot assignments, then fill unused template slots
         // with additional documents in their original order. Do not invent slots.
         $used = array_column($matches, 'ordinal'); $available = [];
-        foreach ($reference as $candidate) {
+        foreach ($referenceEntries as $candidate) {
             if ($candidate && str_contains($this->text($candidate['title_node']), '[') && !in_array($candidate['ordinal'], $used, true)) $available[] = $candidate;
         }
         foreach ($student as $block) {
@@ -584,12 +589,6 @@ class PaperFormatter
             $matches[$id] = $match; $proposals[$id] = $this->text($match['label']);
             $sources[$id] = $match['label']; $sources[spl_object_id($block['title_node'])] = $match['title_node'];
             $mapping[] = ['paragraph' => $this->text($block['title_node']), 'template_paragraph' => $this->text($match['title_node']), 'match' => 'appendix-optional-slot', 'template_label' => $this->text($match['label'])];
-        }
-        $matchedOrdinals = array_column($matches, 'ordinal');
-        foreach ($reference as $candidate) {
-            if ($candidate && !str_contains($this->text($candidate['title_node']), '[') && !in_array($candidate['ordinal'], $matchedOrdinals, true)) {
-                $warnings[] = 'No student document matched template appendix: '.$this->text($candidate['label']).' — '.$this->text($candidate['title_node']).'. Supply the actual document if required; formatting cannot create it.';
-            }
         }
         // Calculate all destinations before editing, so swapped labels are safe.
         do {
@@ -624,7 +623,64 @@ class PaperFormatter
         }
         $this->orderMatchedAppendices($studentRoles['appendix:label'] ?? [], $matches, $proposals, $warnings, $mapping);
         if ($mapping) $warnings[] = 'Appendix labels were corrected by matching their titles to the template. Review appendix cross-references and the list of appendices; those text references were preserved.';
-        return ['warnings' => array_values(array_unique($warnings)), 'mapping' => $mapping, 'sources' => $sources];
+        return ['warnings' => array_values(array_unique($warnings)), 'mapping' => $mapping, 'sources' => $sources, 'template_entries' => $referenceEntries];
+    }
+
+    /** Reserve every missing template appendix as a heading-only page. */
+    private function insertEmptyTemplateAppendices(array $entries, DOMXPath $referenceXp, DOMXPath $studentXp, array $paragraphProperties, array $runProperties): array
+    {
+        $result = ['processed' => 0, 'warnings' => [], 'mapping' => []];
+        if (!$entries) return $result;
+        $doc = $studentXp->document; $body = $studentXp->query('/w:document/w:body')->item(0); $labels = [];
+        foreach ($studentXp->query('/w:document/w:body/w:p') as $paragraph) {
+            if ($this->isAppendixHeader($paragraph, $studentXp)) $labels[mb_strtoupper($this->text($paragraph))] = $paragraph;
+        }
+        $makeHeader = function (DOMElement $source) use ($doc, $referenceXp, $studentXp, $paragraphProperties, $runProperties): DOMElement {
+            $p = $doc->createElementNS(self::W, 'w:p'); $run = $doc->createElementNS(self::W, 'w:r');
+            $text = $doc->createElementNS(self::W, 'w:t'); $text->appendChild($doc->createTextNode($this->text($source)));
+            $run->appendChild($text); $p->appendChild($run);
+            $this->copyReferenceParagraph($source, $p, $referenceXp, $studentXp, $paragraphProperties, $runProperties);
+            return $p;
+        };
+        if (!$labels && !$studentXp->query('/w:document/w:body/w:p[normalize-space(.)="APPENDICES"]')->length) {
+            $divider = $referenceXp->query('/w:document/w:body/w:p[normalize-space(.)="APPENDICES"]')->item(0);
+            if ($divider instanceof DOMElement) {
+                $p = $makeHeader($divider); $body->insertBefore($p, $studentXp->query('./w:sectPr', $body)->item(0));
+                $this->materializePageStart($p, $studentXp); $result['processed']++;
+            }
+        }
+        foreach ($entries as $index => $entry) {
+            $key = mb_strtoupper($this->text($entry['label']));
+            if (isset($labels[$key])) {
+                $hasTitle = false; $hasDocument = false;
+                for ($node = $labels[$key]->nextSibling; $node; $node = $node->nextSibling) {
+                    if (!$node instanceof DOMElement) continue;
+                    if ($node->localName === 'sectPr' || ($node->localName === 'p' && $this->isAppendixHeader($node, $studentXp))) break;
+                    if ($node->localName === 'tbl' || $studentXp->query('.//w:drawing | .//w:pict | .//w:object', $node)->length) { $hasDocument = true; break; }
+                    if ($this->text($node) === '') continue;
+                    if (!$hasTitle) $hasTitle = true;
+                    else { $hasDocument = true; break; }
+                }
+                if ($hasTitle && !$hasDocument) $result['warnings'][] = 'Appendix page is blank: '.$this->text($entry['label']).' — '.$this->text($entry['title_node']).'. No supporting document was supplied.';
+                continue;
+            }
+            $anchor = null;
+            foreach (array_slice($entries, $index + 1) as $later) {
+                $laterKey = mb_strtoupper($this->text($later['label']));
+                if (isset($labels[$laterKey])) { $anchor = $labels[$laterKey]; break; }
+            }
+            $anchor ??= $studentXp->query('./w:sectPr', $body)->item(0);
+            $label = $makeHeader($entry['label']); $title = $makeHeader($entry['title_node']);
+            $body->insertBefore($label, $anchor); $body->insertBefore($title, $anchor);
+            $this->materializePageStart($label, $studentXp);
+            // The following appendix must start a new page, leaving this one empty.
+            if ($anchor instanceof DOMElement && $anchor->localName === 'p') $this->materializePageStart($anchor, $studentXp);
+            $labels[$key] = $label;
+            $result['processed'] += 2;
+            $result['warnings'][] = 'Blank appendix page added: '.$this->text($entry['label']).' — '.$this->text($entry['title_node']).'. No supporting document was supplied.';
+            $result['mapping'][] = ['paragraph' => $this->text($entry['label']), 'template_paragraph' => $this->text($entry['title_node']), 'match' => 'appendix-empty-page'];
+        }
+        return $result;
     }
 
     /** Move whole appendix blocks, including tables and images; unmatched blocks retain their slots. */

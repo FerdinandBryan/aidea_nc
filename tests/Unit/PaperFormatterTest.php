@@ -213,6 +213,48 @@ class PaperFormatterTest extends TestCase
         }
     }
 
+    public function test_missing_template_appendices_get_header_only_pages_in_template_order(): void
+    {
+        $p = static fn ($text) => '<w:p><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
+        $reference = $this->paper($p('APPENDICES').$p('Appendix A').$p('Permission Letter').$p('[Insert letter.]').$p('Appendix B').'<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="360" w:line="240"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial"/><w:b/><w:sz w:val="28"/></w:rPr><w:t>Editing Certificate</w:t></w:r></w:p>'.$p('[Insert signed certificate here.]').$p('Appendix C').$p('Curriculum Vitae'));
+        foreach ([true, false] as $hasAppendices) {
+            $student = $this->paper($p('CHAPTER 1').$p('Original paper content.').($hasAppendices ? $p('APPENDICES').$p('Appendix A').$p('Permission Letter').$p('Original letter content.').'<w:p><w:r><w:drawing/></w:r></w:p>'.$p('Appendix C').$p('Curriculum Vitae').$p('Original vitae content.') : ''));
+            $service = new PaperFormatter;
+            for ($pass = 0; $pass < 2; $pass++) {
+                $report = $service->formatUsingReference($student, $reference); $xp = $this->xml($student);
+                $labels = array_map(fn ($node) => $node->textContent, iterator_to_array($xp->query('//w:p[starts-with(w:r/w:t, "Appendix ")]/w:r/w:t')));
+                $this->assertSame(['Appendix A', 'Appendix B', 'Appendix C'], $labels);
+                $this->assertSame(1, $xp->query('//w:t[.="APPENDICES"]')->length);
+                $this->assertSame(0, $xp->query('//w:t[contains(., "Insert signed certificate") or contains(., "Insert letter")]')->length);
+                $title = '//w:p[w:r/w:t="Editing Certificate"]';
+                $this->assertSame('center', $xp->evaluate('string('.$title.'/w:pPr/w:jc/@w:val)'));
+                $this->assertSame('360', $xp->evaluate('string('.$title.'/w:pPr/w:spacing/@w:before)'));
+                $this->assertSame('Arial', $xp->evaluate('string('.$title.'/w:r/w:rPr/w:rFonts/@w:ascii)'));
+                $this->assertSame('28', $xp->evaluate('string('.$title.'/w:r/w:rPr/w:sz/@w:val)'));
+                $this->assertSame(1, $xp->query('//w:p[w:r/w:t="Appendix B"]//w:br[@w:type="page"]')->length);
+                $this->assertSame(1, $xp->query('//w:p[w:r/w:t="Appendix C"]//w:br[@w:type="page"]')->length);
+                $this->assertSame(1, $xp->query('//w:t[.="Original paper content."]')->length);
+                $this->assertSame($hasAppendices ? 1 : 0, $xp->query('//w:drawing')->length);
+                $this->assertNotEmpty(array_filter($report['manual_review_rules'], fn ($warning) => str_contains($warning, 'No supporting document was supplied.')));
+            }
+        }
+    }
+
+    public function test_repeated_optional_template_titles_still_reserve_each_missing_appendix(): void
+    {
+        $p = static fn ($text) => '<w:p><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
+        $reference = $this->paper($p('APPENDICES').$p('Appendix B').$p('[Supporting document]').$p('Appendix D').$p('[Supporting document]'));
+        $student = $this->paper($p('APPENDICES'));
+        $service = new PaperFormatter;
+        for ($pass = 0; $pass < 2; $pass++) {
+            $service->formatUsingReference($student, $reference); $xp = $this->xml($student);
+            $this->assertSame(1, $xp->query('//w:t[.="APPENDICES"]')->length);
+            $this->assertSame(1, $xp->query('//w:t[.="Appendix B"]')->length);
+            $this->assertSame(1, $xp->query('//w:t[.="Appendix D"]')->length);
+            $this->assertSame(2, $xp->query('//w:t[.="[Supporting document]"]')->length);
+        }
+    }
+
     public function test_empty_rules_apply_layout_from_the_admin_reference_docx(): void
     {
         $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="BodyText"/></w:pPr><w:r><w:t>Reference body.</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>');
