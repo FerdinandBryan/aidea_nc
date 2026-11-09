@@ -135,7 +135,7 @@ class PaperFormatter
             'manual_review_rules' => $result['warnings'],
             'manual_review_required' => count($result['warnings']) > 0,
             'template_mapping' => $result['mapping'],
-            'note' => 'Formatting was copied from the selected DOCX template. Student text and embedded objects were preserved; unmatched structures are listed for review.'];
+            'note' => 'Formatting was copied from the selected DOCX template. Matched appendix labels, titles and order may be corrected; body text and embedded objects were preserved. Unmatched structures are listed for review.'];
     }
 
     public function referenceHeadings(string $path): array
@@ -260,7 +260,7 @@ class PaperFormatter
                     }
                     $targetText = mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($target)));
                     $footer = $formFooters[spl_object_id($target)] ?? null;
-                    $source = $footer['source'] ?? null; $matchedText = false; $matchedWords = false; $matchedExample = false;
+                    $source = $appendixLabels['sources'][spl_object_id($target)] ?? $footer['source'] ?? null; $matchedText = false; $matchedWords = false; $matchedExample = false;
                     if (!$source && isset($matchingHeadings[$targetText])) {
                         $source = $matchingHeadings[$targetText]; $matchedText = true;
                     } elseif (!$source) {
@@ -485,7 +485,7 @@ class PaperFormatter
     /** Labels belong to the template title, not to the student's existing letter. */
     private function alignAppendixLabels(array $referenceRoles, array $studentRoles, DOMXPath $referenceXp, DOMXPath $studentXp): array
     {
-        $normalize = static fn (string $text) => mb_strtolower(trim(preg_replace('/\s+/u', ' ', $text)));
+        $normalize = static fn (string $text) => mb_strtolower(trim(preg_replace('/[^\p{L}\p{N}]+/u', ' ', $text)));
         $blocks = function (array $roles, DOMXPath $xp) use ($normalize): array {
             $titles = [];
             foreach ($roles['appendix:title'] ?? [] as $title) $titles[spl_object_id($title)] = $title;
@@ -495,21 +495,64 @@ class PaperFormatter
                     if (!$next instanceof DOMElement) continue;
                     if ($next->localName !== 'p') break;
                     if ($this->text($next) === '') continue;
-                    if (isset($titles[spl_object_id($next)])) $blocks[] = ['label' => $label, 'title' => $normalize($this->text($next))];
+                    if (isset($titles[spl_object_id($next)])) $blocks[] = ['label' => $label, 'title' => $normalize($this->text($next)), 'title_node' => $next];
                     break;
                 }
             }
             return $blocks;
         };
         $reference = [];
-        foreach ($blocks($referenceRoles, $referenceXp) as $block) {
+        foreach ($blocks($referenceRoles, $referenceXp) as $ordinal => $block) {
             $key = $block['title'];
-            $reference[$key] = array_key_exists($key, $reference) ? null : $this->text($block['label']);
+            $description = '';
+            for ($node = $block['title_node']->nextSibling; $node; $node = $node->nextSibling) {
+                if ($node instanceof DOMElement && in_array($node, $referenceRoles['appendix:label'] ?? [], true)) break;
+                if ($node instanceof DOMElement && $node->localName === 'p') $description .= ' '.$this->text($node);
+                if (mb_strlen($description) > 2000) break;
+            }
+            $block['description'] = $description;
+            $reference[$key] = array_key_exists($key, $reference) ? null : [...$block, 'ordinal' => $ordinal];
         }
-        $student = $blocks($studentRoles, $studentXp); $proposals = []; $warnings = []; $mapping = [];
+        $student = $blocks($studentRoles, $studentXp); $proposals = []; $warnings = []; $mapping = []; $sources = []; $matches = [];
         foreach ($student as $block) {
-            $destination = $reference[$block['title']] ?? null;
-            if ($destination !== null) $proposals[spl_object_id($block['label'])] = $destination;
+            $match = $reference[$block['title']] ?? null;
+            if (!$match && strlen($block['title']) >= 20) {
+                $scores = [];
+                foreach ($reference as $key => $candidate) {
+                    if (!$candidate || str_contains($this->text($candidate['title_node']), '[')) continue;
+                    $scores[$key] = levenshtein($block['title'], $key) / max(strlen($block['title']), strlen($key));
+                }
+                asort($scores); $keys = array_keys($scores);
+                if ($keys && $scores[$keys[0]] <= 0.16 && (!isset($keys[1]) || $scores[$keys[1]] - $scores[$keys[0]] >= 0.08)) $match = $reference[$keys[0]];
+            }
+            if (!$match) {
+                $words = $this->headingWords($block['title']); $candidates = [];
+                if (count($words) >= 3) foreach ($reference as $candidate) {
+                    if (!$candidate || str_contains($this->text($candidate['title_node']), '[')) continue;
+                    $titleWords = $this->headingWords($candidate['title']);
+                    $descriptionWords = $this->headingWords($candidate['title'].' '.$candidate['description']);
+                    if (array_intersect($words, $titleWords) && !array_diff($words, $descriptionWords)) $candidates[] = $candidate;
+                }
+                if (count($candidates) === 1) $match = $candidates[0];
+            }
+            if (!$match) {
+                // Optional supporting-document slots accept the student's actual title.
+                // The current letter can identify such a slot, but never a named document.
+                foreach ($reference as $candidate) {
+                    if ($candidate && str_contains($this->text($candidate['title_node']), '[')
+                        && $normalize($this->text($candidate['label'])) === $normalize($this->text($block['label']))) {
+                        $match = $candidate; break;
+                    }
+                }
+            }
+            $id = spl_object_id($block['label']);
+            if ($match) {
+                $proposals[$id] = $this->text($match['label']); $matches[$id] = $match;
+                $sources[$id] = $match['label'];
+                $sources[spl_object_id($block['title_node'])] = $match['title_node'];
+            } else {
+                $warnings[] = 'Unmatched appendix: '.$this->text($block['label']).' — '.$this->text($block['title_node']).'. Its content and label were preserved; identify the corresponding template appendix before moving or renaming it.';
+            }
         }
         // Calculate all destinations before editing, so swapped labels are safe.
         do {
@@ -530,13 +573,52 @@ class PaperFormatter
         } while ($blocked);
         foreach ($student as $block) {
             $label = $block['label']; $destination = $proposals[spl_object_id($label)] ?? null;
-            if ($destination === null || $normalize($destination) === $normalize($this->text($label))) continue;
+            if ($destination === null) continue;
+            $match = $matches[spl_object_id($label)];
+            if (!str_contains($this->text($match['title_node']), '[') && $this->text($block['title_node']) !== $this->text($match['title_node'])) {
+                $oldTitle = $this->text($block['title_node']);
+                foreach (iterator_to_array($studentXp->query('.//w:t', $block['title_node'])) as $index => $node) $node->textContent = $index === 0 ? $this->text($match['title_node']) : '';
+                $mapping[] = ['paragraph' => $this->text($block['title_node']), 'template_paragraph' => $this->text($match['title_node']), 'match' => 'appendix-template-title', 'previous_title' => $oldTitle];
+            }
+            if ($normalize($destination) === $normalize($this->text($label))) continue;
             $old = $this->text($label); $nodes = iterator_to_array($studentXp->query('.//w:t', $label));
             foreach ($nodes as $index => $node) $node->textContent = $index === 0 ? $destination : '';
             $mapping[] = ['paragraph' => $destination, 'template_paragraph' => $destination, 'match' => 'appendix-title-label', 'previous_label' => $old, 'appendix_title' => $block['title']];
         }
+        $this->orderMatchedAppendices($studentRoles['appendix:label'] ?? [], $matches, $proposals, $warnings, $mapping);
         if ($mapping) $warnings[] = 'Appendix labels were corrected by matching their titles to the template. Review appendix cross-references and the list of appendices; those text references were preserved.';
-        return ['warnings' => array_values(array_unique($warnings)), 'mapping' => $mapping];
+        return ['warnings' => array_values(array_unique($warnings)), 'mapping' => $mapping, 'sources' => $sources];
+    }
+
+    /** Move whole appendix blocks, including tables and images; unmatched blocks retain their slots. */
+    private function orderMatchedAppendices(array $labels, array $matches, array $proposals, array &$warnings, array &$mapping): void
+    {
+        if (count($labels) < 2) return;
+        $parent = $labels[0]->parentNode; $groups = []; $slots = [];
+        foreach ($labels as $index => $label) {
+            if ($label->parentNode !== $parent) { $warnings[] = 'Appendix order requires review because labels are nested in different document containers.'; return; }
+            $id = spl_object_id($label);
+            if (isset($matches[$id], $proposals[$id])) $slots[] = $index;
+            $groups[$index] = [];
+            for ($node = $label; $node && $node !== ($labels[$index + 1] ?? null); $node = $node->nextSibling) {
+                if ($node instanceof DOMElement && $node->localName === 'sectPr') break;
+                $groups[$index][] = $node;
+            }
+        }
+        $ordered = $slots;
+        usort($ordered, fn ($a, $b) => $matches[spl_object_id($labels[$a])]['ordinal'] <=> $matches[spl_object_id($labels[$b])]['ordinal']);
+        if ($ordered === $slots) return;
+        $anchors = [];
+        foreach ($slots as $slot) {
+            $anchors[$slot] = $parent->ownerDocument->createComment('appendix position');
+            $parent->insertBefore($anchors[$slot], $labels[$slot]);
+        }
+        foreach ($slots as $slot) foreach ($groups[$slot] as $node) $parent->removeChild($node);
+        foreach ($slots as $position => $slot) {
+            foreach ($groups[$ordered[$position]] as $node) $parent->insertBefore($node, $anchors[$slot]);
+            $parent->removeChild($anchors[$slot]);
+        }
+        $mapping[] = ['paragraph' => 'Appendix order', 'template_paragraph' => 'Selected template appendix order', 'match' => 'appendix-block-order'];
     }
 
     /** Match a template form's placeholder name plus literal role, without naming the role in code. */

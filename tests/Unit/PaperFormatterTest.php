@@ -158,6 +158,39 @@ class PaperFormatterTest extends TestCase
         $this->assertNotEmpty(array_filter($report['manual_review_rules'], fn ($warning) => str_contains($warning, 'duplicate labels')));
     }
 
+    public function test_appendix_blocks_use_specific_template_styles_descriptions_and_order(): void
+    {
+        $p = static fn ($text, $before = 0) => '<w:p><w:pPr><w:spacing w:before="'.$before.'"/></w:pPr><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
+        $reference = $this->paper($p('APPENDICES').$p('Appendix A', 100).$p('Informed Consent/Assent Form', 200).$p('[Insert the signed consent form.]').$p('Appendix G', 300).$p('Certificate of Statistical Advising', 400).$p('[Insert the certificate or applicable documentation of data analysis.]'));
+        $student = $this->paper($p('APPENDICES').$p('Appendix A').$p('Certificate of Data Analysis').'<w:tbl><w:tr><w:tc>'.$p('Original analysis table.').'</w:tc></w:tr></w:tbl><w:p><w:r><w:drawing/></w:r></w:p>'.$p('Appendix G').$p('Informed Consent/ Assent Form').$p('Original consent document.'));
+        $service = new PaperFormatter;
+        for ($pass = 0; $pass < 2; $pass++) {
+            $service->formatUsingReference($student, $reference);
+            $xp = $this->xml($student);
+            $labels = array_map(fn ($node) => $node->textContent, iterator_to_array($xp->query('//w:p[w:r/w:t="Appendix A" or w:r/w:t="Appendix G"]/w:r/w:t')));
+            $this->assertSame(['Appendix A', 'Appendix G'], $labels);
+            $this->assertSame('200', $xp->evaluate('string(//w:p[w:r/w:t="Informed Consent/Assent Form"]/w:pPr/w:spacing/@w:before)'));
+            $this->assertSame('400', $xp->evaluate('string(//w:p[w:r/w:t="Certificate of Statistical Advising"]/w:pPr/w:spacing/@w:before)'));
+            $this->assertSame(1, $xp->query('//w:p[w:r/w:t="Appendix G"]/following-sibling::w:tbl//w:t[.="Original analysis table."]')->length);
+            $this->assertSame(1, $xp->query('//w:p[w:r/w:t="Appendix G"]/following-sibling::w:p//w:drawing')->length);
+            $this->assertSame(1, $xp->query('//w:p[w:r/w:t="Appendix A"]/following-sibling::w:p[w:r/w:t="Original consent document."]/following-sibling::w:p[w:r/w:t="Appendix G"]')->length);
+        }
+    }
+
+    public function test_optional_appendix_slots_keep_actual_titles_and_unmatched_blocks_keep_their_content(): void
+    {
+        $p = static fn ($text, $before = 0) => '<w:p><w:pPr><w:spacing w:before="'.$before.'"/></w:pPr><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
+        $reference = $this->paper($p('APPENDICES').$p('Appendix A').$p('Consent Form', 120).$p('Appendix J').$p('[Title of Appendix J]', 420));
+        $student = $this->paper($p('APPENDICES').$p('Appendix J').$p('Documentation').$p('Original photographs.').$p('Appendix Q').$p('Research Ethics Clearance').$p('Original clearance.').$p('Appendix A').$p('Consent Form').$p('Original consent.'));
+        $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        $this->assertSame('420', $xp->evaluate('string(//w:p[w:r/w:t="Documentation"]/w:pPr/w:spacing/@w:before)'));
+        $this->assertSame(0, $xp->query('//w:t[.="[Title of Appendix J]"]')->length);
+        $this->assertSame(1, $xp->query('//w:t[.="Original photographs."]')->length);
+        $this->assertSame(1, $xp->query('//w:p[w:r/w:t="Appendix A"]/following-sibling::w:p[w:r/w:t="Original consent."]/following-sibling::w:p[w:r/w:t="Appendix Q"]/following-sibling::w:p[w:r/w:t="Original clearance."]/following-sibling::w:p[w:r/w:t="Appendix J"]')->length);
+        $this->assertNotEmpty(array_filter($report['manual_review_rules'], fn ($warning) => str_contains($warning, 'Unmatched appendix: Appendix Q')));
+    }
+
     public function test_empty_rules_apply_layout_from_the_admin_reference_docx(): void
     {
         $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="BodyText"/></w:pPr><w:r><w:t>Reference body.</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>');
