@@ -536,6 +536,21 @@ class PaperFormatter
                 if (count($candidates) === 1) $match = $candidates[0];
             }
             if (!$match) {
+                // A short title can identify an entry through a distinctive word,
+                // provided no other template entry or description uses that word.
+                $words = $this->headingWords($block['title']); $shortMatches = [];
+                if (count($words) <= 2) foreach ($words as $word) {
+                    if (mb_strlen($word) < 5) continue;
+                    $owners = [];
+                    foreach ($reference as $candidate) {
+                        if (!$candidate || str_contains($this->text($candidate['title_node']), '[')) continue;
+                        if (in_array($word, $this->headingWords($candidate['title'].' '.$candidate['description']), true)) $owners[] = $candidate;
+                    }
+                    if (count($owners) === 1 && in_array($word, $this->headingWords($owners[0]['title']), true)) $shortMatches[$owners[0]['ordinal']] = $owners[0];
+                }
+                if (count($shortMatches) === 1) $match = reset($shortMatches);
+            }
+            if (!$match) {
                 // Optional supporting-document slots accept the student's actual title.
                 // The current letter can identify such a slot, but never a named document.
                 foreach ($reference as $candidate) {
@@ -550,8 +565,30 @@ class PaperFormatter
                 $proposals[$id] = $this->text($match['label']); $matches[$id] = $match;
                 $sources[$id] = $match['label'];
                 $sources[spl_object_id($block['title_node'])] = $match['title_node'];
-            } else {
-                $warnings[] = 'Unmatched appendix: '.$this->text($block['label']).' — '.$this->text($block['title_node']).'. Its content and label were preserved; identify the corresponding template appendix before moving or renaming it.';
+            }
+        }
+        // Keep existing optional-slot assignments, then fill unused template slots
+        // with additional documents in their original order. Do not invent slots.
+        $used = array_column($matches, 'ordinal'); $available = [];
+        foreach ($reference as $candidate) {
+            if ($candidate && str_contains($this->text($candidate['title_node']), '[') && !in_array($candidate['ordinal'], $used, true)) $available[] = $candidate;
+        }
+        foreach ($student as $block) {
+            $id = spl_object_id($block['label']);
+            if (isset($matches[$id])) continue;
+            $match = array_shift($available);
+            if (!$match) {
+                $warnings[] = 'Unmatched appendix: '.$this->text($block['label']).' — '.$this->text($block['title_node']).'. No matching named entry or unused optional template slot is available; its content and label were preserved.';
+                continue;
+            }
+            $matches[$id] = $match; $proposals[$id] = $this->text($match['label']);
+            $sources[$id] = $match['label']; $sources[spl_object_id($block['title_node'])] = $match['title_node'];
+            $mapping[] = ['paragraph' => $this->text($block['title_node']), 'template_paragraph' => $this->text($match['title_node']), 'match' => 'appendix-optional-slot', 'template_label' => $this->text($match['label'])];
+        }
+        $matchedOrdinals = array_column($matches, 'ordinal');
+        foreach ($reference as $candidate) {
+            if ($candidate && !str_contains($this->text($candidate['title_node']), '[') && !in_array($candidate['ordinal'], $matchedOrdinals, true)) {
+                $warnings[] = 'No student document matched template appendix: '.$this->text($candidate['label']).' — '.$this->text($candidate['title_node']).'. Supply the actual document if required; formatting cannot create it.';
             }
         }
         // Calculate all destinations before editing, so swapped labels are safe.

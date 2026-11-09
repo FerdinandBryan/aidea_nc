@@ -191,6 +191,28 @@ class PaperFormatterTest extends TestCase
         $this->assertNotEmpty(array_filter($report['manual_review_rules'], fn ($warning) => str_contains($warning, 'Unmatched appendix: Appendix Q')));
     }
 
+    public function test_additional_documents_fill_only_available_template_slots_and_free_named_entries(): void
+    {
+        $p = static fn ($text) => '<w:p><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
+        foreach ([['D', 'H', 'K', 'L'], ['B', 'F', 'N', 'O']] as [$certificate, $tally, $extraOne, $extraTwo]) {
+            $reference = $this->paper($p('APPENDICES').$p('Appendix '.$certificate).$p('Certificate of Validation').$p('Appendix '.$tally).$p('Sample Tally Sheet').$p('[Insert a tally sheet summarizing the data.]').$p('Appendix '.$extraOne).$p('[Title of Appendix '.$extraOne.']').$p('Appendix '.$extraTwo).$p('[Title of Appendix '.$extraTwo.']'));
+            $student = $this->paper($p('APPENDICES').$p('Appendix '.$certificate).$p('Research Ethics Clearance').$p('Original clearance.').$p('Appendix Q').$p('Certificate of Validation').$p('Original certificate.').$p('Appendix R').$p('Tally Test').'<w:p><w:r><w:drawing/></w:r></w:p>'.$p('Appendix S').$p('Work Plan').$p('Original work plan.'));
+            $service = new PaperFormatter;
+            for ($pass = 0; $pass < 2; $pass++) {
+                $report = $service->formatUsingReference($student, $reference);
+                $xp = $this->xml($student);
+                foreach (['Certificate of Validation' => $certificate, 'Sample Tally Sheet' => $tally, 'Research Ethics Clearance' => $extraOne, 'Work Plan' => $extraTwo] as $title => $letter) {
+                    $this->assertSame('Appendix '.$letter, $xp->evaluate('string(//w:p[w:r/w:t="'.$title.'"]/preceding-sibling::w:p[normalize-space(.) != ""][1]/w:r/w:t)'));
+                }
+                $this->assertEmpty(array_filter($report['manual_review_rules'], fn ($warning) => str_contains($warning, 'Unmatched appendix:') || str_contains($warning, 'duplicate labels')));
+                $labels = array_map(fn ($node) => $node->textContent, iterator_to_array($xp->query('//w:p[starts-with(w:r/w:t, "Appendix ")]/w:r/w:t')));
+                $this->assertSame(array_map(fn ($letter) => 'Appendix '.$letter, [$certificate, $tally, $extraOne, $extraTwo]), $labels);
+                $this->assertSame(1, $xp->query('//w:drawing')->length);
+                $this->assertSame(1, $xp->query('//w:t[.="Original clearance."]')->length);
+            }
+        }
+    }
+
     public function test_empty_rules_apply_layout_from_the_admin_reference_docx(): void
     {
         $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="BodyText"/></w:pPr><w:r><w:t>Reference body.</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>');
