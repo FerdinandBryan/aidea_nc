@@ -1608,6 +1608,31 @@ class PaperFormatter
                 }
                 $anchor->parentNode->replaceChild($inline, $anchor);
             }
+            // Vertical placement applies to dedicated image pages, including
+            // an appendix label/title above the image, not figures in body text.
+            $startsPage = fn (DOMElement $node) => $xp->query('.//w:br[@w:type="page"] | ./w:pPr/w:pageBreakBefore[not(@w:val="0" or @w:val="false" or @w:val="off")]', $node)->length > 0;
+            $dedicated = $startsPage($p); $reserved = 0;
+            for ($previous = $p->previousSibling; !$dedicated && $previous; $previous = $previous->previousSibling) {
+                if (!$previous instanceof DOMElement || $previous->localName !== 'p') break;
+                $text = $this->text($previous);
+                if ($text !== '' && !$this->isAppendixHeader($previous, $xp) && !preg_match('/^curriculum\s+vitae\s*[:.]?$/iu', $text)) break;
+                if ($xp->query('.//w:drawing | .//w:pict | .//w:object', $previous)->length) break;
+                $reserved += 240 + (float) $xp->evaluate('string(./w:pPr/w:spacing/@w:before)', $previous) + (float) $xp->evaluate('string(./w:pPr/w:spacing/@w:after)', $previous);
+                $dedicated = $startsPage($previous);
+            }
+            $extents = $xp->query('./w:r/w:drawing/*[local-name()="inline"]/*[local-name()="extent"]', $p);
+            if (!$dedicated || $extents->length !== 1) continue;
+            $section = $xp->query('following::w:sectPr[1]', $p)->item(0);
+            $height = (float) $xp->evaluate('string(./w:pgSz/@w:h)', $section) ?: 15840;
+            foreach (['top', 'bottom'] as $side) {
+                $value = $xp->evaluate('string(./w:pgMar/@w:'.$side.')', $section);
+                $height -= $value !== '' ? (float) $value : 1440;
+            }
+            $imageHeight = (float) $extents->item(0)->getAttribute('cy') / 635;
+            $spacing = $this->ensure($this->ensure($p, 'pPr', true), 'spacing');
+            $this->attr($spacing, 'before', max(0, round(($height - $reserved - $imageHeight) / 2)));
+            $this->attr($spacing, 'after', 0);
+            foreach (['beforeLines', 'afterLines', 'beforeAutospacing', 'afterAutospacing'] as $name) $this->attr($spacing, $name, 0);
         }
     }
 

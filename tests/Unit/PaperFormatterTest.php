@@ -1262,6 +1262,16 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('1000000', $xp->evaluate('string(/w:document/w:body/w:p//w:drawing/*/*[local-name()="extent"]/@cx)'));
     }
 
+    public function test_dedicated_image_page_gets_vertical_centering_space(): void
+    {
+        $body = '<w:p><w:r><w:t>Body text.</w:t></w:r></w:p><w:p><w:r><w:br w:type="page"/><w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="4000000" cy="5486400"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"/></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p><w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:bottom="1440"/></w:sectPr>';
+        $student = $this->paper($body); $reference = $this->paper($body);
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        $this->assertSame('2160', $xp->evaluate('string(//w:p[w:r/w:drawing]/w:pPr/w:spacing/@w:before)'));
+        $this->assertSame('center', $xp->evaluate('string(//w:p[w:r/w:drawing]/w:pPr/w:jc/@w:val)'));
+    }
+
     public function test_fixed_paper_removes_old_system_notes_and_verification_adds_no_marks(): void
     {
         $file = $this->paper('<w:p><w:pPr><w:spacing w:line="240"/></w:pPr><w:r><w:rPr><w:highlight w:val="yellow"/></w:rPr><w:t>Research text.</w:t></w:r></w:p><w:p><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>Needs attention: Line spacing requires 2.</w:t></w:r></w:p>');

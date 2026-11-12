@@ -2676,6 +2676,26 @@ async function _dvGenerateFixedPdf() {
         return document.getElementById('dvPrevBody');
     }
 
+    function centerImagePages(holder) {
+        holder.querySelectorAll('.docx-wrapper > section.docx').forEach(function(page) {
+            var article=page.querySelector('article');
+            if(!article || article.querySelector('table,svg,object,canvas') || article.querySelectorAll('img').length!==1)return;
+            var image=article.querySelector('img'), paragraph=image.closest('p');
+            if(!paragraph || paragraph.parentNode!==article || paragraph.textContent.trim())return;
+            var headers=Array.from(article.children).filter(function(n){return n!==paragraph && n.textContent.trim();});
+            if(headers.some(function(n){return !/^(APPENDIX\s+[A-Z](?:\s*[-:.].*)?|CURRICULUM\s+VITAE)\s*[:.]?$/i.test(n.textContent.trim());}))return;
+            var css=getComputedStyle(page), height=parseFloat(css.height);
+            if(css.boxSizing==='border-box')height-=(parseFloat(css.paddingTop)||0)+(parseFloat(css.paddingBottom)||0)+(parseFloat(css.borderTopWidth)||0)+(parseFloat(css.borderBottomWidth)||0);
+            if(!(height>0))return;
+            Array.from(article.children).forEach(function(n){if(n!==paragraph&&!headers.includes(n))n.style.display='none';});
+            var reserved=headers.reduce(function(sum,n){var c=getComputedStyle(n);return sum+n.getBoundingClientRect().height+(parseFloat(c.marginTop)||0)+(parseFloat(c.marginBottom)||0);},0);
+            var available=Math.max(1,height-reserved);
+            article.style.height=height+'px';
+            paragraph.style.cssText+=';margin:0!important;padding:0!important;text-indent:0!important;display:flex;align-items:center;justify-content:center;height:'+available+'px;';
+            image.style.maxWidth='100%';image.style.maxHeight=available+'px';image.style.objectFit='contain';
+        });
+    }
+
     function centerDividerPages(holder) {
         holder.querySelectorAll('.docx-wrapper > section.docx').forEach(function (page) {
             var article = page.querySelector('article');
@@ -2852,6 +2872,7 @@ async function _dvGenerateFixedPdf() {
             if (window._dvFitFigureCaptions) window._dvFitFigureCaptions(holder);
             if (!(blob.formattingReport && blob.formattingReport.template_mapping)) keepCoverDateOnFirstPage(holder);
             centerDividerPages(holder);
+            centerImagePages(holder);
             // Show one rendered paper page at a time.
             var pages = Array.from(holder.querySelectorAll('.docx-wrapper > section.docx'));
             if (!pages.length) throw new Error('The document renderer did not produce any pages.');
