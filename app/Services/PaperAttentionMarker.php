@@ -114,14 +114,33 @@ class PaperAttentionMarker
                 $notes[$targetIndex][] = $message;
                 $issues[] = ['paragraph' => $targetIndex + 1, 'type' => 'appendix-title', 'message' => $message];
             }
+            $headingKey = static fn (string $text) => mb_strtolower(trim(preg_replace('/[^\p{L}\p{N}]+/u', ' ', $text)));
+            $templateHeadingKeys = [];
+            foreach ($templateHeadings as $heading) $templateHeadingKeys[$headingKey((string) $heading)] = true;
+            $seenHeadings = []; $headingScope = 'front';
+            foreach ($paragraphs as $index => $paragraph) {
+                $text = $this->paragraphText($paragraph);
+                $style = $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph);
+                if (preg_match('/^TOC/i', $style) || $xp->query('./w:pPr/w:tabs/w:tab[@w:leader="dot"] | .//w:tab', $paragraph)->length || preg_match('/\.{3,}/', $text)) continue;
+                $key = $headingKey($text);
+                if (preg_match('/^CHAPTER\s+(?:\d+|[IVX]+|ONE|TWO|THREE|FOUR|FIVE)\b/i', $text) || preg_match('/^APPENDIX\s+[A-Z](?:\s*[-:.]|$)/i', $text)) $headingScope = $key;
+                if ($key === '' || !isset($templateHeadingKeys[$key])) continue;
+                $scopedKey = $headingScope.'|'.$key;
+                if (!isset($seenHeadings[$scopedKey])) { $seenHeadings[$scopedKey] = $index + 1; continue; }
+                $message = 'Duplicate heading: '.$text.'. The same heading already appears at paragraph '.$seenHeadings[$scopedKey].' in this section; capitalization does not make it a different heading. Review both sections before removing or merging content.';
+                $issues[] = ['paragraph' => $index + 1, 'type' => 'content', 'issue_kind' => 'duplicate_heading', 'message' => $message];
+                $notes[$index][] = $message;
+            }
             $existingHeadingKeys = [];
             foreach ($paragraphs as $paragraph) {
-                $key = mb_strtolower(preg_replace('/\s+/u', ' ', $this->paragraphText($paragraph)));
+                $style = $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph);
+                if (preg_match('/^TOC/i', $style) || $xp->query('./w:pPr/w:tabs/w:tab[@w:leader="dot"] | .//w:tab', $paragraph)->length) continue;
+                $key = $headingKey($this->paragraphText($paragraph));
                 if ($key !== '') $existingHeadingKeys[$key] = true;
             }
             foreach ($templateHeadings as $heading) {
                 $heading = trim((string) $heading);
-                $key = mb_strtolower(preg_replace('/\s+/u', ' ', $heading));
+                $key = $headingKey($heading);
                 if ($key === '' || isset($existingHeadingKeys[$key])) continue;
                 $message = 'Admin template heading is missing: '.$heading.'.';
                 $paragraphNumber = 0;

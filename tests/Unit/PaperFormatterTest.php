@@ -1194,6 +1194,18 @@ class PaperFormatterTest extends TestCase
         $this->assertEquals(1, $xp->evaluate('count(//w:t[.="Researcher One"])'));
     }
 
+    public function test_duplicate_template_headings_ignore_case_but_respect_chapters_and_contents(): void
+    {
+        $p = static fn ($text) => '<w:p><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
+        $file = $this->paper('<w:p><w:pPr><w:pStyle w:val="TOC1"/></w:pPr><w:r><w:t>RESEARCH DESIGN</w:t></w:r></w:p>'.$p('CHAPTER 1').$p('Research Design').$p('Original research content.').$p('RESEARCH DESIGN:').$p('CHAPTER 2').$p('RESEARCH DESIGN'));
+        $result = (new PaperAttentionMarker)->mark($file, (new PaperFormatter)->settings($this->rules()), [], false, ['Research Design']);
+        $duplicates = array_values(array_filter($result['issues'], fn ($issue) => ($issue['issue_kind'] ?? '') === 'duplicate_heading'));
+        $this->assertCount(1, $duplicates);
+        $this->assertSame(5, $duplicates[0]['paragraph']);
+        $this->assertStringContainsString('paragraph 3', $duplicates[0]['message']);
+        $this->assertSame(0, count(array_filter($result['issues'], fn ($issue) => ($issue['issue_kind'] ?? '') === 'missing_section')));
+    }
+
     public function test_fixed_paper_removes_old_system_notes_and_verification_adds_no_marks(): void
     {
         $file = $this->paper('<w:p><w:pPr><w:spacing w:line="240"/></w:pPr><w:r><w:rPr><w:highlight w:val="yellow"/></w:rPr><w:t>Research text.</w:t></w:r></w:p><w:p><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>Needs attention: Line spacing requires 2.</w:t></w:r></w:p>');
