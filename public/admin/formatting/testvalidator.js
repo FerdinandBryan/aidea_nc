@@ -2908,11 +2908,9 @@ async function _dvGenerateFixedPdf() {
                 page.removeAttribute('aria-hidden');
                 page.setAttribute('aria-label', 'Page ' + (index + 1) + ' of ' + pages.length);
                 var label = document.createElement('div');
-                label.className = 'dv-paper-page-number';
-                label.textContent = String(index + 1);
-                label.setAttribute('aria-label', 'Page ' + (index + 1));
-                label.style.cssText = 'position:absolute;top:0.5in;right:1in;margin:0;color:#000;font:12pt "Times New Roman",serif;line-height:1;pointer-events:none;';
-                page.appendChild(label);
+                label.textContent = 'Page ' + (index + 1) + ' of ' + pages.length;
+                label.style.cssText = 'color:#f1f5f9;font:13px Arial,sans-serif;margin:6px 0 10px;';
+                page.parentNode.insertBefore(label, page);
             });
             function fitPages() {
                 var availableWidth = Math.max(1, holder.clientWidth - 24);
