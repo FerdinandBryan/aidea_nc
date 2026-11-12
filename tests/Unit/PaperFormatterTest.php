@@ -1247,6 +1247,21 @@ class PaperFormatterTest extends TestCase
         }
     }
 
+    public function test_standalone_photos_are_centered_without_moving_template_photo_cells(): void
+    {
+        $pic = '<w:drawing><wp:anchor xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="1000000" cy="1200000"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"/></a:graphicData></a:graphic></wp:anchor></w:drawing>';
+        $photo = '<w:p><w:pPr><w:jc w:val="left"/><w:ind w:left="720" w:firstLine="720"/></w:pPr><w:r>'.$pic.'</w:r></w:p>';
+        $body = '<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p>'.$photo.'<w:tbl><w:tr><w:tc>'.$photo.'</w:tc></w:tr></w:tbl>';
+        $reference = $this->paper($body); $student = $this->paper($body);
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        $this->assertSame('center', $xp->evaluate('string(/w:document/w:body/w:p[w:r/w:drawing]/w:pPr/w:jc/@w:val)'));
+        $this->assertSame('0', $xp->evaluate('string(/w:document/w:body/w:p[w:r/w:drawing]/w:pPr/w:ind/@w:firstLine)'));
+        $this->assertEquals(1, $xp->evaluate('count(/w:document/w:body/w:p/w:r/w:drawing/*[local-name()="inline"])'));
+        $this->assertSame('left', $xp->evaluate('string(//w:tbl//w:p/w:pPr/w:jc/@w:val)'));
+        $this->assertSame('1000000', $xp->evaluate('string(/w:document/w:body/w:p//w:drawing/*/*[local-name()="extent"]/@cx)'));
+    }
+
     public function test_fixed_paper_removes_old_system_notes_and_verification_adds_no_marks(): void
     {
         $file = $this->paper('<w:p><w:pPr><w:spacing w:line="240"/></w:pPr><w:r><w:rPr><w:highlight w:val="yellow"/></w:rPr><w:t>Research text.</w:t></w:r></w:p><w:p><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>Needs attention: Line spacing requires 2.</w:t></w:r></w:p>');

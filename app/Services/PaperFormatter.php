@@ -365,6 +365,7 @@ class PaperFormatter
                 if (in_array(strtoupper($this->text($paragraph)), ['APPROVAL SHEET', 'ABSTRACT'], true) || $this->isChapter($this->text($paragraph))) break;
             }
             $this->isolateSectionDividers($studentXp, ['height' => 15840], true);
+            $this->centerStandalonePictures($studentXp);
             $studentZip->addFromString('word/document.xml', $studentDoc->saveXML());
 
             $referenceStylesXml = $referenceZip->getFromName('word/styles.xml');
@@ -1329,6 +1330,7 @@ class PaperFormatter
             $this->removeBlankPageBreaks($xp);
             $this->flowAppendixPictures($xp, $cfg);
             $this->attachAppendixAttachments($xp, $cfg);
+            $this->centerStandalonePictures($xp);
             // The fixed copy is clean; issue highlights belong to the attention copy.
             foreach (iterator_to_array($xp->query('//w:highlight')) as $highlight) $highlight->parentNode->removeChild($highlight);
             $zip->addFromString('word/document.xml', $doc->saveXML());
@@ -1587,6 +1589,24 @@ class PaperFormatter
                 $break = $p->ownerDocument->createElementNS(self::W, 'w:p');
                 $next->parentNode->insertBefore($break, $next);
                 $this->pageBreak($break, $xp);
+            }
+        }
+    }
+
+    private function centerStandalonePictures(DOMXPath $xp): void
+    {
+        foreach ($xp->query('/w:document/w:body/w:p[w:r/w:drawing or w:r/w:pict]') as $p) {
+            if ($this->text($p) !== '') continue;
+            if (!$xp->query('.//*[local-name()="pic" and namespace-uri()="http://schemas.openxmlformats.org/drawingml/2006/picture"] | .//*[local-name()="imagedata"]', $p)->length) continue;
+            $this->centerTitleParagraph($p, $xp);
+            foreach (iterator_to_array($xp->query('./w:r/w:drawing/*[local-name()="anchor"]', $p)) as $anchor) {
+                if (!$xp->query('.//*[local-name()="pic" and namespace-uri()="http://schemas.openxmlformats.org/drawingml/2006/picture"]', $anchor)->length) continue;
+                $inline = $p->ownerDocument->createElementNS($anchor->namespaceURI, 'wp:inline');
+                foreach (['distT', 'distB', 'distL', 'distR'] as $distance) $inline->setAttribute($distance, '0');
+                foreach (iterator_to_array($anchor->childNodes) as $child) {
+                    if ($child instanceof DOMElement && in_array($child->localName, ['extent', 'effectExtent', 'docPr', 'cNvGraphicFramePr', 'graphic'], true)) $inline->appendChild($child);
+                }
+                $anchor->parentNode->replaceChild($inline, $anchor);
             }
         }
     }
