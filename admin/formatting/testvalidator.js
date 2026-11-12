@@ -2676,6 +2676,64 @@ async function _dvGenerateFixedPdf() {
         return document.getElementById('dvPrevBody');
     }
 
+    function applyTemplatePagination(holder) {
+        var pages=Array.from(holder.querySelectorAll('.docx-wrapper > section.docx'));
+        function normalized(text){return (text||'').replace(/\u00a0/g,' ').replace(/[^\p{L}\p{N}]+/gu,' ').trim().toUpperCase();}
+        function roman(value){var out='';[[1000,'m'],[900,'cm'],[500,'d'],[400,'cd'],[100,'c'],[90,'xc'],[50,'l'],[40,'xl'],[10,'x'],[9,'ix'],[5,'v'],[4,'iv'],[1,'i']].forEach(function(pair){while(value>=pair[0]){out+=pair[1];value-=pair[0];}});return out;}
+        function isToc(p){return /(?:^|[ -])(?:docx-)?toc\d*(?:$|[ -])/i.test(p.className||'') || !!p.querySelector('a[href*="_Toc"],a[href*="_AideaToc"]');}
+        var tocPages=new Set(), chapterPages=new Set(), chapterStart=-1, targets=new Map(), entries=[];
+        pages.forEach(function(page,index){
+            var article=page.querySelector('article');if(!article)return;
+            var paragraphs=Array.from(article.querySelectorAll('p'));
+            if(paragraphs.some(function(p){return normalized(p.textContent)==='TABLE OF CONTENTS';}))tocPages.add(index);
+            paragraphs.forEach(function(p){
+                var text=(p.textContent||'').trim();
+                if(isToc(p)){entries.push({node:p,page:index});return;}
+                if(!text)return;
+                if(/^CHAPTER\s*(?:[1-5]|I{1,3}|IV|V|ONE|TWO|THREE|FOUR|FIVE)(?:[^0-9]|$)/i.test(text)&&text.length<240&&!/\.{3,}/.test(text)){
+                    chapterPages.add(index);if(chapterStart<0&&/^CHAPTER\s*(?:1|I|ONE)(?:[^0-9]|$)/i.test(text))chapterStart=index;
+                }
+                var key=normalized(text);if(!targets.has(key))targets.set(key,[]);targets.get(key).push({page:index,node:p});
+            });
+        });
+        if(chapterStart<0)return {updated:0,unmatched:0};
+        var numbers=pages.map(function(page,index){return index<chapterStart?roman(index+1):String(index-chapterStart+1);});
+        pages.forEach(function(page,index){
+            page.querySelectorAll('.dv-paper-page-number').forEach(function(n){n.remove();});
+            // Native page fields may have cached values; use the measured sheet number.
+            page.querySelectorAll('header p,footer p').forEach(function(p){if(/^(?:\d+|[ivxlcdm]+)$/i.test(p.textContent.trim()))p.style.visibility='hidden';});
+            var article=page.querySelector('article');
+            var approval=article&&Array.from(article.querySelectorAll('p')).some(function(p){return normalized(p.textContent)==='APPROVAL SHEET';});
+            if(index===0||approval||chapterPages.has(index))return;
+            var label=document.createElement('div');label.className='dv-paper-page-number';label.textContent=numbers[index];
+            label.style.cssText='position:absolute;top:0.5in;right:1in;color:#000;font:12pt "Times New Roman",serif;line-height:1;pointer-events:none;';
+            page.appendChild(label);
+        });
+        // Plain dotted TOC rows are also supported when Word did not assign TOC styles.
+        tocPages.forEach(function(index){var article=pages[index].querySelector('article');Array.from(article.querySelectorAll('p')).forEach(function(p){if(/\.{3,}\s*(?:\d+|[ivxlcdm]+)\s*$/i.test(p.textContent)&&!entries.some(function(e){return e.node===p;}))entries.push({node:p,page:index});});});
+        var updated=0,unmatched=0,lastTarget=-1;
+        entries.forEach(function(entry){
+            var p=entry.node, text=p.textContent.trim(), key=normalized(text.replace(/(?:\.{2,}|\t|\s)+[0-9ivxlcdm]+\s*$/i,''));
+            var rowWalker=document.createTreeWalker(p,NodeFilter.SHOW_TEXT), rowTexts=[], rowNode;while(rowNode=rowWalker.nextNode())if(rowNode.textContent.trim())rowTexts.push(rowNode);
+            if(rowTexts.length>1 && /^(?:[0-9]+|[ivxlcdm]+)$/i.test(rowTexts[rowTexts.length-1].textContent.trim()))key=normalized(rowTexts.slice(0,-1).map(function(n){return n.textContent;}).join(' ').replace(/\.{2,}\s*$/,''));
+            var candidates=(targets.get(key)||[]).filter(function(t){return t.page!==entry.page&&!tocPages.has(t.page);});
+            if(!candidates.length){var chapter=key.match(/^CHAPTER ([1-5]|I|II|III|IV|V)\b/);if(chapter){var prefix=chapter[0];targets.forEach(function(values,targetKey){if(targetKey===prefix||targetKey.startsWith(prefix+' '))candidates=candidates.concat(values.filter(function(t){return t.page!==entry.page&&!tocPages.has(t.page);}));});}}
+            var link=p.querySelector('a[href^="#"]'), target=null;
+            if(link){var id=decodeURIComponent(link.getAttribute('href').slice(1));var bookmark=Array.from(holder.querySelectorAll('[id]')).find(function(n){return n.id===id;});if(bookmark){var sheet=bookmark.closest('section.docx');if(sheet)target={page:pages.indexOf(sheet)};}}
+            if(!target&&key==='TITLE PAGE')target={page:0};
+            if(!target&&candidates.length===1)target=candidates[0];
+            if(!target&&candidates.length>1)target=candidates.find(function(t){return t.page>=lastTarget;});
+            if(!target||target.page<0){unmatched++;return;}
+            var walker=document.createTreeWalker(p,NodeFilter.SHOW_TEXT), texts=[],node;while(node=walker.nextNode())if(node.textContent.trim())texts.push(node);
+            var last=texts[texts.length-1];if(!last){unmatched++;return;}
+            var old=last.textContent;
+            if(!/[0-9ivxlcdm]+\s*$/i.test(old)){unmatched++;return;}
+            last.textContent=old.replace(/[0-9ivxlcdm]+\s*$/i,numbers[target.page]);
+            p.setAttribute('data-dv-toc-page',numbers[target.page]);lastTarget=target.page;updated++;
+        });
+        return {updated:updated,unmatched:unmatched};
+    }
+
     function centerImagePages(holder) {
         holder.querySelectorAll('.docx-wrapper > section.docx').forEach(function(page) {
             var article=page.querySelector('article');
@@ -2914,6 +2972,13 @@ async function _dvGenerateFixedPdf() {
                 label.style.cssText = 'position:absolute;top:0.5in;right:1in;margin:0;color:#000;font:12pt "Times New Roman",serif;line-height:1;pointer-events:none;';
                 page.appendChild(label);
             });
+            var paginationResult=applyTemplatePagination(holder);
+            if(paginationResult.unmatched){
+                var tocNotice=document.createElement('p');
+                tocNotice.style.cssText='color:#fca5a5;font-size:13px;';
+                tocNotice.textContent=paginationResult.unmatched+' Table of Contents entries could not be matched to a section. Review those entries before submitting.';
+                body.insertBefore(tocNotice,holder);
+            }
             function fitPages() {
                 var availableWidth = Math.max(1, holder.clientWidth - 24);
                 pages.forEach(function (page) {
