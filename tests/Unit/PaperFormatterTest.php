@@ -1230,6 +1230,23 @@ class PaperFormatterTest extends TestCase
         }
     }
 
+    public function test_standalone_all_caps_cv_is_used_instead_of_adding_an_empty_appendix(): void
+    {
+        $p = static fn ($text) => '<w:p><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
+        $reference = $this->paper($p('APPENDICES').$p('Appendix M').$p('Curriculum Vitae').$p('PERSONAL INFORMATION').$p('Name: [Name]'));
+        $student = $this->paper($p('APPENDICES').$p('CURRICULUM VITAE').'<w:p><w:r><w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="5486400" cy="7315200"/></wp:inline></w:drawing></w:r></w:p>'.$p('PERSONAL INFORMATION').$p('Name: Original author'));
+        for ($pass = 0; $pass < 2; $pass++) {
+            $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+            $xp = $this->xml($student);
+            $this->assertEquals(1, $xp->evaluate('count(//w:t[.="Appendix M"])'));
+            $this->assertEquals(1, $xp->evaluate('count(//w:p[w:r/w:t="Appendix M"]/following-sibling::w:p[1][w:r/w:t="Curriculum Vitae" or w:r/w:t="CURRICULUM VITAE"])'));
+            $this->assertEquals(1, $xp->evaluate('count(//w:drawing)'));
+            $this->assertSame('5486400', $xp->evaluate('string(//*[local-name()="extent"]/@cx)'));
+            $this->assertEquals(1, $xp->evaluate('count(//w:t[.="Name: Original author"])'));
+            $this->assertCount(0, array_filter($report['template_mapping'], fn ($entry) => $entry['match'] === 'appendix-empty-page'));
+        }
+    }
+
     public function test_fixed_paper_removes_old_system_notes_and_verification_adds_no_marks(): void
     {
         $file = $this->paper('<w:p><w:pPr><w:spacing w:line="240"/></w:pPr><w:r><w:rPr><w:highlight w:val="yellow"/></w:rPr><w:t>Research text.</w:t></w:r></w:p><w:p><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>Needs attention: Line spacing requires 2.</w:t></w:r></w:p>');

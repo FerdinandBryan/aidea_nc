@@ -54,6 +54,11 @@ class TemplateCvPhotoFormatter
                 continue;
             }
             $picture = $pictures[0]; $original = $containers[0];
+            $extent = $student->query('.//*[local-name()="extent"]', $picture)->item(0);
+            if ($extent && ((float) $extent->getAttribute('cx') > 3200400 || (float) $extent->getAttribute('cy') > 3200400)) {
+                $result['warnings'][] = 'The CV contains a large embedded image, which may be the complete CV rather than a portrait. Its content and size were preserved; review it against the template instead of shrinking it into the photo slot.';
+                continue;
+            }
             $copy = $student->document->importNode($slot, true);
             $cell = $student->query('.//w:tc', $copy)->item(0);
             foreach (iterator_to_array($cell->childNodes) as $child) if (!$child instanceof DOMElement || $child->localName !== 'tcPr') $cell->removeChild($child);

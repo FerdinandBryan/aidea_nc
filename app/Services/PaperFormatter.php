@@ -184,6 +184,8 @@ class PaperFormatter
             $referenceStylesXp = $this->packageStyles($referenceZip);
             $referenceRoles = $this->referenceParagraphRoles($referenceXp, $referenceStylesXp);
             $studentRoles = $this->referenceParagraphRoles($studentXp, $this->packageStyles($studentZip));
+            $this->labelExistingCvAppendix($referenceRoles, $studentXp);
+            $studentRoles = $this->referenceParagraphRoles($studentXp, $this->packageStyles($studentZip));
             $appendixLabels = $this->alignAppendixLabels($referenceRoles, $studentRoles, $referenceXp, $studentXp);
             $formFooters = $this->appendixFormFooters($referenceRoles, $studentRoles, $referenceXp, $studentXp);
             $formStarts = [];
@@ -495,6 +497,42 @@ class PaperFormatter
             $roles[$role][] = $paragraph;
         }
         return $roles;
+    }
+
+    /** A standalone CV heading already supplies the appendix; add its label there. */
+    private function labelExistingCvAppendix(array $referenceRoles, DOMXPath $studentXp): void
+    {
+        $sources = [];
+        foreach ($referenceRoles['appendix:title'] ?? [] as $title) {
+            if (!preg_match('/^curriculum\s+vitae\s*[:.]?$/iu', $this->text($title))) continue;
+            for ($label = $title->previousSibling; $label; $label = $label->previousSibling) {
+                if (!$label instanceof DOMElement || $label->localName !== 'p') break;
+                if ($this->text($label) === '') continue;
+                if (in_array($label, $referenceRoles['appendix:label'] ?? [], true)) $sources[] = $label;
+                break;
+            }
+        }
+        if (count($sources) !== 1) return;
+        $cvs = []; $hasLabel = false;
+        foreach ($studentXp->query('/w:document/w:body/w:p') as $p) {
+            if (!preg_match('/^curriculum\s+vitae\s*[:.]?$/iu', $this->text($p))) continue;
+            if (preg_match('/^TOC/i', $studentXp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $p)) || $studentXp->query('.//w:tab', $p)->length) continue;
+            $cvs[] = $p;
+            for ($previous = $p->previousSibling; $previous; $previous = $previous->previousSibling) {
+                if (!$previous instanceof DOMElement || $previous->localName !== 'p') break;
+                if ($this->text($previous) === '') continue;
+                if ($this->isAppendixHeader($previous, $studentXp)) $hasLabel = true;
+                break;
+            }
+        }
+        if (!$cvs || $hasLabel) return;
+        $label = $studentXp->document->importNode($sources[0], true);
+        $cvs[0]->parentNode->insertBefore($label, $cvs[0]);
+        $this->materializePageStart($label, $studentXp);
+        // The label and its existing CV belong on the same page.
+        $pr = $this->ensure($cvs[0], 'pPr', true);
+        $this->attr($this->ensure($pr, 'pageBreakBefore'), 'val', 0);
+        foreach (iterator_to_array($studentXp->query('.//w:br[@w:type="page"]', $cvs[0])) as $break) $break->parentNode->removeChild($break);
     }
 
     /** Labels belong to the template title, not to the student's existing letter. */
