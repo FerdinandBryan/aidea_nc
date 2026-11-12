@@ -1206,6 +1206,30 @@ class PaperFormatterTest extends TestCase
         $this->assertSame(0, count(array_filter($result['issues'], fn ($issue) => ($issue['issue_kind'] ?? '') === 'missing_section')));
     }
 
+    public function test_cv_photo_uses_template_slot_for_all_caps_and_title_case_headings(): void
+    {
+        $p = static fn ($text) => '<w:p><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
+        $slot = '<w:tbl><w:tblPr><w:tblInd w:w="6476" w:type="dxa"/></w:tblPr><w:tr><w:trPr><w:trHeight w:val="2160"/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2160" w:type="dxa"/></w:tcPr>'.$p('[1.5 x 1.5-inch photograph]').'</w:tc></w:tr></w:tbl>';
+        $picture = '<w:p><w:r><w:drawing><wp:anchor xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:positionH/><wp:extent cx="900000" cy="1000000"/><wp:docPr id="1" name="Photo"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rIdPhoto"/></pic:blipFill><pic:spPr><a:xfrm><a:ext cx="900000" cy="1000000"/></a:xfrm></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r></w:p>';
+        foreach (['CURRICULUM VITAE', 'Curriculum Vitae'] as $heading) {
+            $reference = $this->paper($p('APPENDICES').$p('Appendix M').$p('Curriculum Vitae').$slot.$p('PERSONAL INFORMATION').$p('Name: [Name]'));
+            $student = $this->paper($p('APPENDICES').$p('Appendix M').$p($heading).$p('PERSONAL INFORMATION').$p('Name: Original author').$picture);
+            for ($pass = 0; $pass < 2; $pass++) {
+                $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+                $xp = $this->xml($student);
+                $this->assertEquals(1, $xp->evaluate('count(//w:drawing)'));
+                $this->assertEquals(1, $xp->evaluate('count(//w:tbl)'));
+                $this->assertEquals(1, $xp->evaluate('count(//w:tbl//w:drawing/*[local-name()="inline"])'));
+                $this->assertSame('6476', $xp->evaluate('string(//w:tbl/w:tblPr/w:tblInd/@w:w)'));
+                $this->assertSame('1371600', $xp->evaluate('string(//*[local-name()="extent"]/@cx)'));
+                $this->assertSame('rIdPhoto', $xp->evaluate('string(//*[local-name()="blip"]/@*[local-name()="embed"])'));
+                $this->assertEquals(1, $xp->evaluate('count(//w:t[.="Name: Original author"])'));
+                $this->assertEquals(0, $xp->evaluate('count(//w:t[contains(., "photograph")])'));
+                $this->assertContains('cv-photo-slot', array_column($report['template_mapping'], 'match'));
+            }
+        }
+    }
+
     public function test_fixed_paper_removes_old_system_notes_and_verification_adds_no_marks(): void
     {
         $file = $this->paper('<w:p><w:pPr><w:spacing w:line="240"/></w:pPr><w:r><w:rPr><w:highlight w:val="yellow"/></w:rPr><w:t>Research text.</w:t></w:r></w:p><w:p><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>Needs attention: Line spacing requires 2.</w:t></w:r></w:p>');

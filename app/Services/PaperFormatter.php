@@ -335,6 +335,9 @@ class PaperFormatter
                     $processed++;
                 }
             }
+            $cvPhotos = (new TemplateCvPhotoFormatter)->apply($studentXp, $referenceXp);
+            $warnings = array_merge($warnings, $cvPhotos['warnings']);
+            $mapping = array_merge($mapping, $cvPhotos['mapping']);
             $emptyAppendices = $this->insertEmptyTemplateAppendices($appendixLabels['template_entries'], $referenceXp, $studentXp, $paragraphProperties, $runProperties);
             $processed += $emptyAppendices['processed'];
             $warnings = array_merge($warnings, $emptyAppendices['warnings']);
