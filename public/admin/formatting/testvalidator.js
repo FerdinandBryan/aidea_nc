@@ -2676,6 +2676,28 @@ async function _dvGenerateFixedPdf() {
         return document.getElementById('dvPrevBody');
     }
 
+    function centerDividerPages(holder) {
+        holder.querySelectorAll('.docx-wrapper > section.docx').forEach(function (page) {
+            var article = page.querySelector('article');
+            if (!article || article.querySelector('table,img,svg,object,canvas')) return;
+            var paragraphs = Array.from(article.children).filter(function (p) { return (p.textContent || '').trim(); });
+            if (paragraphs.length !== 1 || !/^(REFERENCES|APPENDICES)$/i.test(paragraphs[0].textContent.trim())) return;
+            var title = paragraphs[0], css = getComputedStyle(page);
+            var height = parseFloat(css.height);
+            if (css.boxSizing === 'border-box') height -= (parseFloat(css.paddingTop) || 0) + (parseFloat(css.paddingBottom) || 0) + (parseFloat(css.borderTopWidth) || 0) + (parseFloat(css.borderBottomWidth) || 0);
+            if (!(height > 0)) return;
+            Array.from(article.children).forEach(function (p) { if (p !== title) p.style.display = 'none'; });
+            article.style.height = height + 'px';
+            article.style.minHeight = '0';
+            article.style.display = 'flex';
+            article.style.flexDirection = 'column';
+            article.style.justifyContent = 'center';
+            ['margin','padding','text-indent'].forEach(function (name) { title.style.setProperty(name, '0', 'important'); });
+            title.style.setProperty('text-align', 'center', 'important');
+            title.style.setProperty('width', '100%', 'important');
+        });
+    }
+
     function keepCoverDateOnFirstPage(holder) {
         var sheets = holder.querySelectorAll('.docx-wrapper > section.docx');
         if (sheets.length < 2) return;
@@ -2829,6 +2851,7 @@ async function _dvGenerateFixedPdf() {
             });
             if (window._dvFitFigureCaptions) window._dvFitFigureCaptions(holder);
             if (!(blob.formattingReport && blob.formattingReport.template_mapping)) keepCoverDateOnFirstPage(holder);
+            centerDividerPages(holder);
             // Show one rendered paper page at a time.
             var pages = Array.from(holder.querySelectorAll('.docx-wrapper > section.docx'));
             if (!pages.length) throw new Error('The document renderer did not produce any pages.');
