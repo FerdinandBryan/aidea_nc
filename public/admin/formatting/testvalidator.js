@@ -3023,9 +3023,7 @@ async function _dvGenerateFixedPdf() {
         { name: 'Appendices', head: /^APPENDICES$/, rule: /word appendices/i }
     ];
 
-    var st = document.createElement('style');
-    st.textContent = '#dvPrevOverlay .docx-wrapper section.docx p span[style*="background"]{background-color:#fde047!important;color:#000!important;}';
-    document.head.appendChild(st);
+    // Use the marked document's actual highlights; transparent span backgrounds must stay transparent.
 
     function norm(t) {
         return t.replace(/\s+/g, ' ').trim().toUpperCase()
