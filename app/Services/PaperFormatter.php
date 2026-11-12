@@ -129,6 +129,7 @@ class PaperFormatter
         // A reference document must not pass through the checklist-only layout,
         // which imposes chapter breaks, cover positioning and appendix typography.
         $result = $this->applyReferenceFormatting($path, $referencePath, $referenceRules);
+        $this->removeFixedCopyHighlights($path);
         return ['settings' => $this->settings($referenceRules),
             'paragraphs_processed' => $result['processed'],
             'applied_rules' => ['Selected DOCX paragraph styles', 'Selected DOCX page layout'],
@@ -354,6 +355,10 @@ class PaperFormatter
             }
             // Divider pages must remain isolated even when the template uses
             // blank spacer paragraphs or section boundaries for their layout.
+            foreach ($studentXp->query('/w:document/w:body/w:p') as $paragraph) {
+                if ($this->isDate($this->text($paragraph))) $this->centerTitleParagraph($paragraph, $studentXp);
+                if (in_array(strtoupper($this->text($paragraph)), ['APPROVAL SHEET', 'ABSTRACT'], true) || $this->isChapter($this->text($paragraph))) break;
+            }
             $this->isolateSectionDividers($studentXp, ['height' => 15840], true);
             $studentZip->addFromString('word/document.xml', $studentDoc->saveXML());
 
@@ -1543,6 +1548,29 @@ class PaperFormatter
                 $this->pageBreak($break, $xp);
             }
         }
+    }
+
+    private function removeFixedCopyHighlights(string $path): void
+    {
+        $zip = new ZipArchive;
+        if ($zip->open($path) !== true) throw new InvalidArgumentException('Cannot clean the fixed document.');
+        try {
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $name = $zip->getNameIndex($i);
+                if (!str_starts_with($name, 'word/') || !str_ends_with($name, '.xml')) continue;
+                $xml = $zip->getFromIndex($i);
+                if (stripos($xml, '<!DOCTYPE') !== false) continue;
+                $doc = new DOMDocument;
+                if (!@$doc->loadXML($xml, LIBXML_NONET)) continue;
+                $xp = new DOMXPath($doc); $xp->registerNamespace('w', self::W);
+                $changed = false;
+                foreach (iterator_to_array($xp->query('//w:highlight | //w:shd')) as $mark) {
+                    if ($mark->localName === 'shd' && !in_array(strtoupper($mark->getAttributeNS(self::W, 'fill')), ['FFFF00', 'FFF200', 'FFEB3B', 'FEF08A'], true)) continue;
+                    $mark->parentNode->removeChild($mark); $changed = true;
+                }
+                if ($changed) $zip->addFromString($name, $doc->saveXML());
+            }
+        } finally { $zip->close(); }
     }
 
     private function resizeCvPhoto(DOMElement $p, array $settings, DOMXPath $xp): void

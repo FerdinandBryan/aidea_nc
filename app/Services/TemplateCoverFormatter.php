@@ -118,9 +118,14 @@ class TemplateCoverFormatter
             $isBold = $bold && !in_array($bold->getAttributeNS(self::W, 'val'), ['0', 'false', 'off'], true);
             $align = $xp->evaluate('string(./w:pPr/w:jc/@w:val)', $p);
             $format = ($isBold ? 'bold' : 'plain').':'.$align;
+            // Month/year is a semantic slot, independent of author typography.
+            // Separate it even when Word has no blank paragraph before it.
+            $date = preg_match('/^(?:\[\s*Month\s+Year\s*\]|(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\.?)$/i', $text);
+            if ($date) { $format = 'cover-date'; $new = true; }
             $index = count($groups) - 1;
             if ($new || $index < 0 || $groups[$index]['format'] !== $format) { $groups[] = ['paragraphs' => [], 'keys' => [], 'format' => $format]; $index++; }
             $groups[$index]['paragraphs'][] = $p;
+            if ($date) $groups[$index]['keys'][] = 'cover-date';
             if (!str_contains($text, '[')) $groups[$index]['keys'][] = trim(mb_strtolower(preg_replace('/[^\p{L}\p{N}]+/u', ' ', $text)));
             $new = false;
         }

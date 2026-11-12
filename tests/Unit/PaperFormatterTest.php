@@ -1159,6 +1159,41 @@ class PaperFormatterTest extends TestCase
         }
     }
 
+    public function test_reference_fixed_copy_removes_highlights_from_text_styles_and_headers(): void
+    {
+        $body = '<w:p><w:r><w:rPr><w:highlight w:val="yellow"/><w:shd w:fill="FFFF00"/></w:rPr><w:t>Research title</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p>';
+        $reference = $this->paper($body); $student = $this->paper($body);
+        foreach ([$reference, $student] as $file) {
+            $zip = new ZipArchive; $zip->open($file);
+            $zip->addFromString('word/styles.xml', '<w:styles xmlns:w="'.self::W.'"><w:style w:type="paragraph" w:styleId="Normal"><w:rPr><w:highlight w:val="yellow"/></w:rPr></w:style></w:styles>');
+            $zip->addFromString('word/header1.xml', '<w:hdr xmlns:w="'.self::W.'">'.$body.'</w:hdr>');
+            $zip->close();
+        }
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $zip = new ZipArchive; $zip->open($student);
+        foreach (['word/document.xml', 'word/styles.xml', 'word/header1.xml'] as $part) {
+            $this->assertStringNotContainsString('w:highlight', $zip->getFromName($part));
+            $this->assertStringNotContainsString('w:fill="FFFF00"', $zip->getFromName($part));
+        }
+        $zip->close();
+        $this->assertGreaterThan(0, $this->xml($reference)->evaluate('count(//w:highlight)'));
+    }
+
+    public function test_cover_date_uses_its_template_slot_even_with_plain_author_names(): void
+    {
+        $p = static fn ($text) => '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
+        $reference = $this->paper($p('[Title]').'<w:p/>'.$p('by').'<w:p/>'.$p('[Author]').'<w:p/><w:p/>'.$p('[Month Year]').$p('CHAPTER 1'));
+        $student = $this->paper($p('Research title').'<w:p/>'.$p('by').'<w:p/>'.$p('Researcher One').$p('November 2025').$p('CHAPTER 1'));
+        $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        $date = '//w:p[.//w:t="November 2025"]';
+        $this->assertContains('cover-block', array_column($report['template_mapping'], 'match'));
+        $this->assertSame('center', $xp->evaluate('string('.$date.'/w:pPr/w:jc/@w:val)'));
+        $this->assertSame('0', $xp->evaluate('string('.$date.'/w:pPr/w:ind/@w:firstLine)'));
+        $this->assertEquals($this->xml($reference)->evaluate('count(//w:p[.//w:t="[Month Year]"]/preceding-sibling::w:p)'), $xp->evaluate('count('.$date.'/preceding-sibling::w:p)'));
+        $this->assertEquals(1, $xp->evaluate('count(//w:t[.="Researcher One"])'));
+    }
+
     public function test_fixed_paper_removes_old_system_notes_and_verification_adds_no_marks(): void
     {
         $file = $this->paper('<w:p><w:pPr><w:spacing w:line="240"/></w:pPr><w:r><w:rPr><w:highlight w:val="yellow"/></w:rPr><w:t>Research text.</w:t></w:r></w:p><w:p><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>Needs attention: Line spacing requires 2.</w:t></w:r></w:p>');
