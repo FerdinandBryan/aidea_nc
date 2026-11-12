@@ -1,6 +1,35 @@
 /* The selected server template is authoritative for both preview and download. */
 (function () {
     var endpoint = 'https://aidea-nc.wasmer.app/api/papers/fix';
+    async function cleanFixedPaper(blob) {
+        await new Promise(function (resolve) { _validatorDeps.ensureJSZip(resolve); });
+        var zip = await JSZip.loadAsync(await blob.arrayBuffer());
+        var W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+        var changed = false;
+        for (var name of Object.keys(zip.files)) {
+            if (!/^word\/.*\.xml$/.test(name) || zip.files[name].dir) continue;
+            var xml = await zip.files[name].async('string');
+            var doc = new DOMParser().parseFromString(xml, 'application/xml');
+            if (doc.getElementsByTagName('parsererror').length) throw new Error('Cannot clean invalid Word XML.');
+            var marks = Array.from(doc.getElementsByTagNameNS(W, 'highlight'));
+            Array.from(doc.getElementsByTagNameNS(W, 'shd')).forEach(function (node) {
+                var fill = node.getAttributeNS(W, 'fill') || '';
+                if (/^[a-f0-9]{6}$/i.test(fill)) {
+                    var r = parseInt(fill.slice(0,2),16), g = parseInt(fill.slice(2,4),16), b = parseInt(fill.slice(4,6),16);
+                    if (r >= 180 && g >= 150 && b < 180 && Math.min(r,g) - b > 45) marks.push(node);
+                }
+            });
+            if (!marks.length) continue;
+            marks.forEach(function (node) { node.parentNode.removeChild(node); });
+            zip.file(name, new XMLSerializer().serializeToString(doc));
+            changed = true;
+        }
+        if (!changed) return blob;
+        var clean = await zip.generateAsync({type:'blob',mimeType:blob.type});
+        clean.formattingReport = blob.formattingReport;
+        return clean;
+    }
+
     var cached = null;
     window._dvInvalidateFixedCopy = function () { cached = null; };
     _dvGenerateFixedDocx = async function (file) {
@@ -45,7 +74,7 @@
                 blob = await response.blob();
             }
             if (!blob.size) throw new Error('The formatting API returned an empty document.');
-            return blob;
+            return await cleanFixedPaper(blob);
         })();
         cached = { file: file, key: key, promise: promise };
         try { return await promise; }
@@ -78,6 +107,8 @@
             for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
             var fixed = new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
             fixed.formattingReport = data.report;
+            fixed = await cleanFixedPaper(fixed);
+            if (window._dvFixRevision !== revision) return;
             if (data.attention_document_base64) {
                 var annotated = atob(data.attention_document_base64);
                 var markedBytes = new Uint8Array(annotated.length);
