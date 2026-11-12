@@ -115,7 +115,7 @@
                 for (var j = 0; j < annotated.length; j++) markedBytes[j] = annotated.charCodeAt(j);
                 window._dvAttentionResult = {revision:revision,blob:new Blob([markedBytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),issues:data.attention_issues || [],objects:data.attention_objects || [],manualChecks:(data.review && data.review.findings || []).filter(function(f){return f.status==='manual';}).length,fixedValidation:data.report && data.report.fixed_validation};
                 document.querySelectorAll('[data-dv-attention]').forEach(function (button) {
-                    button.textContent = 'Preview Needs attention (' + (data.attention_issues || []).length + ')';
+                    var label='Preview Needs attention (' + (data.attention_issues || []).length + ')';if(button.getAttribute('aria-busy')==='true')button.dataset.dvIdleLabel=label;else button.textContent=label;
                 });
             }
             var findings=data.review && data.review.findings || [];
@@ -140,7 +140,7 @@
         } catch (error) {
             if(window._dvFixRevision===revision){
                 window._dvAttentionError=error.message;
-                document.querySelectorAll('[data-dv-attention]').forEach(function(button){button.textContent='Preview Needs attention (check failed)';});
+                document.querySelectorAll('[data-dv-attention]').forEach(function(button){if(button.getAttribute('aria-busy')==='true')button.dataset.dvIdleLabel='Preview Needs attention (check failed)';else button.textContent='Preview Needs attention (check failed)';});
                 document.querySelectorAll('[data-dv-checklist-summary]').forEach(function(summary){summary.textContent='Checklist check could not complete: '+error.message;});
             }
         }
@@ -214,7 +214,7 @@
         if (!result || result.revision !== window._dvFixRevision) {
             var waiting=document.createElement('div');waiting.className='attention-paper';
             var progress=document.createElement('div');progress.className='attention-status';progress.setAttribute('role','status');
-            progress.textContent='Preparing marked paper. This preview will open automatically when the check finishes...';waiting.appendChild(progress);layout.appendChild(waiting);
+            window._dvShowPreviewLoading(progress,'Preparing marked paper. Waiting for the formatting check...');waiting.appendChild(progress);layout.appendChild(waiting);
             var requestedRevision=window._dvFixRevision;
             await window._dvCheckAndFixPaper();
             if(!overlay.isConnected)return;
@@ -256,7 +256,7 @@
         }
         var download=document.createElement('button');download.type='button';download.textContent='Download marked copy';download.onclick=function(){_dvTriggerDownload(result.blob,_dvBaseName(_dvLastFile.name)+'_needs_attention.docx');};sidebar.appendChild(download);
         var holder = document.createElement('div');holder.className='attention-paper';layout.appendChild(holder);
-        var status=document.createElement('div');status.className='attention-status';status.setAttribute('role','status');status.textContent='Loading marked paper...';holder.appendChild(status);
+        var status=document.createElement('div');status.className='attention-status';status.setAttribute('role','status');window._dvShowPreviewLoading(status,'Loading marked paper...');holder.appendChild(status);
         var paper=document.createElement('div');holder.appendChild(paper);
         try {
             await window._dvLoadPreviewLib();

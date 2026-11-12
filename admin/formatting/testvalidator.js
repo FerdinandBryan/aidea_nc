@@ -2756,7 +2756,8 @@ async function _dvGenerateFixedPdf() {
 
     window._dvPreviewFixed = async function () {
         var body = openOverlay('Preview: Fix paper (aligned to the template)');
-        body.textContent = 'Preparing preview...';
+        var renderLoading=null;
+        window._dvShowPreviewLoading(body, 'Preparing fixed paper...');
         try {
             if (!_dvLastFile) throw new Error('Run a format check first.');
             if (/\.pdf$/i.test(_dvLastFile.name || '')) throw new Error('Preview works on .docx files only. Upload the Word version.');
@@ -2766,6 +2767,9 @@ async function _dvGenerateFixedPdf() {
 
             var blob = await _dvGenerateFixedDocx(_dvLastFile, _dvLastRules, _dvLastFormattingProfile);
             body.innerHTML = '';
+            renderLoading=document.createElement('div');
+            window._dvShowPreviewLoading(renderLoading,'Rendering fixed paper...');
+            body.appendChild(renderLoading);
             var bar = document.createElement('div');
             bar.style.cssText = 'margin-bottom:16px;';
             bar.className='dv-fixed-report';
@@ -2931,6 +2935,8 @@ async function _dvGenerateFixedPdf() {
         } catch (e) {
             console.warn('[Validator] preview failed', e);
             body.textContent = 'Could not build the preview: ' + (e && e.message ? e.message : e);
+        } finally {
+            if(renderLoading)renderLoading.remove();
         }
     };
 
@@ -2976,6 +2982,37 @@ async function _dvGenerateFixedPdf() {
             holder.textContent = 'Could not build the redlined preview: ' + (e && e.message ? e.message : e);
         }
     };
+    window._dvShowPreviewLoading = function (container, message) {
+        if (!document.getElementById('dvPreviewLoadingStyle')) {
+            var style=document.createElement('style');style.id='dvPreviewLoadingStyle';
+            style.textContent='.dv-preview-loading{display:flex;align-items:center;justify-content:center;gap:12px;min-height:120px;color:inherit;font-size:14px}.dv-preview-spinner{display:inline-block;width:18px;height:18px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:dvPreviewSpin .8s linear infinite;flex-shrink:0}.dv-preview-button-loading{display:inline-flex;align-items:center;gap:8px}@keyframes dvPreviewSpin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.dv-preview-spinner{animation:none}}';
+            document.head.appendChild(style);
+        }
+        var status=document.createElement('div');status.className='dv-preview-loading';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+        var spinner=document.createElement('span');spinner.className='dv-preview-spinner';spinner.setAttribute('aria-hidden','true');
+        var text=document.createElement('span');text.textContent=message;
+        status.appendChild(spinner);status.appendChild(text);container.replaceChildren(status);
+    };
+    async function runPreviewWithLoading(button, kind) {
+        if (button.disabled || button.getAttribute('aria-busy')==='true') return;
+        var original=button.textContent;
+        button.disabled=true;button.setAttribute('aria-busy','true');button.classList.add('dv-preview-button-loading');
+        // Install the shared spinner style before opening either preview.
+        var temporary=document.createElement('div');window._dvShowPreviewLoading(temporary,'Loading preview...');
+        var spinner=document.createElement('span');spinner.className='dv-preview-spinner';spinner.setAttribute('aria-hidden','true');
+        button.replaceChildren(spinner,document.createTextNode('Loading preview...'));
+        try {
+            await new Promise(function(resolve){setTimeout(resolve,0);});
+            if(window._dvFixApiReady)await window._dvFixApiReady;
+            await (kind==='fixed'?window._dvPreviewFixed():window._dvPreviewAttention());
+        } catch(error) {
+            var body=openOverlay('Preview could not load');body.textContent='Could not load the preview: '+(error.message||error);
+        } finally {
+            button.disabled=false;button.removeAttribute('aria-busy');button.classList.remove('dv-preview-button-loading');
+            button.textContent=button.dataset.dvIdleLabel||original;delete button.dataset.dvIdleLabel;
+        }
+    }
+
     function addButtons() {
         document.querySelectorAll('.dv-download-row').forEach(function (row) {
             if (row.getAttribute('data-dv-extra')) return;
@@ -2985,13 +3022,13 @@ async function _dvGenerateFixedPdf() {
             var b1 = document.createElement('button');
             b1.type = 'button'; b1.className = 'btn-modal-close';
             b1.textContent = 'Preview Fix paper';
-            b1.onclick = window._dvPreviewFixed;
+            b1.onclick = function () { return runPreviewWithLoading(b1, 'fixed'); };
             var b2 = document.createElement('button');
             b2.type = 'button'; b2.className = 'btn-modal-close';
             var attention=window._dvAttentionResult;
             b2.textContent = attention && attention.revision===window._dvFixRevision ? 'Preview Needs attention ('+attention.issues.length+')' : 'Preview Needs attention (checking...)';
             b2.setAttribute('data-dv-attention', '1');
-            b2.onclick = function () { window._dvPreviewAttention(); };
+            b2.onclick = function () { return runPreviewWithLoading(b2, 'attention'); };
             row.appendChild(b1);
             row.appendChild(b2);
             /* DV_BUTTONS_TOP: move the button row to the top of the result */
@@ -3506,7 +3543,7 @@ async function _dvGenerateFixedPdf() {
     var s = document.currentScript;
     var base = (s && s.src) ? s.src.replace(/[^\/]*$/, '') : '';
     var e = document.createElement('script');
-    e.src = base + 'fixpaper-api.js?v=31';
+    e.src = base + 'fixpaper-api.js?v=32';
     window._dvFixApiReady = new Promise(function (resolve, reject) {
         e.onload = resolve;
         e.onerror = function () { reject(new Error('The paper formatting API client could not load. Refresh the page.')); };
