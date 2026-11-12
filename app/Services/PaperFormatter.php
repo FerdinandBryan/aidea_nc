@@ -352,6 +352,9 @@ class PaperFormatter
                     }
                 }
             }
+            // Divider pages must remain isolated even when the template uses
+            // blank spacer paragraphs or section boundaries for their layout.
+            $this->isolateSectionDividers($studentXp, ['height' => 15840], true);
             $studentZip->addFromString('word/document.xml', $studentDoc->saveXML());
 
             $referenceStylesXml = $referenceZip->getFromName('word/styles.xml');
@@ -1500,7 +1503,7 @@ class PaperFormatter
         foreach ($xp->query('//w:sectPr/w:type[@w:val="oddPage" or @w:val="evenPage"]') as $type) $this->attr($type, 'val', 'nextPage');
     }
 
-    private function isolateSectionDividers(DOMXPath $xp, array $cfg): void
+    private function isolateSectionDividers(DOMXPath $xp, array $cfg, bool $preserveTypography = false): void
     {
         foreach ($xp->query('/w:document/w:body/w:p') as $p) {
             if (!in_array(strtoupper($this->text($p)), ['REFERENCES', 'APPENDICES'], true)) continue;
@@ -1509,6 +1512,7 @@ class PaperFormatter
             foreach ($p->getElementsByTagNameNS(self::W, 't') as $text) $text->textContent = strtoupper($text->textContent);
             $this->centerTitleParagraph($p, $xp);
             foreach ($xp->query('.//w:r', $p) as $run) {
+                if ($preserveTypography) continue;
                 $rPr = $this->ensure($run, 'rPr', true);
                 foreach (['b', 'bCs'] as $key) $this->attr($this->ensure($rPr, $key), 'val', 1);
                 foreach (['sz', 'szCs'] as $key) $this->attr($this->ensure($rPr, $key), 'val', 76);
@@ -1516,10 +1520,13 @@ class PaperFormatter
             $section = $xp->query('.//w:sectPr | following::w:sectPr[1]', $p)->item(0);
             $top = $xp->evaluate('string(./w:pgMar/@w:top)', $section);
             $bottom = $xp->evaluate('string(./w:pgMar/@w:bottom)', $section);
-            $height = $cfg['height'] - ($top !== '' ? (float) $top : 1440) - ($bottom !== '' ? (float) $bottom : 1440);
+            $pageHeight = $xp->evaluate('string(./w:pgSz/@w:h)', $section);
+            $height = ($pageHeight !== '' ? (float) $pageHeight : $cfg['height']) - ($top !== '' ? (float) $top : 1440) - ($bottom !== '' ? (float) $bottom : 1440);
+            $fontSize = $preserveTypography ? $xp->evaluate('string(.//w:rPr/w:sz/@w:val)', $p) : 76;
+            $lineHeight = is_numeric($fontSize) ? round((float) $fontSize * 12) : 912;
             $spacing = $this->ensure($this->ensure($p, 'pPr', true), 'spacing');
-            $this->attr($spacing, 'line', 912); $this->attr($spacing, 'lineRule', 'exact');
-            $this->attr($spacing, 'before', max(0, round(($height - 912) / 2))); $this->attr($spacing, 'after', 0);
+            $this->attr($spacing, 'line', $lineHeight); $this->attr($spacing, 'lineRule', 'exact');
+            $this->attr($spacing, 'before', max(0, round(($height - $lineHeight) / 2))); $this->attr($spacing, 'after', 0);
             foreach (['beforeLines', 'afterLines', 'beforeAutospacing', 'afterAutospacing'] as $key) $this->attr($spacing, $key, 0);
             $this->pageBreak($p, $xp);
             $this->attr($this->ensure($this->ensure($p, 'pPr', true), 'keepNext'), 'val', 0);

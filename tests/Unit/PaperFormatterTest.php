@@ -481,17 +481,17 @@ class PaperFormatterTest extends TestCase
         }
     }
 
-    public function test_reference_mode_does_not_impose_appendix_typography_or_chapter_page_breaks(): void
+    public function test_reference_mode_preserves_font_and_chapter_breaks_while_isolating_dividers(): void
     {
         $reference = $this->paper('<w:p><w:pPr><w:pageBreakBefore w:val="0"/></w:pPr><w:r><w:rPr><w:b w:val="0"/><w:sz w:val="22"/></w:rPr><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Reference body.</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:sz w:val="26"/><w:b w:val="0"/></w:rPr><w:t>APPENDICES</w:t></w:r></w:p>');
         $student = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Own body.</w:t></w:r></w:p><w:p><w:r><w:t>APPENDICES</w:t></w:r></w:p>');
         (new PaperFormatter)->formatUsingReference($student, $reference, $this->rules());
         $xp = $this->xml($student);
-        $this->assertEquals(0, $xp->evaluate('count(//w:br[@w:type="page"])'));
+        $this->assertEquals(1, $xp->evaluate('count(//w:p[.//w:t="APPENDICES"]//w:br[@w:type="page"])'));
         $this->assertSame('0', $xp->evaluate('string(//w:p[.//w:t="CHAPTER 1"]/w:pPr/w:pageBreakBefore/@w:val)'));
         $this->assertSame('26', $xp->evaluate('string(//w:p[.//w:t="APPENDICES"]/w:r/w:rPr/w:sz/@w:val)'));
         $this->assertSame('0', $xp->evaluate('string(//w:p[.//w:t="APPENDICES"]/w:r/w:rPr/w:b/@w:val)'));
-        $this->assertSame('left', $xp->evaluate('string(//w:p[.//w:t="APPENDICES"]/w:pPr/w:jc/@w:val)'));
+        $this->assertSame('center', $xp->evaluate('string(//w:p[.//w:t="APPENDICES"]/w:pPr/w:jc/@w:val)'));
     }
 
     public function test_reference_body_formatting_follows_the_matching_section_and_copies_surrounding_gaps(): void
@@ -1138,6 +1138,25 @@ class PaperFormatterTest extends TestCase
         }
         $this->assertEquals(1, $xp->evaluate('count(//w:p[w:r/w:t="Author (2025). Research source."]//w:br[@w:type="page"])'));
         $this->assertSame('24', $xp->evaluate('string(//w:p[w:r/w:t="Author (2025). Research source."]/w:r/w:rPr/w:sz/@w:val)'));
+    }
+
+    public function test_reference_document_dividers_have_separate_centered_pages(): void
+    {
+        $body = '<w:p><w:r><w:t>Previous chapter text.</w:t></w:r></w:p>';
+        foreach (['REFERENCES', 'APPENDICES'] as $word) {
+            $body .= '<w:p><w:r><w:rPr><w:b/><w:sz w:val="76"/></w:rPr><w:t>'.$word.'</w:t></w:r></w:p><w:p><w:r><w:t>Content after '.$word.'</w:t></w:r></w:p>';
+        }
+        $reference = $this->paper($body);
+        $student = $this->paper($body);
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        foreach (['REFERENCES', 'APPENDICES'] as $word) {
+            $p = '//w:p[w:r/w:t="'.$word.'"]';
+            $this->assertSame('center', $xp->evaluate('string('.$p.'/w:pPr/w:jc/@w:val)'));
+            $this->assertEquals(1, $xp->evaluate('count('.$p.'//w:br[@w:type="page"])'));
+            $this->assertEquals(1, $xp->evaluate('count('.$p.'/following-sibling::w:p[1]//w:br[@w:type="page"])'));
+            $this->assertGreaterThan(0, (int) $xp->evaluate('string('.$p.'/w:pPr/w:spacing/@w:before)'));
+        }
     }
 
     public function test_fixed_paper_removes_old_system_notes_and_verification_adds_no_marks(): void
