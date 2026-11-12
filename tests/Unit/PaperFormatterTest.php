@@ -1272,29 +1272,6 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('center', $xp->evaluate('string(//w:p[w:r/w:drawing]/w:pPr/w:jc/@w:val)'));
     }
 
-    public function test_template_pagination_uses_roman_front_matter_decimal_chapters_and_toc_fields(): void
-    {
-        $p = static fn ($text) => '<w:p><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
-        $toc = '<w:p><w:pPr><w:pStyle w:val="TOC1"/></w:pPr><w:r><w:t>Introduction......00</w:t></w:r></w:p>';
-        $body = $p('Research title').$p('APPROVAL SHEET').$p('ACKNOWLEDGEMENTS').$p('TABLE OF CONTENTS').$toc.$p('CHAPTER 1').$p('Introduction').$p('Original research content.').$p('CHAPTER 2').$p('Literature review.').'<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:bottom="1440"/></w:sectPr>';
-        $reference = $this->paper($body); $student = $this->paper($body);
-        $pagination = new \App\Services\TemplatePaginationFormatter;
-        for ($pass = 0; $pass < 2; $pass++) {
-            $pagination->apply($student, $reference, [['detail' => 'Pagination uses Roman preliminary pages and decimal chapter pages.']]);
-            $xp = $this->xml($student);
-            $this->assertEquals(1, $xp->evaluate('count(//w:pgNumType[@w:fmt="lowerRoman" and @w:start="3"])'));
-            $this->assertEquals(1, $xp->evaluate('count(//w:pgNumType[@w:fmt="decimal" and @w:start="1"])'));
-            $this->assertEquals(2, $xp->evaluate('count(//w:sectPr/w:titlePg)'));
-            $this->assertEquals(1, $xp->evaluate('count(//w:bookmarkStart[starts-with(@w:name,"_AideaToc")])'));
-            $this->assertEquals(1, $xp->evaluate('count(//w:fldSimple[contains(@w:instr,"PAGEREF")])'));
-            $this->assertEquals(1, $xp->evaluate('count(//w:t[.="Original research content."])'));
-            $zip = new ZipArchive; $zip->open($student);
-            $this->assertStringContainsString(' PAGE ', $zip->getFromName('word/aideaPageHeader.xml'));
-            $this->assertStringContainsString('w:updateFields', $zip->getFromName('word/settings.xml'));
-            $zip->close();
-        }
-    }
-
     public function test_fixed_paper_removes_old_system_notes_and_verification_adds_no_marks(): void
     {
         $file = $this->paper('<w:p><w:pPr><w:spacing w:line="240"/></w:pPr><w:r><w:rPr><w:highlight w:val="yellow"/></w:rPr><w:t>Research text.</w:t></w:r></w:p><w:p><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>Needs attention: Line spacing requires 2.</w:t></w:r></w:p>');

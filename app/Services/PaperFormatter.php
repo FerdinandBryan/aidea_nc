@@ -129,7 +129,6 @@ class PaperFormatter
         // A reference document must not pass through the checklist-only layout,
         // which imposes chapter breaks, cover positioning and appendix typography.
         $result = $this->applyReferenceFormatting($path, $referencePath, $referenceRules);
-        (new TemplatePaginationFormatter)->apply($path, $referencePath, $rules);
         $this->removeFixedCopyHighlights($path);
         return ['settings' => $this->settings($referenceRules),
             'paragraphs_processed' => $result['processed'],
