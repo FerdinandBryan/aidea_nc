@@ -303,6 +303,16 @@ function _getFormatRules(templateId) {
 }
 function _getActiveFormatTemplates(){return _getActiveFormatTemplatesOriginal();}
 
+function _alignNormalize(value) {
+    if (!value) return null;
+    const normalized = String(value).trim().toLowerCase();
+    if (['justify', 'justified', 'both'].includes(normalized)) return 'justified';
+    if (['left', 'start'].includes(normalized)) return 'left';
+    if (['right', 'end'].includes(normalized)) return 'right';
+    if (['center', 'centre'].includes(normalized)) return 'center';
+    return normalized;
+}
+
 /* ---------- DOCX: exact formatting from document.xml ---------- */
 async function _extractDocxFormatting(file) {
     return new Promise((resolve, reject) => {
