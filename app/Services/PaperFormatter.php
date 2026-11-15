@@ -344,8 +344,9 @@ class PaperFormatter
                     if ($chapter !== '' && ($role === 'chapter' || $role === 'body' || str_starts_with($role, 'topic'))) $sources = array_values(array_filter($sources, fn ($candidate) => ($referenceContexts[spl_object_id($candidate)] ?? '') === $chapter));
                     $uniformSources = $sources && count(array_unique(array_map(fn ($candidate) => $this->referenceFormatSignature($candidate, $referenceXp), $sources))) === 1;
                     $appendixHeading = $role === 'appendix:title' || str_starts_with($role, 'appendix:heading:');
-                    if ($studentXp->query('ancestor::w:tbl', $target)->length || (!$appendixHeading && $studentXp->query('.//w:drawing | .//w:pict | .//w:object', $target)->length)) {
-                        $warnings[] = 'Tables and embedded-object layout were preserved and require review against the selected template.';
+                    if ($studentXp->query('ancestor::w:tbl', $target)->length) continue; // Table formatting has its own matcher.
+                    if ((!$appendixHeading && $studentXp->query('.//w:drawing | .//w:pict | .//w:object', $target)->length)) {
+                        $warnings[] = 'Embedded-object layout was preserved and requires review against the selected template.';
                         continue;
                     }
                     $targetText = mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($target)));
@@ -443,6 +444,8 @@ class PaperFormatter
                     $processed++;
                 }
             }
+            $tables = (new TemplateTableFormatter)->apply($studentXp, $referenceXp, $studentContexts, $referenceContexts);
+            $warnings = array_merge($warnings, $tables['warnings']); $mapping = array_merge($mapping, $tables['mapping']);
             $photos = (new TemplatePhotoFormatter)->apply($studentXp, $referenceXp);
             $warnings = array_merge($warnings, $photos['warnings']); $mapping = array_merge($mapping, $photos['mapping']);
             if ($studentXp->query('//w:drawing | //w:pict | //w:tbl | //w:object')->length) $warnings[] = 'Pictures and tables keep their existing layout unless an unambiguous template match supplies their placement. Review scanned pages and unmatched objects against the selected template.';
@@ -456,11 +459,20 @@ class PaperFormatter
                     $layoutSource = $referenceSection;
                     if ($referenceXp->query('//w:sectPr')->length > 1) {
                         $matches = $sectionMatches[spl_object_id($section)]['sources'] ?? [];
-                        if (count($matches) !== 1) {
+                        $layouts = [];
+                        foreach ($matches as $matchedSection) {
+                            $parts = [];
+                            foreach (['pgSz', 'pgMar', 'pgBorders', 'cols', 'vAlign', 'docGrid'] as $propertyName) {
+                                $property = $referenceXp->query('./w:'.$propertyName, $matchedSection)->item(0);
+                                $parts[] = $property ? $property->C14N() : '';
+                            }
+                            $layouts[implode('|', $parts)] = $matchedSection;
+                        }
+                        if (count($layouts) !== 1) {
                             $warnings[] = 'The paper section does not uniquely match one template section. Its page geometry was preserved for review instead of applying an unrelated section layout.';
                             continue;
                         }
-                        $layoutSource = reset($matches);
+                        $layoutSource = reset($layouts);
                     }
                     foreach (['pgSz', 'pgMar', 'pgBorders', 'cols', 'vAlign', 'docGrid'] as $name) {
                         $property = $referenceXp->query('./w:'.$name, $layoutSource)->item(0);

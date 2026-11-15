@@ -88,6 +88,58 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('8100', $xp->evaluate('string(//w:p[w:r/w:t="1 Actual figure 5"]/w:pPr/w:tabs/w:tab/@w:pos)'));
     }
 
+    public function test_compatible_tables_follow_each_selected_template_and_preserve_all_values(): void
+    {
+        $table = function ($width, $font, $header, $body, $rows) {
+            $cell = fn ($text, $bold) => '<w:tc><w:tcPr><w:tcW w:w="'.($width / 2).'" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr><w:p><w:pPr><w:jc w:val="right"/><w:spacing w:line="240"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="'.$font.'"/><w:sz w:val="22"/>'.($bold ? '<w:b/>' : '').'</w:rPr><w:t>'.$text.'</w:t></w:r></w:p></w:tc>';
+            $xml = '<w:tbl><w:tblPr><w:tblW w:w="'.$width.'" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="8"/></w:tblBorders><w:tblCellMar><w:left w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="'.($width / 2).'"/><w:gridCol w:w="'.($width / 2).'"/></w:tblGrid><w:tr><w:trPr><w:tblHeader/></w:trPr>'.$cell($header, true).$cell('Value', true).'</w:tr>';
+            for ($i = 0; $i < $rows; $i++) $xml .= '<w:tr>'.$cell($body.$i, false).$cell((string) (20 + $i), false).'</w:tr>';
+            return $xml.'</w:tbl>';
+        };
+        foreach (['Arial' => 6000, 'Verdana' => 8000] as $font => $width) {
+            $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p>'.$table($width, $font, 'Sample header', 'Sample body', 1));
+            $student = $this->paper('<w:p><w:r><w:t>CHAPTER I</w:t></w:r></w:p>'.$table(4000, 'Old font', 'My header', 'My values ', 4));
+            $before = $this->xml($student)->evaluate('string(//w:tbl)');
+            $formatter = new PaperFormatter;
+            $report = $formatter->formatUsingReference($student, $reference);
+            $xp = $this->xml($student);
+            $this->assertSame((string) $width, $xp->evaluate('string(//w:tblPr/w:tblW/@w:w)'));
+            $this->assertSame('80', $xp->evaluate('string(//w:tblPr/w:tblCellMar/w:left/@w:w)'));
+            $this->assertSame('single', $xp->evaluate('string(//w:tblPr/w:tblBorders/w:top/@w:val)'));
+            $this->assertSame(5, $xp->query('//w:tr')->length);
+            foreach ($xp->query('//w:tc') as $cell) {
+                $this->assertSame((string) ($width / 2), $xp->evaluate('string(./w:tcPr/w:tcW/@w:w)', $cell));
+                $this->assertSame('center', $xp->evaluate('string(./w:tcPr/w:vAlign/@w:val)', $cell));
+                $this->assertSame($font, $xp->evaluate('string(./w:p/w:r/w:rPr/w:rFonts/@w:ascii)', $cell));
+                $this->assertSame('right', $xp->evaluate('string(./w:p/w:pPr/w:jc/@w:val)', $cell));
+            }
+            $this->assertSame($before, $xp->evaluate('string(//w:tbl)'));
+            $this->assertContains('table-layout', array_column($report['template_mapping'], 'match'));
+            $formatter->formatUsingReference($student, $reference);
+            $this->assertSame($before, $this->xml($student)->evaluate('string(//w:tbl)'));
+        }
+    }
+
+    public function test_ambiguous_template_tables_are_reported_without_overwriting_student_layout(): void
+    {
+        $table = fn ($width) => '<w:tbl><w:tblPr><w:tblW w:w="'.$width.'" w:type="dxa"/></w:tblPr><w:tr><w:tc><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>B</w:t></w:r></w:p></w:tc></w:tr></w:tbl>';
+        $reference = $this->paper($table(6000).$table(8000)); $student = $this->paper($table(4000));
+        $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+        $this->assertSame('4000', $this->xml($student)->evaluate('string(//w:tblPr/w:tblW/@w:w)'));
+        $this->assertContains('No unique compatible template table layout matched this chapter and column structure.', $report['manual_review_rules']);
+    }
+
+    public function test_identical_layouts_across_template_sections_apply_to_a_merged_student_section(): void
+    {
+        $layout = '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:left="2000" w:right="1500" w:top="1600" w:bottom="1700"/></w:sectPr>';
+        $reference = $this->paper('<w:p><w:pPr>'.$layout.'</w:pPr><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER 2</w:t></w:r></w:p>'.$layout);
+        $student = $this->paper('<w:p><w:r><w:t>CHAPTER I</w:t></w:r></w:p><w:p><w:r><w:t>CHAPTER II</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:left="1000"/></w:sectPr>');
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        $this->assertSame('11906', $xp->evaluate('string(/w:document/w:body/w:sectPr/w:pgSz/@w:w)'));
+        $this->assertSame('2000', $xp->evaluate('string(/w:document/w:body/w:sectPr/w:pgMar/@w:left)'));
+    }
+
     public function test_checklist_and_explicit_template_values_are_parsed(): void
     {
         $service = new PaperFormatter; $cfg = $service->settings($this->rules());
