@@ -1734,9 +1734,11 @@ async function _dvGenerateFixedPdf() {
         try {
             await orig.call(window.docx, tmpBlob, box, null, {
                 inWrapper: false, breakPages: false, ignoreLastRenderedPageBreak: true,
-                ignoreHeight: true, renderHeaders: false, renderFooters: false
+                ignoreHeight: true, renderHeaders: false, renderFooters: false, experimental: true
             });
             if (document.fonts && document.fonts.ready) await document.fonts.ready;
+            // docx-preview positions template tab stops in a deferred 500 ms pass.
+            await new Promise(function (resolve) { setTimeout(resolve, 550); });
 
             var items = [];
             Array.from(box.querySelectorAll('section.docx > article')).forEach(function (art, ai) {
@@ -1830,7 +1832,8 @@ async function _dvGenerateFixedPdf() {
         if (!window.docx || !window.docx.renderAsync || window.docx.__dvPaged) return false;
         var orig = window.docx.renderAsync;
         window.docx.renderAsync = async function (data, bodyEl, styleEl, opts) {
-            if (!window._dvPaginateOn || (opts && (opts.__dvMeasure || opts.renderComments))) return orig.apply(this, arguments);
+            opts = Object.assign({}, opts || {}, { experimental: true });
+            if (!window._dvPaginateOn || (opts && (opts.__dvMeasure || opts.renderComments))) return orig.call(this, data, bodyEl, styleEl, opts);
             try {
                 var blob = (data instanceof Blob) ? data : new Blob([data]);
                 var nb = await paginate(blob, orig);
