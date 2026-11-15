@@ -302,7 +302,7 @@ Route::post('/format-templates/{templateId}/reference', [\App\Http\Controllers\A
 Route::get('/pricing-sheet', [\App\Http\Controllers\PricingSheetController::class, 'show'])->middleware('auth:sanctum');
 Route::post('/pricing-sheet', [\App\Http\Controllers\PricingSheetController::class, 'store'])->middleware(['auth:sanctum', 'admin']);
 Route::delete('/pricing-sheet', [\App\Http\Controllers\PricingSheetController::class, 'destroy'])->middleware(['auth:sanctum', 'admin']);
-Route::post('/docx/format', [App\Http\Controllers\DocxFormatController::class, 'format'])->middleware('throttle:20,1');
+Route::post('/docx/format', [App\Http\Controllers\DocxFormatController::class, 'format'])->middleware(['auth:sanctum', 'throttle:20,1']);
 
 // --- Word -> PDF for the certificate editor ---
 \Illuminate\Support\Facades\Route::middleware(['auth:sanctum', 'admin'])->post('/certificates/docx-to-pdf', [\App\Http\Controllers\DocxPdfController::class, 'convert']);

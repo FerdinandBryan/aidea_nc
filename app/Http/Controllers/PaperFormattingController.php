@@ -17,7 +17,11 @@ class PaperFormattingController extends Controller
     public function show(string $templateId, AdminFormattingTemplate $templates, PaperFormatter $formatter)
     {
         $template = $templates->load($templateId);
-        try { $settings = $formatter->settings($template['effective_rules']); }
+        try {
+            $reference = $templates->hasDeclaredReference($template) ? $templates->referencePath($templateId) : null;
+            if ($templates->hasDeclaredReference($template) && !$reference) throw new InvalidArgumentException('Re-upload the selected admin DOCX reference before requesting its settings.');
+            $settings = $formatter->templateSettings($template['effective_rules'], $reference);
+        }
         catch (InvalidArgumentException $e) { throw ValidationException::withMessages(['template_id' => $e->getMessage()]); }
         return response()->json(['template_id' => $templateId, 'template' => $template['name'] ?? 'Selected template',
             'revision' => $template['revision'], 'settings' => $settings])->header('Cache-Control', 'private, no-store');
@@ -52,7 +56,7 @@ class PaperFormattingController extends Controller
             $reference = $templates->hasDeclaredReference($template) ? $templates->referencePath($data['template_id']) : null;
             $report = $reference
                 ? $formatter->formatUsingReference($path, $reference, $template['effective_rules'])
-                : $formatter->format($path, $template['effective_rules']);
+                : $formatter->formatFromTemplateRules($path, $template['effective_rules']);
             $original = $marker->mark($request->file('file')->getRealPath(), $report['settings'], [], false);
             $verification = $marker->mark($path, $report['settings'], [], false);
             $report['attention_resolutions'] = $marker->resolutions($original['issues'], $verification['issues']);

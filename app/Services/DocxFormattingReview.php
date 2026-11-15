@@ -33,14 +33,16 @@ class DocxFormattingReview
                     $values[] = $xp->evaluate('string(./w:rPr/w:rFonts/@w:ascii)', $run) ?: null;
                 }
             } elseif ($type === 'size' || preg_match('/font\s+size/i', $text)) {
-                $kind = 'size'; $target = $cfg['size'];
+                $kind = 'size'; $target = true;
+                $headingSizes = $formatter->settings($rules)['headings'];
                 foreach ($xp->query('//w:body//w:p[not(ancestor::w:txbxContent) and not(.//w:drawing or .//w:pict)]') as $p) {
                     $content = trim($xp->evaluate('string(.)', $p));
-                    if (in_array(strtoupper($content), ['REFERENCES', 'APPENDICES'], true)) continue;
+                    $expected = $headingSizes[mb_strtoupper($content)]['size'] ?? $cfg['size'];
+                    if ($expected === null) continue;
                     foreach ($xp->query('.//w:r[w:t]', $p) as $run) {
                         if (trim($xp->evaluate('string(w:t)', $run)) === '') continue;
                         $v = $xp->evaluate('string(./w:rPr/w:sz/@w:val)', $run);
-                        $values[] = $v === '' ? null : (float) $v / 2;
+                        $values[] = $v === '' ? null : abs((float) $v / 2 - $expected) < .01;
                     }
                 }
             } elseif ($type === 'margin' || preg_match('/\bmargins?\b/i', $text)) {

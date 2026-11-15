@@ -123,6 +123,82 @@ class PaperFormatter
         return $cfg;
     }
 
+    public function templateSettings(array $rules, ?string $referencePath = null): array
+    {
+        $source = $referencePath ? $this->referenceRules($referencePath) : $rules;
+        $cfg = $this->settings($source); $pageDefined = false;
+        foreach ($source as $rule) if (in_array(strtolower($rule['type'] ?? ''), ['paper', 'page-size'], true) || preg_match('/short bond|paper size|8\.5.*11|\bA4\b/i', $rule['detail'] ?? '')) $pageDefined = true;
+        if (!$pageDefined) { $cfg['width'] = null; $cfg['height'] = null; }
+        return $cfg;
+    }
+
+    /** Rules-only templates change only explicit admin settings; no thesis layout defaults. */
+    public function formatFromTemplateRules(string $path, array $rules): array
+    {
+        $cfg = $this->settings($rules); $zip = new ZipArchive;
+        if ($zip->open($path) !== true) throw new InvalidArgumentException('Upload a valid Word document.');
+        $processed = 0;
+        try {
+            $xml = $zip->getFromName('word/document.xml'); $doc = new DOMDocument;
+            if (!$xml || stripos($xml, '<!DOCTYPE') !== false || !@$doc->loadXML($xml, LIBXML_NONET)) throw new InvalidArgumentException('The Word document contains invalid XML.');
+            $xp = new DOMXPath($doc); $xp->registerNamespace('w', self::W);
+            $abstract = false; $cv = false;
+            foreach ($xp->query('/w:document/w:body//w:p[not(ancestor::w:txbxContent)]') as $p) {
+                if ($this->text($p) === '' || $xp->query('.//w:drawing | .//w:pict | .//w:object', $p)->length) continue;
+                $heading = preg_match('/^Heading[ _-]?\d+$/i', $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $p)) || $xp->query('./w:pPr/w:outlineLvl[@w:val < 9]', $p)->length;
+                $name = mb_strtoupper($this->text($p));
+                if ($heading) { $abstract = false; $cv = false; }
+                if ($cfg['abstract'] !== null && $name === 'ABSTRACT') { $abstract = true; $heading = true; }
+                if (isset($cfg['cv']['spacing']) && $name === 'CURRICULUM VITAE') { $cv = true; $heading = true; }
+                $line = $abstract ? $cfg['abstract'] : ($cv ? $cfg['cv']['spacing'] : $cfg['spacing']);
+                $pr = $this->ensure($p, 'pPr', true);
+                if ($line !== null && !$heading) {
+                    $sp = $this->ensure($pr, 'spacing'); $this->attr($sp, 'line', round($line * 240)); $this->attr($sp, 'lineRule', 'auto');
+                }
+                if ($cfg['alignment'] !== null && !$heading) $this->attr($this->ensure($pr, 'jc'), 'val', $cfg['alignment']);
+                if ($cfg['indentation'] !== null && !$heading) {
+                    $ind = $this->ensure($pr, 'ind'); $this->attr($ind, 'firstLine', round($cfg['indentation'] * 1440));
+                    foreach (['hanging', 'firstLineChars', 'hangingChars'] as $key) $ind->removeAttributeNS(self::W, $key);
+                }
+                foreach ($xp->query('.//w:r[w:t]', $p) as $run) {
+                    if ($cfg['font'] === null && $cfg['size'] === null) continue;
+                    $rp = $this->ensure($run, 'rPr', true);
+                    if ($cfg['font'] !== null) {
+                        $font = $this->ensure($rp, 'rFonts');
+                        foreach (['asciiTheme', 'hAnsiTheme', 'eastAsiaTheme', 'csTheme'] as $key) $font->removeAttributeNS(self::W, $key);
+                        foreach (['ascii', 'hAnsi', 'eastAsia', 'cs'] as $key) $this->attr($font, $key, $cfg['font']);
+                    }
+                    if ($cfg['size'] !== null) foreach (['sz', 'szCs'] as $key) $this->attr($this->ensure($rp, $key), 'val', round($cfg['size'] * 2));
+                }
+                $processed++;
+            }
+            $explicitPage = false;
+            foreach ($rules as $rule) if (in_array(strtolower($rule['type'] ?? ''), ['paper', 'page-size'], true) || preg_match('/short bond|paper size|8\.5.*11|\bA4\b/i', $rule['detail'] ?? '')) $explicitPage = true;
+            if ($explicitPage || $cfg['margins']) {
+                $sections = iterator_to_array($xp->query('//w:sectPr'));
+                if (!$sections) $sections[] = $this->ensure($xp->query('/w:document/w:body')->item(0), 'sectPr');
+                foreach ($sections as $section) {
+                    if ($explicitPage) { $size = $this->ensure($section, 'pgSz'); $this->attr($size, 'w', $cfg['width']); $this->attr($size, 'h', $cfg['height']); }
+                    if ($cfg['margins']) foreach ($cfg['margins'] as $side => $inch) $this->attr($this->ensure($section, 'pgMar'), $side, round($inch * 1440));
+                }
+            }
+            $zip->addFromString('word/document.xml', $doc->saveXML());
+        } finally { $zip->close(); }
+        $this->removeFixedCopyHighlights($path);
+        if (!$explicitPage) { $cfg['width'] = null; $cfg['height'] = null; }
+        $applied = []; $manual = ['Only explicit settings in this template were applied. Section layout, objects and unsupported prose requirements need a DOCX reference or manual review.'];
+        foreach ($rules as $rule) {
+            $single = $this->settings([$rule]); $supported = false;
+            foreach (['font', 'size', 'spacing', 'alignment', 'indentation', 'abstract'] as $key) if ($single[$key] !== null) $supported = true;
+            if ($single['margins'] || isset($single['cv']['spacing']) || in_array(strtolower($rule['type'] ?? ''), ['paper', 'page-size'], true) || preg_match('/short bond|paper size|8\.5.*11|\bA4\b/i', $rule['detail'] ?? '')) $supported = true;
+            $name = $rule['name'] ?? $rule['detail'] ?? $rule['type'] ?? 'Admin setting';
+            if ($supported) $applied[] = $name; else $manual[] = 'Manual template requirement: '.$name;
+        }
+        return ['settings' => $cfg, 'formatting_source' => 'explicit-admin-rules', 'paragraphs_processed' => $processed,
+            'applied_rules' => $applied, 'manual_review_rules' => $manual,
+            'manual_review_required' => true, 'note' => 'No default thesis font, paper size, headings, cover layout or appendix pages were added.'];
+    }
+
     public function formatUsingReference(string $path, string $referencePath, array $rules = []): array
     {
         $referenceRules = $this->referenceRules($referencePath);
@@ -130,7 +206,15 @@ class PaperFormatter
         // which imposes chapter breaks, cover positioning and appendix typography.
         $result = $this->applyReferenceFormatting($path, $referencePath, $referenceRules);
         $this->removeFixedCopyHighlights($path);
-        return ['settings' => $this->settings($referenceRules),
+        $settings = $this->templateSettings($referenceRules); $spacingMatches = [];
+        foreach ($result['mapping'] as $match) if (isset($match['expected_spacing'])) {
+            $key = mb_strtolower(preg_replace('/\s+/u', ' ', trim($match['paragraph'])));
+            $spacingMatches[$key][] = $match['expected_spacing'];
+        }
+        $settings['paragraph_spacing'] = [];
+        foreach ($spacingMatches as $key => $values) if (count(array_unique($values)) === 1) $settings['paragraph_spacing'][$key] = $values[0];
+        if ($result['multiple_sections']) $settings['margins'] = [];
+        return ['settings' => $settings, 'formatting_source' => 'selected-docx-reference',
             'paragraphs_processed' => $result['processed'],
             'applied_rules' => ['Selected DOCX paragraph styles', 'Selected DOCX page layout'],
             'manual_review_rules' => $result['warnings'],
@@ -184,8 +268,7 @@ class PaperFormatter
             $referenceStylesXp = $this->packageStyles($referenceZip);
             $referenceRoles = $this->referenceParagraphRoles($referenceXp, $referenceStylesXp);
             $studentRoles = $this->referenceParagraphRoles($studentXp, $this->packageStyles($studentZip));
-            $this->labelExistingCvAppendix($referenceRoles, $studentXp);
-            $studentRoles = $this->referenceParagraphRoles($studentXp, $this->packageStyles($studentZip));
+            // Matching supplies formatting, never missing content or appendix pages.
             $appendixLabels = $this->alignAppendixLabels($referenceRoles, $studentRoles, $referenceXp, $studentXp);
             $formFooters = $this->appendixFormFooters($referenceRoles, $studentRoles, $referenceXp, $studentXp);
             $formStarts = [];
@@ -241,7 +324,7 @@ class PaperFormatter
             $paragraphProperties = ['pStyle', 'keepNext', 'keepLines', 'pageBreakBefore', 'widowControl', 'pBdr', 'shd', 'tabs', 'bidi', 'snapToGrid', 'spacing', 'ind', 'contextualSpacing', 'jc', 'textDirection', 'outlineLvl'];
             $runProperties = ['rStyle', 'rFonts', 'b', 'bCs', 'i', 'iCs', 'caps', 'smallCaps', 'color', 'spacing', 'sz', 'szCs', 'u', 'vertAlign', 'lang'];
             $referenceIndent = $this->settings($referenceRules)['indentation'];
-            $processed = $cover['processed']; $warnings = $cover['warnings']; $mapping = $cover['mapping'];
+            $processed = $cover['processed']; $warnings = $cover['warnings']; $mapping = $cover['mapping']; $sectionMatches = [];
             $warnings = array_merge($warnings, $appendixLabels['warnings']);
             $mapping = array_merge($mapping, $appendixLabels['mapping']);
             foreach ($referenceRoles as $role => $paragraphs) {
@@ -282,12 +365,18 @@ class PaperFormatter
                     }
                     if (!$source && $role === 'body') $source = $this->sectionBodySource($target, $sectionBodies, $matchingProfiles);
                     if (!$source && $sources) {
-                        if (count($sources) === count($paragraphs)) $source = $sources[$index];
-                        elseif ($uniformSources) $source = $sources[min($index, count($sources) - 1)];
+                        if ($uniformSources) $source = $sources[0];
                     }
                     if (!$source) {
                         $warnings[] = 'No template paragraph matched: '.mb_substr($this->text($target), 0, 100);
                         continue;
+                    }
+                    $targetSection = $studentXp->query('.//w:sectPr | following::w:sectPr[1]', $target)->item(0);
+                    $sourceSection = $referenceXp->query('.//w:sectPr | following::w:sectPr[1]', $source)->item(0);
+                    if ($targetSection && $sourceSection) {
+                        $id = spl_object_id($targetSection);
+                        $sectionMatches[$id]['target'] = $targetSection;
+                        $sectionMatches[$id]['sources'][spl_object_id($sourceSection)] = $sourceSection;
                     }
                     // Citation emphasis identifies titles within an entry, not the whole entry.
                     $entryRunProperties = $role === 'references:entry' ? array_values(array_diff($runProperties, ['b', 'bCs', 'i', 'iCs', 'u'])) : $runProperties;
@@ -327,6 +416,8 @@ class PaperFormatter
                     if ($before && !in_array(strtolower($before->getAttributeNS(self::W, 'val')), ['0', 'false', 'off'], true)) $this->materializePageStart($target, $studentXp);
                     if (!($footer['continuation'] ?? false)) $this->copyReferenceHeadingGap($source, $target, $referenceXp, $studentXp, $referenceStylesXp);
                     $mapping[] = ['paragraph' => $this->text($target), 'template_paragraph' => $this->text($source), 'match' => $matchedText ? 'heading-text' : ($matchedWords ? 'heading-words' : ($matchedExample ? 'chapter-heading-example' : 'structure'))];
+                    $sourceSpacing = $referenceXp->query('./w:pPr/w:spacing', $source)->item(0) ?? $this->inheritedParagraphProperty($source, $referenceXp, $referenceStylesXp, 'spacing');
+                    if ($sourceSpacing && in_array($sourceSpacing->getAttributeNS(self::W, 'lineRule'), ['', 'auto'], true) && is_numeric($sourceSpacing->getAttributeNS(self::W, 'line'))) $mapping[count($mapping) - 1]['expected_spacing'] = (float) $sourceSpacing->getAttributeNS(self::W, 'line') / 240;
                     if ($role === 'body' && $referenceIndent !== null && !$referenceXp->query('./w:pPr/w:ind', $source)->length) {
                         $indent = $this->ensure($this->ensure($target, 'pPr', true), 'ind');
                         foreach (['hanging', 'hangingChars', 'firstLineChars'] as $key) $indent->removeAttributeNS(self::W, $key);
@@ -337,35 +428,36 @@ class PaperFormatter
                     $processed++;
                 }
             }
-            $cvPhotos = (new TemplateCvPhotoFormatter)->apply($studentXp, $referenceXp);
-            $warnings = array_merge($warnings, $cvPhotos['warnings']);
-            $mapping = array_merge($mapping, $cvPhotos['mapping']);
-            $emptyAppendices = $this->insertEmptyTemplateAppendices($appendixLabels['template_entries'], $referenceXp, $studentXp, $paragraphProperties, $runProperties);
-            $processed += $emptyAppendices['processed'];
-            $warnings = array_merge($warnings, $emptyAppendices['warnings']);
-            $mapping = array_merge($mapping, $emptyAppendices['mapping']);
+            $photos = (new TemplatePhotoFormatter)->apply($studentXp, $referenceXp);
+            $warnings = array_merge($warnings, $photos['warnings']); $mapping = array_merge($mapping, $photos['mapping']);
+            if ($studentXp->query('//w:drawing | //w:pict | //w:tbl | //w:object')->length) $warnings[] = 'Pictures and tables keep their existing layout unless an unambiguous template match supplies their placement. Review scanned pages and unmatched objects against the selected template.';
             $referenceSection = $referenceXp->query('//w:sectPr')->item($referenceXp->query('//w:sectPr')->length - 1);
             if ($referenceSection instanceof DOMElement) {
                 $studentSections = iterator_to_array($studentXp->query('//w:sectPr'));
                 if (!$studentSections) $studentSections[] = $this->ensure($studentDoc->documentElement->getElementsByTagNameNS(self::W, 'body')->item(0), 'sectPr');
-                if ($referenceXp->query('//w:sectPr')->length > 1) $warnings[] = 'The template has multiple sections. The final section page layout was applied; section-specific headers, footers and layout require review.';
+                if ($referenceXp->query('//w:sectPr')->length > 1) $warnings[] = 'The template has multiple sections. Only uniquely matched section geometry was copied; ambiguous layouts and section-specific headers or footers require review.';
                 if ($referenceXp->query('//w:headerReference | //w:footerReference')->length) $warnings[] = 'Existing headers and footers were preserved. Compare them with the template headers and footers.';
                 foreach ($studentSections as $section) {
+                    $layoutSource = $referenceSection;
+                    if ($referenceXp->query('//w:sectPr')->length > 1) {
+                        $matches = $sectionMatches[spl_object_id($section)]['sources'] ?? [];
+                        if (count($matches) !== 1) {
+                            $warnings[] = 'The paper section does not uniquely match one template section. Its page geometry was preserved for review instead of applying an unrelated section layout.';
+                            continue;
+                        }
+                        $layoutSource = reset($matches);
+                    }
                     foreach (['pgSz', 'pgMar', 'pgBorders', 'cols', 'vAlign', 'docGrid'] as $name) {
+                        $property = $referenceXp->query('./w:'.$name, $layoutSource)->item(0);
+                        if (!$property) {
+                            if (in_array($name, ['pgSz', 'pgMar'], true)) $warnings[] = 'The template does not specify '.($name === 'pgSz' ? 'paper size' : 'page margins').'; the original value was preserved for review.';
+                            continue;
+                        }
                         foreach (iterator_to_array($studentXp->query('./w:'.$name, $section)) as $old) $section->removeChild($old);
-                        $property = $referenceXp->query('./w:'.$name, $referenceSection)->item(0);
-                        if ($property) $section->replaceChild($studentDoc->importNode($property, true), $this->ensure($section, $name));
+                        $section->replaceChild($studentDoc->importNode($property, true), $this->ensure($section, $name));
                     }
                 }
-            }
-            // Divider pages must remain isolated even when the template uses
-            // blank spacer paragraphs or section boundaries for their layout.
-            foreach ($studentXp->query('/w:document/w:body/w:p') as $paragraph) {
-                if ($this->isDate($this->text($paragraph))) $this->centerTitleParagraph($paragraph, $studentXp);
-                if (in_array(strtoupper($this->text($paragraph)), ['APPROVAL SHEET', 'ABSTRACT'], true) || $this->isChapter($this->text($paragraph))) break;
-            }
-            $this->isolateSectionDividers($studentXp, ['height' => 15840], true);
-            $this->centerStandalonePictures($studentXp);
+            } else $warnings[] = 'The template has no explicit page geometry; the original document layout was preserved for review.';
             $studentZip->addFromString('word/document.xml', $studentDoc->saveXML());
 
             $referenceStylesXml = $referenceZip->getFromName('word/styles.xml');
@@ -401,7 +493,7 @@ class PaperFormatter
                     $studentZip->addFromString('word/styles.xml', $studentStyles->saveXML());
                 }
             }
-            return ['processed' => $processed, 'warnings' => array_values(array_unique($warnings)), 'mapping' => $mapping];
+            return ['processed' => $processed, 'warnings' => array_values(array_unique($warnings)), 'mapping' => $mapping, 'multiple_sections' => $referenceXp->query('//w:sectPr')->length > 1];
         } finally { $studentZip->close(); $referenceZip->close(); }
     }
     /** Blank paragraphs are layout in a Word template, outside the heading's pPr. */
@@ -498,42 +590,6 @@ class PaperFormatter
             $roles[$role][] = $paragraph;
         }
         return $roles;
-    }
-
-    /** A standalone CV heading already supplies the appendix; add its label there. */
-    private function labelExistingCvAppendix(array $referenceRoles, DOMXPath $studentXp): void
-    {
-        $sources = [];
-        foreach ($referenceRoles['appendix:title'] ?? [] as $title) {
-            if (!preg_match('/^curriculum\s+vitae\s*[:.]?$/iu', $this->text($title))) continue;
-            for ($label = $title->previousSibling; $label; $label = $label->previousSibling) {
-                if (!$label instanceof DOMElement || $label->localName !== 'p') break;
-                if ($this->text($label) === '') continue;
-                if (in_array($label, $referenceRoles['appendix:label'] ?? [], true)) $sources[] = $label;
-                break;
-            }
-        }
-        if (count($sources) !== 1) return;
-        $cvs = []; $hasLabel = false;
-        foreach ($studentXp->query('/w:document/w:body/w:p') as $p) {
-            if (!preg_match('/^curriculum\s+vitae\s*[:.]?$/iu', $this->text($p))) continue;
-            if (preg_match('/^TOC/i', $studentXp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $p)) || $studentXp->query('.//w:tab', $p)->length) continue;
-            $cvs[] = $p;
-            for ($previous = $p->previousSibling; $previous; $previous = $previous->previousSibling) {
-                if (!$previous instanceof DOMElement || $previous->localName !== 'p') break;
-                if ($this->text($previous) === '') continue;
-                if ($this->isAppendixHeader($previous, $studentXp)) $hasLabel = true;
-                break;
-            }
-        }
-        if (!$cvs || $hasLabel) return;
-        $label = $studentXp->document->importNode($sources[0], true);
-        $cvs[0]->parentNode->insertBefore($label, $cvs[0]);
-        $this->materializePageStart($label, $studentXp);
-        // The label and its existing CV belong on the same page.
-        $pr = $this->ensure($cvs[0], 'pPr', true);
-        $this->attr($this->ensure($pr, 'pageBreakBefore'), 'val', 0);
-        foreach (iterator_to_array($studentXp->query('.//w:br[@w:type="page"]', $cvs[0])) as $break) $break->parentNode->removeChild($break);
     }
 
     /** Labels belong to the template title, not to the student's existing letter. */
@@ -674,63 +730,6 @@ class PaperFormatter
         $this->orderMatchedAppendices($studentRoles['appendix:label'] ?? [], $matches, $proposals, $warnings, $mapping);
         if ($mapping) $warnings[] = 'Appendix labels were corrected by matching their titles to the template. Review appendix cross-references and the list of appendices; those text references were preserved.';
         return ['warnings' => array_values(array_unique($warnings)), 'mapping' => $mapping, 'sources' => $sources, 'template_entries' => $referenceEntries];
-    }
-
-    /** Reserve every missing template appendix as a heading-only page. */
-    private function insertEmptyTemplateAppendices(array $entries, DOMXPath $referenceXp, DOMXPath $studentXp, array $paragraphProperties, array $runProperties): array
-    {
-        $result = ['processed' => 0, 'warnings' => [], 'mapping' => []];
-        if (!$entries) return $result;
-        $doc = $studentXp->document; $body = $studentXp->query('/w:document/w:body')->item(0); $labels = [];
-        foreach ($studentXp->query('/w:document/w:body/w:p') as $paragraph) {
-            if ($this->isAppendixHeader($paragraph, $studentXp)) $labels[mb_strtoupper($this->text($paragraph))] = $paragraph;
-        }
-        $makeHeader = function (DOMElement $source) use ($doc, $referenceXp, $studentXp, $paragraphProperties, $runProperties): DOMElement {
-            $p = $doc->createElementNS(self::W, 'w:p'); $run = $doc->createElementNS(self::W, 'w:r');
-            $text = $doc->createElementNS(self::W, 'w:t'); $text->appendChild($doc->createTextNode($this->text($source)));
-            $run->appendChild($text); $p->appendChild($run);
-            $this->copyReferenceParagraph($source, $p, $referenceXp, $studentXp, $paragraphProperties, $runProperties);
-            return $p;
-        };
-        if (!$labels && !$studentXp->query('/w:document/w:body/w:p[normalize-space(.)="APPENDICES"]')->length) {
-            $divider = $referenceXp->query('/w:document/w:body/w:p[normalize-space(.)="APPENDICES"]')->item(0);
-            if ($divider instanceof DOMElement) {
-                $p = $makeHeader($divider); $body->insertBefore($p, $studentXp->query('./w:sectPr', $body)->item(0));
-                $this->materializePageStart($p, $studentXp); $result['processed']++;
-            }
-        }
-        foreach ($entries as $index => $entry) {
-            $key = mb_strtoupper($this->text($entry['label']));
-            if (isset($labels[$key])) {
-                $hasTitle = false; $hasDocument = false;
-                for ($node = $labels[$key]->nextSibling; $node; $node = $node->nextSibling) {
-                    if (!$node instanceof DOMElement) continue;
-                    if ($node->localName === 'sectPr' || ($node->localName === 'p' && $this->isAppendixHeader($node, $studentXp))) break;
-                    if ($node->localName === 'tbl' || $studentXp->query('.//w:drawing | .//w:pict | .//w:object', $node)->length) { $hasDocument = true; break; }
-                    if ($this->text($node) === '') continue;
-                    if (!$hasTitle) $hasTitle = true;
-                    else { $hasDocument = true; break; }
-                }
-                if ($hasTitle && !$hasDocument) $result['warnings'][] = 'Appendix page is blank: '.$this->text($entry['label']).' — '.$this->text($entry['title_node']).'. No supporting document was supplied.';
-                continue;
-            }
-            $anchor = null;
-            foreach (array_slice($entries, $index + 1) as $later) {
-                $laterKey = mb_strtoupper($this->text($later['label']));
-                if (isset($labels[$laterKey])) { $anchor = $labels[$laterKey]; break; }
-            }
-            $anchor ??= $studentXp->query('./w:sectPr', $body)->item(0);
-            $label = $makeHeader($entry['label']); $title = $makeHeader($entry['title_node']);
-            $body->insertBefore($label, $anchor); $body->insertBefore($title, $anchor);
-            $this->materializePageStart($label, $studentXp);
-            // The following appendix must start a new page, leaving this one empty.
-            if ($anchor instanceof DOMElement && $anchor->localName === 'p') $this->materializePageStart($anchor, $studentXp);
-            $labels[$key] = $label;
-            $result['processed'] += 2;
-            $result['warnings'][] = 'Blank appendix page added: '.$this->text($entry['label']).' — '.$this->text($entry['title_node']).'. No supporting document was supplied.';
-            $result['mapping'][] = ['paragraph' => $this->text($entry['label']), 'template_paragraph' => $this->text($entry['title_node']), 'match' => 'appendix-empty-page'];
-        }
-        return $result;
     }
 
     /** Move whole appendix blocks, including tables and images; unmatched blocks retain their slots. */
@@ -1187,6 +1186,7 @@ class PaperFormatter
         } finally { $zip->close(); }
     }
 
+    /** @deprecated Historical checklist compatibility; application endpoints use the template-specific methods above. */
     public function format(string $path, array $rules): array
     {
         if (empty($rules)) {

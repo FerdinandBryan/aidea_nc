@@ -115,6 +115,24 @@ class PaperFormattingApiTest extends TestCase
     public function test_authentication_is_required(): void
     {
         $this->postJson('/api/papers/fix', [])->assertUnauthorized();
+        $this->postJson('/api/docx/format', [])->assertUnauthorized();
+    }
+
+    public function test_legacy_docx_endpoint_requires_and_uses_the_selected_template(): void
+    {
+        Sanctum::actingAs(new User(['name' => 'Student']));
+        $this->post('/api/docx/format', ['file' => $this->paper()], ['Accept' => 'application/json'])->assertStatus(422)->assertJsonValidationErrors('template_id');
+        $this->templates([['id' => 'article', 'active' => true, 'formatting' => ['font' => 'Verdana', 'font_size' => 9], 'rules' => []]]);
+        $response = $this->post('/api/docx/format', ['file' => $this->paper(), 'template_id' => 'article', 'include_report' => '1'], ['Accept' => 'application/json'])->assertOk();
+        $this->assertSame('Verdana', $response->json('report.settings.font'));
+        $this->assertSame(9, $response->json('report.settings.size'));
+        $this->assertSame('explicit-admin-rules', $response->json('report.formatting_source'));
+        $path = tempnam(sys_get_temp_dir(), 'template_alias_'); $this->files[] = $path;
+        file_put_contents($path, base64_decode($response->json('document_base64')));
+        $zip = new ZipArchive; $zip->open($path); $xml = $zip->getFromName('word/document.xml'); $zip->close();
+        $this->assertStringContainsString('Verdana', $xml);
+        $this->assertStringNotContainsString('Times New Roman', $xml);
+        $this->assertStringNotContainsString('w:pgMar', $xml);
     }
 
     public function test_exported_fixed_docx_can_be_reuploaded_even_when_mime_is_generic_zip(): void
@@ -166,7 +184,7 @@ class PaperFormattingApiTest extends TestCase
         $path = $response->baseResponse->getFile()->getPathname(); $this->files[] = $path;
         $zip = new ZipArchive; $zip->open($path); $xml = $zip->getFromName('word/document.xml'); $zip->close();
         $this->assertStringContainsString('w:line="480"', $xml);
-        $this->assertStringContainsString('w:type="page"', $xml);
+        $this->assertStringNotContainsString('w:type="page"', $xml);
         $this->assertStringNotContainsString('w:line="240"', $xml);
     }
 
@@ -282,7 +300,9 @@ class PaperFormattingApiTest extends TestCase
         Sanctum::actingAs(new User(['is_admin' => true]));
         $template = [['id' => $templateId, 'active' => true, 'file' => ['name' => 'admin-example.docx']]];
         $this->persistTemplates($template);
-        $beforeRevision = $this->getJson('/api/format-templates/'.$templateId.'/formatting')->assertOk()->json('revision');
+        $this->getJson('/api/format-templates/'.$templateId.'/formatting')->assertStatus(422)->assertJsonValidationErrors('template_id');
+        $this->persistTemplates($template);
+        $beforeRevision = (new \App\Services\AdminFormattingTemplate)->load($templateId)['revision'];
         $this->persistTemplates($template);
         $this->post('/api/format-templates/'.$templateId.'/reference', ['file' => $reference], ['Accept' => 'application/json'])->assertOk();
         $referencePath = (new \App\Services\AdminFormattingTemplate)->referenceStoragePath($templateId);

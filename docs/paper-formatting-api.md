@@ -87,14 +87,31 @@ Missing template sections are reported; their placeholder text is not inserted.
 PDF/DOC reference files receive a validation error asking for an editable
 DOCX, rather than silently using checklist rules as a replacement layout.
 
-For templates without an attached reference, supported rules include font, font size, line spacing, abstract spacing,
-margins, alignment, indentation, hanging reference indents, and the special
-References/Appendices headings. Explicit rule `type`/`value` settings take
-precedence over recognized descriptions. Paper size defaults to short bond
-(US Letter), with A4 supported when specified by the template. Chapter headings
-get explicit page breaks. A title page with a degree statement, authors and
-date receives additional space between groups without changing line spacing.
-Its vertical layout is estimated from text length; Word's rendering can vary.
+For templates without an attached reference, only explicit admin settings are
+applied: font, size, line spacing, margins, alignment, indentation and page size.
+Unspecified properties stay unchanged; no default thesis margins, font, paper
+size, chapter breaks, cover gaps or divider placement are injected. Unsupported
+prose or structural instructions remain manual review requirements.
+
+The browser requires an explicitly selected active template. It does not add a
+built-in checklist, choose a different template, or seed demo templates into an
+empty library. It displays the server's document without section-specific CSS
+that recenters headings, dates or images. Formatting review is independent of
+the older thesis-keyword classifier; a readable document can be compared with
+the selected template even when it is not a traditional thesis.
+
+Photo placement is copied only from a uniquely matched named template section
+with an explicit single-cell photo placeholder and dimensions. The template
+supplies the position and alignment; the original photo and its aspect ratio
+are retained. Large scans and ambiguous or unsupported objects are preserved
+and flagged. Missing appendix pages are not fabricated. Different section
+geometries are copied only when a student section matches one source section;
+an ambiguous section is preserved for review rather than receiving the final
+template section's geometry.
+
+The compatibility endpoint POST /api/docx/format now requires authentication
+and template_id and delegates to the same template pipeline. Its previous
+fixed-font/fixed-margin formatter is removed.
 
 Content criteria (citation accuracy, required argumentation, word counts and
 section completeness) need review. Written checklist criteria remain part of

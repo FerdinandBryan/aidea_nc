@@ -1,6 +1,37 @@
 /* The selected server template is authoritative for both preview and download. */
 (function () {
+    if(window._dvTemplateApiInstalled)return;
+    window._dvTemplateApiInstalled=true;
     var endpoint = 'https://aidea-nc.wasmer.app/api/papers/fix';
+    async function cleanFixedPaper(blob) {
+        await new Promise(function (resolve) { _validatorDeps.ensureJSZip(resolve); });
+        var zip = await JSZip.loadAsync(await blob.arrayBuffer());
+        var W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+        var changed = false;
+        for (var name of Object.keys(zip.files)) {
+            if (!/^word\/.*\.xml$/.test(name) || zip.files[name].dir) continue;
+            var xml = await zip.files[name].async('string');
+            var doc = new DOMParser().parseFromString(xml, 'application/xml');
+            if (doc.getElementsByTagName('parsererror').length) throw new Error('Cannot clean invalid Word XML.');
+            var marks = Array.from(doc.getElementsByTagNameNS(W, 'highlight'));
+            Array.from(doc.getElementsByTagNameNS(W, 'shd')).forEach(function (node) {
+                var fill = node.getAttributeNS(W, 'fill') || '';
+                if (/^[a-f0-9]{6}$/i.test(fill)) {
+                    var r = parseInt(fill.slice(0,2),16), g = parseInt(fill.slice(2,4),16), b = parseInt(fill.slice(4,6),16);
+                    if (r >= 180 && g >= 150 && b < 180 && Math.min(r,g) - b > 45) marks.push(node);
+                }
+            });
+            if (!marks.length) continue;
+            marks.forEach(function (node) { node.parentNode.removeChild(node); });
+            zip.file(name, new XMLSerializer().serializeToString(doc));
+            changed = true;
+        }
+        if (!changed) return blob;
+        var clean = await zip.generateAsync({type:'blob',mimeType:blob.type});
+        clean.formattingReport = blob.formattingReport;
+        return clean;
+    }
+
     var cached = null;
     window._dvInvalidateFixedCopy = function () { cached = null; };
     _dvGenerateFixedDocx = async function (file) {
@@ -45,7 +76,7 @@
                 blob = await response.blob();
             }
             if (!blob.size) throw new Error('The formatting API returned an empty document.');
-            return blob;
+            return await cleanFixedPaper(blob);
         })();
         cached = { file: file, key: key, promise: promise };
         try { return await promise; }
@@ -78,13 +109,15 @@
             for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
             var fixed = new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
             fixed.formattingReport = data.report;
+            fixed = await cleanFixedPaper(fixed);
+            if (window._dvFixRevision !== revision) return;
             if (data.attention_document_base64) {
                 var annotated = atob(data.attention_document_base64);
                 var markedBytes = new Uint8Array(annotated.length);
                 for (var j = 0; j < annotated.length; j++) markedBytes[j] = annotated.charCodeAt(j);
                 window._dvAttentionResult = {revision:revision,blob:new Blob([markedBytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),issues:data.attention_issues || [],objects:data.attention_objects || [],manualChecks:(data.review && data.review.findings || []).filter(function(f){return f.status==='manual';}).length,fixedValidation:data.report && data.report.fixed_validation};
                 document.querySelectorAll('[data-dv-attention]').forEach(function (button) {
-                    button.textContent = 'Preview Needs attention (' + (data.attention_issues || []).length + ')';
+                    var label='Preview Needs attention (' + (data.attention_issues || []).length + ')';if(button.getAttribute('aria-busy')==='true')button.dataset.dvIdleLabel=label;else button.textContent=label;
                 });
             }
             var findings=data.review && data.review.findings || [];
@@ -109,7 +142,7 @@
         } catch (error) {
             if(window._dvFixRevision===revision){
                 window._dvAttentionError=error.message;
-                document.querySelectorAll('[data-dv-attention]').forEach(function(button){button.textContent='Preview Needs attention (check failed)';});
+                document.querySelectorAll('[data-dv-attention]').forEach(function(button){if(button.getAttribute('aria-busy')==='true')button.dataset.dvIdleLabel='Preview Needs attention (check failed)';else button.textContent='Preview Needs attention (check failed)';});
                 document.querySelectorAll('[data-dv-checklist-summary]').forEach(function(summary){summary.textContent='Checklist check could not complete: '+error.message;});
             }
         }
@@ -183,7 +216,7 @@
         if (!result || result.revision !== window._dvFixRevision) {
             var waiting=document.createElement('div');waiting.className='attention-paper';
             var progress=document.createElement('div');progress.className='attention-status';progress.setAttribute('role','status');
-            progress.textContent='Preparing marked paper. This preview will open automatically when the check finishes...';waiting.appendChild(progress);layout.appendChild(waiting);
+            window._dvShowPreviewLoading(progress,'Preparing marked paper. Waiting for the formatting check...');waiting.appendChild(progress);layout.appendChild(waiting);
             var requestedRevision=window._dvFixRevision;
             await window._dvCheckAndFixPaper();
             if(!overlay.isConnected)return;
@@ -225,7 +258,7 @@
         }
         var download=document.createElement('button');download.type='button';download.textContent='Download marked copy';download.onclick=function(){_dvTriggerDownload(result.blob,_dvBaseName(_dvLastFile.name)+'_needs_attention.docx');};sidebar.appendChild(download);
         var holder = document.createElement('div');holder.className='attention-paper';layout.appendChild(holder);
-        var status=document.createElement('div');status.className='attention-status';status.setAttribute('role','status');status.textContent='Loading marked paper...';holder.appendChild(status);
+        var status=document.createElement('div');status.className='attention-status';status.setAttribute('role','status');window._dvShowPreviewLoading(status,'Loading marked paper...');holder.appendChild(status);
         var paper=document.createElement('div');holder.appendChild(paper);
         try {
             await window._dvLoadPreviewLib();

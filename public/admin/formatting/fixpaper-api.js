@@ -1,5 +1,7 @@
 /* The selected server template is authoritative for both preview and download. */
 (function () {
+    if(window._dvTemplateApiInstalled)return;
+    window._dvTemplateApiInstalled=true;
     var endpoint = 'https://aidea-nc.wasmer.app/api/papers/fix';
     async function cleanFixedPaper(blob) {
         await new Promise(function (resolve) { _validatorDeps.ensureJSZip(resolve); });

@@ -56,6 +56,7 @@ class PaperAttentionMarker
                 $target = $abstract && !$isHeading ? ($settings['abstract'] ?? $settings['spacing']) : $settings['spacing'];
                 if ($cv) $target = $settings['cv']['spacing'] ?? $target;
                 $headingKey = mb_strtolower(preg_replace('/\s+/u', ' ', $text));
+                if (array_key_exists('paragraph_spacing', $settings)) $target = $settings['paragraph_spacing'][$headingKey] ?? null;
                 if ($target !== null && !isset($templateHeadingKeys[$headingKey])) {
                     $actual = $this->lineSpacing($p, $xp, $stylesXp);
                     if ($actual !== null && abs($actual - $target) > .02) {
@@ -106,7 +107,7 @@ class PaperAttentionMarker
                     $targetIndex = array_search($separateTitle, $paragraphs, true);
                 }
                 $matches = array_keys(array_filter($settings['appendix_titles'] ?? [], fn ($name) => $name !== null && mb_strtolower(trim($name)) === mb_strtolower(trim($actual))));
-                $expectedLetter = count($matches) === 1 && preg_match('/curriculum\s+vitae/i', $actual) ? $matches[0] : $letter;
+                $expectedLetter = count($matches) === 1 ? $matches[0] : $letter;
                 $expected = $settings['appendix_titles'][$expectedLetter] ?? null;
                 if (!$expected) continue;
                 if ($expectedLetter === $letter && mb_strtolower(trim($actual)) === mb_strtolower(trim($expected))) continue;

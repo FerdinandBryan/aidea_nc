@@ -213,46 +213,26 @@ class PaperFormatterTest extends TestCase
         }
     }
 
-    public function test_missing_template_appendices_get_header_only_pages_in_template_order(): void
+    public function test_missing_template_appendices_are_reported_without_inventing_empty_pages(): void
     {
         $p = static fn ($text) => '<w:p><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
-        $reference = $this->paper($p('APPENDICES').$p('Appendix A').$p('Permission Letter').$p('[Insert letter.]').$p('Appendix B').'<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="360" w:line="240"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial"/><w:b/><w:sz w:val="28"/></w:rPr><w:t>Editing Certificate</w:t></w:r></w:p>'.$p('[Insert signed certificate here.]').$p('Appendix C').$p('Curriculum Vitae'));
-        foreach ([true, false] as $hasAppendices) {
-            $student = $this->paper($p('CHAPTER 1').$p('Original paper content.').($hasAppendices ? $p('APPENDICES').$p('Appendix A').$p('Permission Letter').$p('Original letter content.').'<w:p><w:r><w:drawing/></w:r></w:p>'.$p('Appendix C').$p('Curriculum Vitae').$p('Original vitae content.') : ''));
-            $service = new PaperFormatter;
-            for ($pass = 0; $pass < 2; $pass++) {
-                $report = $service->formatUsingReference($student, $reference); $xp = $this->xml($student);
-                $labels = array_map(fn ($node) => $node->textContent, iterator_to_array($xp->query('//w:p[starts-with(w:r/w:t, "Appendix ")]/w:r/w:t')));
-                $this->assertSame(['Appendix A', 'Appendix B', 'Appendix C'], $labels);
-                $this->assertSame(1, $xp->query('//w:t[.="APPENDICES"]')->length);
-                $this->assertSame(0, $xp->query('//w:t[contains(., "Insert signed certificate") or contains(., "Insert letter")]')->length);
-                $title = '//w:p[w:r/w:t="Editing Certificate"]';
-                $this->assertSame('center', $xp->evaluate('string('.$title.'/w:pPr/w:jc/@w:val)'));
-                $this->assertSame('360', $xp->evaluate('string('.$title.'/w:pPr/w:spacing/@w:before)'));
-                $this->assertSame('Arial', $xp->evaluate('string('.$title.'/w:r/w:rPr/w:rFonts/@w:ascii)'));
-                $this->assertSame('28', $xp->evaluate('string('.$title.'/w:r/w:rPr/w:sz/@w:val)'));
-                $this->assertSame(1, $xp->query('//w:p[w:r/w:t="Appendix B"]//w:br[@w:type="page"]')->length);
-                $this->assertSame(1, $xp->query('//w:p[w:r/w:t="Appendix C"]//w:br[@w:type="page"]')->length);
-                $this->assertSame(1, $xp->query('//w:t[.="Original paper content."]')->length);
-                $this->assertSame($hasAppendices ? 1 : 0, $xp->query('//w:drawing')->length);
-                $this->assertNotEmpty(array_filter($report['manual_review_rules'], fn ($warning) => str_contains($warning, 'No supporting document was supplied.')));
-            }
+        $reference = $this->paper($p('APPENDICES').$p('Appendix A').$p('Letter').$p('Appendix B').$p('Certificate'));
+        $student = $this->paper($p('APPENDICES').$p('Appendix A').$p('Letter').$p('Original letter content.'));
+        for ($pass = 0; $pass < 2; $pass++) {
+            (new PaperFormatter)->formatUsingReference($student, $reference); $xp = $this->xml($student);
+            $this->assertEquals(0, $xp->evaluate('count(//w:t[.="Appendix B" or .="Certificate"])'));
+            $this->assertEquals(1, $xp->evaluate('count(//w:t[.="Original letter content."])'));
         }
     }
 
-    public function test_repeated_optional_template_titles_still_reserve_each_missing_appendix(): void
+    public function test_optional_template_slots_do_not_add_placeholder_content(): void
     {
         $p = static fn ($text) => '<w:p><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
         $reference = $this->paper($p('APPENDICES').$p('Appendix B').$p('[Supporting document]').$p('Appendix D').$p('[Supporting document]'));
         $student = $this->paper($p('APPENDICES'));
-        $service = new PaperFormatter;
-        for ($pass = 0; $pass < 2; $pass++) {
-            $service->formatUsingReference($student, $reference); $xp = $this->xml($student);
-            $this->assertSame(1, $xp->query('//w:t[.="APPENDICES"]')->length);
-            $this->assertSame(1, $xp->query('//w:t[.="Appendix B"]')->length);
-            $this->assertSame(1, $xp->query('//w:t[.="Appendix D"]')->length);
-            $this->assertSame(2, $xp->query('//w:t[.="[Supporting document]"]')->length);
-        }
+        (new PaperFormatter)->formatUsingReference($student, $reference); $xp = $this->xml($student);
+        $this->assertEquals(1, $xp->evaluate('count(//w:t[.="APPENDICES"])'));
+        $this->assertEquals(0, $xp->evaluate('count(//w:t[.="Appendix B" or .="Appendix D" or .="[Supporting document]"])'));
     }
 
     public function test_empty_rules_apply_layout_from_the_admin_reference_docx(): void
@@ -474,24 +454,24 @@ class PaperFormatterTest extends TestCase
             $this->assertEquals(0, $xp->evaluate('count(//w:p[.//w:t="My original title"]/w:r/w:rPr/w:b)'));
             $this->assertSame('CustomBody', $xp->evaluate('string(//w:p[.//w:t="My own paragraph."]/w:pPr/w:pStyle/@w:val)'));
             $this->assertContains('Sample section title', $service->referenceHeadings($reference));
-            $this->assertFalse($report['manual_review_required']);
+            $this->assertStringContainsString('no explicit page geometry', implode(' ', $report['manual_review_rules']));
             $zip = new ZipArchive; $zip->open($student); $styles = $zip->getFromName('word/styles.xml'); $zip->close();
             $this->assertStringContainsString('w:before="'.$gap.'"', $styles);
             $this->assertStringContainsString('w:pageBreakBefore w:val="1"', $styles);
         }
     }
 
-    public function test_reference_mode_preserves_font_and_chapter_breaks_while_isolating_dividers(): void
+    public function test_reference_mode_preserves_the_actual_template_divider_alignment_and_breaks(): void
     {
         $reference = $this->paper('<w:p><w:pPr><w:pageBreakBefore w:val="0"/></w:pPr><w:r><w:rPr><w:b w:val="0"/><w:sz w:val="22"/></w:rPr><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Reference body.</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:sz w:val="26"/><w:b w:val="0"/></w:rPr><w:t>APPENDICES</w:t></w:r></w:p>');
         $student = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:r><w:t>Own body.</w:t></w:r></w:p><w:p><w:r><w:t>APPENDICES</w:t></w:r></w:p>');
         (new PaperFormatter)->formatUsingReference($student, $reference, $this->rules());
         $xp = $this->xml($student);
-        $this->assertEquals(1, $xp->evaluate('count(//w:p[.//w:t="APPENDICES"]//w:br[@w:type="page"])'));
+        $this->assertEquals(0, $xp->evaluate('count(//w:p[.//w:t="APPENDICES"]//w:br[@w:type="page"])'));
         $this->assertSame('0', $xp->evaluate('string(//w:p[.//w:t="CHAPTER 1"]/w:pPr/w:pageBreakBefore/@w:val)'));
         $this->assertSame('26', $xp->evaluate('string(//w:p[.//w:t="APPENDICES"]/w:r/w:rPr/w:sz/@w:val)'));
         $this->assertSame('0', $xp->evaluate('string(//w:p[.//w:t="APPENDICES"]/w:r/w:rPr/w:b/@w:val)'));
-        $this->assertSame('center', $xp->evaluate('string(//w:p[.//w:t="APPENDICES"]/w:pPr/w:jc/@w:val)'));
+        $this->assertSame('left', $xp->evaluate('string(//w:p[.//w:t="APPENDICES"]/w:pPr/w:jc/@w:val)'));
     }
 
     public function test_reference_body_formatting_follows_the_matching_section_and_copies_surrounding_gaps(): void
@@ -1140,22 +1120,18 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('24', $xp->evaluate('string(//w:p[w:r/w:t="Author (2025). Research source."]/w:r/w:rPr/w:sz/@w:val)'));
     }
 
-    public function test_reference_document_dividers_have_separate_centered_pages(): void
+    public function test_different_templates_control_their_own_divider_style_and_page_breaks(): void
     {
-        $body = '<w:p><w:r><w:t>Previous chapter text.</w:t></w:r></w:p>';
-        foreach (['REFERENCES', 'APPENDICES'] as $word) {
-            $body .= '<w:p><w:r><w:rPr><w:b/><w:sz w:val="76"/></w:rPr><w:t>'.$word.'</w:t></w:r></w:p><w:p><w:r><w:t>Content after '.$word.'</w:t></w:r></w:p>';
-        }
-        $reference = $this->paper($body);
-        $student = $this->paper($body);
-        (new PaperFormatter)->formatUsingReference($student, $reference);
-        $xp = $this->xml($student);
-        foreach (['REFERENCES', 'APPENDICES'] as $word) {
-            $p = '//w:p[w:r/w:t="'.$word.'"]';
-            $this->assertSame('center', $xp->evaluate('string('.$p.'/w:pPr/w:jc/@w:val)'));
-            $this->assertEquals(1, $xp->evaluate('count('.$p.'//w:br[@w:type="page"])'));
-            $this->assertEquals(1, $xp->evaluate('count('.$p.'/following-sibling::w:p[1]//w:br[@w:type="page"])'));
-            $this->assertGreaterThan(0, (int) $xp->evaluate('string('.$p.'/w:pPr/w:spacing/@w:before)'));
+        foreach ([['left', 28, false], ['center', 64, true]] as [$align, $size, $break]) {
+            $properties = '<w:pPr><w:jc w:val="'.$align.'"/><w:pageBreakBefore w:val="'.($break ? 1 : 0).'"/><w:spacing w:before="180"/></w:pPr>';
+            $reference = $this->paper('<w:p><w:r><w:t>Body.</w:t></w:r></w:p><w:p>'.$properties.'<w:r><w:rPr><w:sz w:val="'.$size.'"/></w:rPr><w:t>REFERENCES</w:t></w:r></w:p>');
+            $student = $this->paper('<w:p><w:r><w:t>Student body.</w:t></w:r></w:p><w:p><w:r><w:t>REFERENCES</w:t></w:r></w:p>');
+            (new PaperFormatter)->formatUsingReference($student, $reference); $xp = $this->xml($student);
+            $path = '//w:p[w:r/w:t="REFERENCES"]';
+            $this->assertSame($align, $xp->evaluate('string('.$path.'/w:pPr/w:jc/@w:val)'));
+            $this->assertSame((string) $size, $xp->evaluate('string('.$path.'/w:r/w:rPr/w:sz/@w:val)'));
+            $this->assertSame('180', $xp->evaluate('string('.$path.'/w:pPr/w:spacing/@w:before)'));
+            $this->assertEquals($break ? 1 : 0, $xp->evaluate('count('.$path.'//w:br[@w:type="page"])'));
         }
     }
 
@@ -1189,7 +1165,7 @@ class PaperFormatterTest extends TestCase
         $date = '//w:p[.//w:t="November 2025"]';
         $this->assertContains('cover-block', array_column($report['template_mapping'], 'match'));
         $this->assertSame('center', $xp->evaluate('string('.$date.'/w:pPr/w:jc/@w:val)'));
-        $this->assertSame('0', $xp->evaluate('string('.$date.'/w:pPr/w:ind/@w:firstLine)'));
+        $this->assertSame('', $xp->evaluate('string('.$date.'/w:pPr/w:ind/@w:firstLine)'));
         $this->assertEquals($this->xml($reference)->evaluate('count(//w:p[.//w:t="[Month Year]"]/preceding-sibling::w:p)'), $xp->evaluate('count('.$date.'/preceding-sibling::w:p)'));
         $this->assertEquals(1, $xp->evaluate('count(//w:t[.="Researcher One"])'));
     }
@@ -1206,48 +1182,30 @@ class PaperFormatterTest extends TestCase
         $this->assertSame(0, count(array_filter($result['issues'], fn ($issue) => ($issue['issue_kind'] ?? '') === 'missing_section')));
     }
 
-    public function test_cv_photo_uses_template_slot_for_all_caps_and_title_case_headings(): void
+    public function test_ambiguous_photo_layout_is_preserved_for_review_instead_of_forced_into_a_slot(): void
     {
         $p = static fn ($text) => '<w:p><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
-        $slot = '<w:tbl><w:tblPr><w:tblInd w:w="6476" w:type="dxa"/></w:tblPr><w:tr><w:trPr><w:trHeight w:val="2160"/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2160" w:type="dxa"/></w:tcPr>'.$p('[1.5 x 1.5-inch photograph]').'</w:tc></w:tr></w:tbl>';
-        $picture = '<w:p><w:r><w:drawing><wp:anchor xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:positionH/><wp:extent cx="900000" cy="1000000"/><wp:docPr id="1" name="Photo"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rIdPhoto"/></pic:blipFill><pic:spPr><a:xfrm><a:ext cx="900000" cy="1000000"/></a:xfrm></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r></w:p>';
-        foreach (['CURRICULUM VITAE', 'Curriculum Vitae'] as $heading) {
-            $reference = $this->paper($p('APPENDICES').$p('Appendix M').$p('Curriculum Vitae').$slot.$p('PERSONAL INFORMATION').$p('Name: [Name]'));
-            $student = $this->paper($p('APPENDICES').$p('Appendix M').$p($heading).$p('PERSONAL INFORMATION').$p('Name: Original author').$picture);
-            for ($pass = 0; $pass < 2; $pass++) {
-                $report = (new PaperFormatter)->formatUsingReference($student, $reference);
-                $xp = $this->xml($student);
-                $this->assertEquals(1, $xp->evaluate('count(//w:drawing)'));
-                $this->assertEquals(1, $xp->evaluate('count(//w:tbl)'));
-                $this->assertEquals(1, $xp->evaluate('count(//w:tbl//w:drawing/*[local-name()="inline"])'));
-                $this->assertSame('6476', $xp->evaluate('string(//w:tbl/w:tblPr/w:tblInd/@w:w)'));
-                $this->assertSame('1371600', $xp->evaluate('string(//*[local-name()="extent"]/@cx)'));
-                $this->assertSame('rIdPhoto', $xp->evaluate('string(//*[local-name()="blip"]/@*[local-name()="embed"])'));
-                $this->assertEquals(1, $xp->evaluate('count(//w:t[.="Name: Original author"])'));
-                $this->assertEquals(0, $xp->evaluate('count(//w:t[contains(., "photograph")])'));
-                $this->assertContains('cv-photo-slot', array_column($report['template_mapping'], 'match'));
-            }
-        }
+        $reference = $this->paper($p('APPENDICES').$p('Appendix M').$p('Curriculum Vitae').'<w:tbl><w:tr><w:tc>'.$p('[Photograph]').'</w:tc></w:tr></w:tbl>');
+        $student = $this->paper($p('APPENDICES').$p('Appendix M').$p('CURRICULUM VITAE').'<w:p><w:r><w:drawing><wp:anchor xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="900000" cy="1000000"/></wp:anchor></w:drawing></w:r></w:p>'.$p('Original author details.'));
+        $report = (new PaperFormatter)->formatUsingReference($student, $reference); $xp = $this->xml($student);
+        $this->assertEquals(0, $xp->evaluate('count(//w:tbl)'));
+        $this->assertEquals(1, $xp->evaluate('count(//*[local-name()="anchor"])'));
+        $this->assertSame('900000', $xp->evaluate('string(//*[local-name()="extent"]/@cx)'));
+        $this->assertEquals(1, $xp->evaluate('count(//w:t[.="Original author details."])'));
+        $this->assertTrue($report['manual_review_required']);
     }
 
-    public function test_standalone_all_caps_cv_is_used_instead_of_adding_an_empty_appendix(): void
+    public function test_standalone_cv_is_not_given_an_invented_appendix_label(): void
     {
         $p = static fn ($text) => '<w:p><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
-        $reference = $this->paper($p('APPENDICES').$p('Appendix M').$p('Curriculum Vitae').$p('PERSONAL INFORMATION').$p('Name: [Name]'));
-        $student = $this->paper($p('APPENDICES').$p('CURRICULUM VITAE').'<w:p><w:r><w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="5486400" cy="7315200"/></wp:inline></w:drawing></w:r></w:p>'.$p('PERSONAL INFORMATION').$p('Name: Original author'));
-        for ($pass = 0; $pass < 2; $pass++) {
-            $report = (new PaperFormatter)->formatUsingReference($student, $reference);
-            $xp = $this->xml($student);
-            $this->assertEquals(1, $xp->evaluate('count(//w:t[.="Appendix M"])'));
-            $this->assertEquals(1, $xp->evaluate('count(//w:p[w:r/w:t="Appendix M"]/following-sibling::w:p[1][w:r/w:t="Curriculum Vitae" or w:r/w:t="CURRICULUM VITAE"])'));
-            $this->assertEquals(1, $xp->evaluate('count(//w:drawing)'));
-            $this->assertSame('5486400', $xp->evaluate('string(//*[local-name()="extent"]/@cx)'));
-            $this->assertEquals(1, $xp->evaluate('count(//w:t[.="Name: Original author"])'));
-            $this->assertCount(0, array_filter($report['template_mapping'], fn ($entry) => $entry['match'] === 'appendix-empty-page'));
-        }
+        $reference = $this->paper($p('APPENDICES').$p('Appendix M').$p('Curriculum Vitae'));
+        $student = $this->paper($p('CURRICULUM VITAE').$p('Original CV content.'));
+        (new PaperFormatter)->formatUsingReference($student, $reference); $xp = $this->xml($student);
+        $this->assertEquals(0, $xp->evaluate('count(//w:t[.="Appendix M"])'));
+        $this->assertEquals(1, $xp->evaluate('count(//w:t[.="Original CV content."])'));
     }
 
-    public function test_standalone_photos_are_centered_without_moving_template_photo_cells(): void
+    public function test_standalone_photos_keep_alignment_without_an_explicit_template_placement(): void
     {
         $pic = '<w:drawing><wp:anchor xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="1000000" cy="1200000"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"/></a:graphicData></a:graphic></wp:anchor></w:drawing>';
         $photo = '<w:p><w:pPr><w:jc w:val="left"/><w:ind w:left="720" w:firstLine="720"/></w:pPr><w:r>'.$pic.'</w:r></w:p>';
@@ -1255,21 +1213,108 @@ class PaperFormatterTest extends TestCase
         $reference = $this->paper($body); $student = $this->paper($body);
         (new PaperFormatter)->formatUsingReference($student, $reference);
         $xp = $this->xml($student);
-        $this->assertSame('center', $xp->evaluate('string(/w:document/w:body/w:p[w:r/w:drawing]/w:pPr/w:jc/@w:val)'));
-        $this->assertSame('0', $xp->evaluate('string(/w:document/w:body/w:p[w:r/w:drawing]/w:pPr/w:ind/@w:firstLine)'));
-        $this->assertEquals(1, $xp->evaluate('count(/w:document/w:body/w:p/w:r/w:drawing/*[local-name()="inline"])'));
+        $this->assertSame('left', $xp->evaluate('string(/w:document/w:body/w:p[w:r/w:drawing]/w:pPr/w:jc/@w:val)'));
+        $this->assertSame('720', $xp->evaluate('string(/w:document/w:body/w:p[w:r/w:drawing]/w:pPr/w:ind/@w:firstLine)'));
+        $this->assertEquals(1, $xp->evaluate('count(/w:document/w:body/w:p/w:r/w:drawing/*[local-name()="anchor"])'));
         $this->assertSame('left', $xp->evaluate('string(//w:tbl//w:p/w:pPr/w:jc/@w:val)'));
         $this->assertSame('1000000', $xp->evaluate('string(/w:document/w:body/w:p//w:drawing/*/*[local-name()="extent"]/@cx)'));
     }
 
-    public function test_dedicated_image_page_gets_vertical_centering_space(): void
+    public function test_image_pages_do_not_get_unrequested_vertical_centering(): void
     {
         $body = '<w:p><w:r><w:t>Body text.</w:t></w:r></w:p><w:p><w:r><w:br w:type="page"/><w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="4000000" cy="5486400"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"/></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p><w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:bottom="1440"/></w:sectPr>';
         $student = $this->paper($body); $reference = $this->paper($body);
         (new PaperFormatter)->formatUsingReference($student, $reference);
         $xp = $this->xml($student);
-        $this->assertSame('2160', $xp->evaluate('string(//w:p[w:r/w:drawing]/w:pPr/w:spacing/@w:before)'));
-        $this->assertSame('center', $xp->evaluate('string(//w:p[w:r/w:drawing]/w:pPr/w:jc/@w:val)'));
+        $this->assertSame('', $xp->evaluate('string(//w:p[w:r/w:drawing]/w:pPr/w:spacing/@w:before)'));
+        $this->assertSame('', $xp->evaluate('string(//w:p[w:r/w:drawing]/w:pPr/w:jc/@w:val)'));
+    }
+
+    public function test_rules_only_templates_change_only_their_explicit_values(): void
+    {
+        foreach ([['Arial', 10, 1], ['Book Antiqua', 14, 1.5]] as [$font, $size, $line]) {
+            $file = $this->paper('<w:p><w:pPr><w:jc w:val="right"/><w:spacing w:before="360"/></w:pPr><w:r><w:t>Original document content.</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:left="900" w:right="900"/></w:sectPr>');
+            $report = (new PaperFormatter)->formatFromTemplateRules($file, [['type' => 'font', 'value' => $font], ['type' => 'size', 'value' => $size], ['type' => 'spacing', 'value' => $line]]);
+            $xp = $this->xml($file);
+            $this->assertSame($font, $xp->evaluate('string(//w:rPr/w:rFonts/@w:ascii)'));
+            $this->assertSame((string) ($size * 2), $xp->evaluate('string(//w:rPr/w:sz/@w:val)'));
+            $this->assertSame((string) ($line * 240), $xp->evaluate('string(//w:pPr/w:spacing/@w:line)'));
+            $this->assertSame('right', $xp->evaluate('string(//w:pPr/w:jc/@w:val)'));
+            $this->assertSame('360', $xp->evaluate('string(//w:pPr/w:spacing/@w:before)'));
+            $this->assertSame('16838', $xp->evaluate('string(//w:pgSz/@w:w)'));
+            $this->assertSame('landscape', $xp->evaluate('string(//w:pgSz/@w:orient)'));
+            $this->assertEquals(0, $xp->evaluate('count(//w:br[@w:type="page"])'));
+            $this->assertNull($report['settings']['width']);
+        }
+    }
+
+    public function test_empty_rules_only_template_does_not_apply_an_institutional_format(): void
+    {
+        $file = $this->paper('<w:p><w:pPr><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Verdana"/><w:sz w:val="18"/></w:rPr><w:t>REFERENCES</w:t></w:r></w:p><w:p><w:r><w:t>Original content.</w:t></w:r></w:p>');
+        (new PaperFormatter)->formatFromTemplateRules($file, []); $xp = $this->xml($file);
+        $this->assertSame('Verdana', $xp->evaluate('string(//w:rPr/w:rFonts/@w:ascii)'));
+        $this->assertSame('18', $xp->evaluate('string(//w:rPr/w:sz/@w:val)'));
+        $this->assertSame('left', $xp->evaluate('string(//w:pPr/w:jc/@w:val)'));
+        $this->assertEquals(0, $xp->evaluate('count(//w:pgSz | //w:pgMar | //w:br[@w:type="page"])'));
+        $this->assertEquals(1, $xp->evaluate('count(//w:t[.="Original content."])'));
+    }
+
+    public function test_ambiguous_template_section_geometry_is_not_spread_over_the_paper(): void
+    {
+        $p = static fn ($text) => '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
+        $reference = $this->paper($p('Introduction').'<w:p><w:pPr><w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr></w:pPr><w:r><w:t>First example.</w:t></w:r></w:p>'.$p('Methods').'<w:p><w:r><w:t>Second example.</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="16838" w:h="11906"/></w:sectPr>');
+        $student = $this->paper($p('Introduction').'<w:p><w:r><w:t>First original section.</w:t></w:r></w:p>'.$p('Methods').'<w:p><w:r><w:t>Second original section.</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="15840" w:h="12240"/></w:sectPr>');
+        $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+        $this->assertSame('15840', $this->xml($student)->evaluate('string(//w:sectPr/w:pgSz/@w:w)'));
+        $this->assertStringContainsString('does not uniquely match', implode(' ', $report['manual_review_rules']));
+        $this->assertSame([], $report['settings']['margins']);
+    }
+
+    public function test_distinct_unmatched_heading_styles_are_not_assigned_by_paragraph_count(): void
+    {
+        $p = static fn ($text, $size) => '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:rPr><w:sz w:val="'.$size.'"/></w:rPr><w:t>'.$text.'</w:t></w:r></w:p>';
+        $reference = $this->paper($p('Example Alpha', 40).$p('Example Beta', 60));
+        $student = $this->paper($p('Original One', 20).$p('Original Two', 24));
+        $report = (new PaperFormatter)->formatUsingReference($student, $reference); $xp = $this->xml($student);
+        $this->assertSame('20', $xp->evaluate('string(//w:p[w:r/w:t="Original One"]/w:r/w:rPr/w:sz/@w:val)'));
+        $this->assertSame('24', $xp->evaluate('string(//w:p[w:r/w:t="Original Two"]/w:r/w:rPr/w:sz/@w:val)'));
+        $this->assertStringContainsString('No template paragraph matched', implode(' ', $report['manual_review_rules']));
+    }
+
+    public function test_reference_validation_uses_each_matched_paragraph_spacing(): void
+    {
+        $heading = static fn ($text) => '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
+        $reference = $this->paper($heading('Executive Summary').'<w:p><w:pPr><w:spacing w:line="300" w:lineRule="auto"/></w:pPr><w:r><w:t>Example summary text.</w:t></w:r></w:p>'.$heading('Findings').'<w:p><w:pPr><w:spacing w:line="420" w:lineRule="auto"/></w:pPr><w:r><w:t>Example findings text.</w:t></w:r></w:p>');
+        $student = $this->paper($heading('Executive Summary').'<w:p><w:r><w:t>Original summary content.</w:t></w:r></w:p>'.$heading('Findings').'<w:p><w:r><w:t>Original findings content.</w:t></w:r></w:p>');
+        $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+        $this->assertSame(1.25, $report['settings']['paragraph_spacing']['original summary content.']);
+        $this->assertSame(1.75, $report['settings']['paragraph_spacing']['original findings content.']);
+        $verification = (new PaperAttentionMarker)->mark($student, $report['settings'], [], false, ['Executive Summary', 'Findings']);
+        $this->assertCount(0, array_filter($verification['issues'], fn ($issue) => $issue['type'] === 'spacing'));
+    }
+
+    public function test_named_photo_slots_use_the_selected_template_geometry_without_cv_specific_rules(): void
+    {
+        $heading = '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Author Profile</w:t></w:r></w:p>';
+        $picture = '<w:p><w:r><w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="600000" cy="900000"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rIdOriginalPhoto"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>';
+        foreach ([['left', 720, 1440, 1440], ['right', 5000, 2160, 2880]] as [$align, $offset, $width, $height]) {
+            $slot = '<w:tbl><w:tblPr><w:tblInd w:w="'.$offset.'" w:type="dxa"/></w:tblPr><w:tr><w:trPr><w:trHeight w:val="'.$height.'"/></w:trPr><w:tc><w:tcPr><w:tcW w:w="'.$width.'" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:jc w:val="'.$align.'"/></w:pPr><w:r><w:t>[Profile photograph]</w:t></w:r></w:p></w:tc></w:tr></w:tbl>';
+            $reference = $this->paper($heading.$slot);
+            $student = $this->paper(str_replace('Author Profile', 'AUTHOR PROFILE', $heading).$picture);
+            for ($pass = 0; $pass < 2; $pass++) {
+                $report = (new PaperFormatter)->formatUsingReference($student, $reference); $xp = $this->xml($student);
+                $this->assertSame((string) $offset, $xp->evaluate('string(//w:tbl/w:tblPr/w:tblInd/@w:w)'));
+                $this->assertSame($align, $xp->evaluate('string(//w:tbl//w:pPr/w:jc/@w:val)'));
+                $this->assertEquals(1, $xp->evaluate('count(//w:drawing)'));
+                $this->assertEquals(1, $xp->evaluate('count(//w:tbl)'));
+                $this->assertSame('rIdOriginalPhoto', $xp->evaluate('string(//*[local-name()="blip"]/@*[local-name()="embed"])'));
+                $cx = (float) $xp->evaluate('string(//*[local-name()="extent"]/@cx)'); $cy = (float) $xp->evaluate('string(//*[local-name()="extent"]/@cy)');
+                $this->assertEqualsWithDelta(2 / 3, $cx / $cy, .001);
+                $this->assertLessThanOrEqual($width * 635, $cx);
+                $this->assertLessThanOrEqual($height * 635, $cy);
+                $this->assertContains('template-photo-slot', array_column($report['template_mapping'], 'match'));
+            }
+        }
     }
 
     public function test_fixed_paper_removes_old_system_notes_and_verification_adds_no_marks(): void

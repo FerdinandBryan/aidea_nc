@@ -185,8 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
     templates = getTemplates();
     filtered = [...templates];
 
-    // Seed demo templates if empty
-    if (templates.length === 0) seedDemoTemplates();
+    // An empty library stays empty until an admin creates a template.
 
     applyFilter();
     updateStats();
@@ -212,64 +211,6 @@ document.addEventListener('DOMContentLoaded', () => {
 /* ══════════════════════════════════════════════
    SEED DEMO DATA
 ══════════════════════════════════════════════ */
-function seedDemoTemplates() {
-    return; // demo seeding disabled
-    const demos = [
-        {
-            id: 1,
-            name: 'Standard Thesis Format 2025',
-            type: 'Final Defense',
-            description: 'Official Norzagaray College thesis format for final defense submissions.',
-            active: true,
-            rules: [
-                { name: 'Title Page', type: 'Required', detail: 'Must include title, authors, course, year, and adviser.' },
-                { name: 'Abstract', type: 'Required', detail: 'Minimum 150 words. Summarize objectives, methods, results, conclusions.' },
-                { name: 'Table of Contents', type: 'Required', detail: 'Must list all chapters and sections with page numbers.' },
-                { name: 'Font & Spacing', type: 'Style', detail: 'Times New Roman 12pt, double-spaced, 1-inch margins.' },
-                { name: 'Citation Style', type: 'Style', detail: 'APA 7th edition.' },
-                { name: 'Minimum Pages', type: 'Length', detail: 'At least 60 pages excluding appendices.' },
-                { name: 'File Format', type: 'File', detail: 'PDF only for final submission.' },
-            ],
-            file: null,
-            createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
-        },
-        {
-            id: 2,
-            name: 'Proposal Submission Format',
-            type: 'Proposal',
-            description: 'Format requirements for initial thesis proposals.',
-            active: true,
-            rules: [
-                { name: 'Cover Page', type: 'Required', detail: 'Proposed title, proponents, course, academic year.' },
-                { name: 'Background of Study', type: 'Required', detail: 'Minimum 1 page narrative.' },
-                { name: 'Statement of Problem', type: 'Required', detail: 'Numbered list of problems to be addressed.' },
-                { name: 'Objectives', type: 'Required', detail: 'General and specific objectives listed separately.' },
-                { name: 'Scope & Delimitation', type: 'Required', detail: 'Define boundaries of the study.' },
-                { name: 'Font & Spacing', type: 'Style', detail: 'Times New Roman 12pt, double-spaced.' },
-            ],
-            file: null,
-            createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
-        },
-        {
-            id: 3,
-            name: 'Revised Final Format',
-            type: 'Revised Final',
-            description: 'For thesis revised after panel defense. Includes panel comments section.',
-            active: false,
-            rules: [
-                { name: 'Panel Revision Sheet', type: 'Required', detail: 'Must attach signed panel revision checklist.' },
-                { name: 'Abstract', type: 'Required', detail: 'Updated to reflect revisions.' },
-                { name: 'Signature Page', type: 'Required', detail: 'Signed by adviser and dean.' },
-                { name: 'File Format', type: 'File', detail: 'PDF with bookmarks.' },
-            ],
-            file: null,
-            createdAt: new Date(Date.now() - 86400000 * 1).toISOString(),
-        },
-    ];
-    saveTemplates(demos);
-    templates = demos;
-    filtered = [...templates];
-}
 
 /* ══════════════════════════════════════════════
    STATS
