@@ -381,6 +381,15 @@ class PaperFormatter
                     // Citation emphasis identifies titles within an entry, not the whole entry.
                     $entryRunProperties = $role === 'references:entry' ? array_values(array_diff($runProperties, ['b', 'bCs', 'i', 'iCs', 'u'])) : $runProperties;
                     $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $entryRunProperties);
+                    // Column labels can use a sequence of default tabs rather than
+                    // explicit tab stops. Copy that sequence only for identical,
+                    // plain-text labels; never replace entry titles or page values.
+                    if (str_starts_with($role, 'index:') && str_ends_with($role, ':columns') && $this->text($source) === $this->text($target)
+                        && !$referenceXp->query('./*[not(self::w:pPr or self::w:r)] | ./w:r/*[not(self::w:rPr or self::w:t or self::w:tab)]', $source)->length
+                        && !$studentXp->query('./*[not(self::w:pPr or self::w:r)] | ./w:r/*[not(self::w:rPr or self::w:t or self::w:tab)]', $target)->length) {
+                        foreach (iterator_to_array($studentXp->query('./w:r', $target)) as $run) $target->removeChild($run);
+                        foreach ($referenceXp->query('./w:r', $source) as $run) $target->appendChild($studentDoc->importNode($run, true));
+                    }
                     foreach (['keepNext', 'keepLines', 'pageBreakBefore', 'outlineLvl'] as $propertyName) {
                         if ($referenceXp->query('./w:pPr/w:'.$propertyName, $source)->length) continue;
                         $inherited = $this->inheritedParagraphProperty($source, $referenceXp, $referenceStylesXp, $propertyName);

@@ -50,6 +50,18 @@ class PaperFormatterTest extends TestCase
         $xp = new DOMXPath($doc); $xp->registerNamespace('w', self::W); return $xp;
     }
 
+    public function test_index_column_header_copies_template_default_tab_sequence(): void
+    {
+        $heading = '<w:p><w:r><w:t>LIST OF FIGURES</w:t></w:r></w:p>';
+        $header = fn ($tabs) => '<w:p><w:r><w:t>Figure</w:t>'.str_repeat('<w:tab/>', $tabs).'<w:t>Page</w:t></w:r></w:p>';
+        $reference = $this->paper($heading.$header(10));
+        $student = $this->paper($heading.$header(3));
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        $this->assertSame(10, $xp->query('//w:p[w:r/w:t="Figure"]/w:r/w:tab')->length);
+        $this->assertSame('FigurePage', $xp->evaluate('string(//w:p[w:r/w:t="Figure"])'));
+    }
+
     public function test_index_columns_use_the_selected_template_tabs(): void
     {
         $paragraph = fn ($text, $pos) => '<w:p><w:pPr><w:tabs><w:tab w:val="right" w:pos="'.$pos.'" w:leader="dot"/></w:tabs></w:pPr><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
