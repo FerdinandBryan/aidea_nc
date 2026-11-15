@@ -191,6 +191,35 @@ class PaperFormatterTest extends TestCase
         }
     }
 
+    public function test_toc_entries_match_template_entries_without_body_heading_gaps_or_page_number_changes(): void
+    {
+        $heading = '<w:p><w:r><w:t>TABLE OF CONTENTS</w:t></w:r></w:p>';
+        $entry = fn ($title, $page, $before, $style) => '<w:p><w:pPr><w:pStyle w:val="'.$style.'"/><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="8000"/></w:tabs><w:spacing w:before="'.$before.'" w:line="240"/><w:jc w:val="left"/></w:pPr><w:r><w:t>'.$title.' .......... '.$page.'</w:t></w:r></w:p>';
+        $reference = $this->paper($heading.$entry('Emotional Engagement', '00', 0, 'TOC2').$entry('Synthesis', '00', 120, 'TOC3').'<w:p><w:r><w:t>CHAPTER 2</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:before="1000"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Emotional Engagement</w:t></w:r></w:p>');
+        $student = $this->paper($heading.$entry('Emotional Engagement', '10', 900, 'TOC2').$entry('Synthesis', '14', 900, 'TOC3'));
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        $this->assertSame('0', $xp->evaluate('string(//w:p[w:pPr/w:pStyle/@w:val="TOC2"]/w:pPr/w:spacing/@w:before)'));
+        $this->assertSame('120', $xp->evaluate('string(//w:p[w:pPr/w:pStyle/@w:val="TOC3"]/w:pPr/w:spacing/@w:before)'));
+        $this->assertSame('10', $xp->evaluate('string(//w:p[w:pPr/w:pStyle/@w:val="TOC2"]/w:r/w:t[2])'));
+        $this->assertSame('14', $xp->evaluate('string(//w:p[w:pPr/w:pStyle/@w:val="TOC3"]/w:r/w:t[2])'));
+        $this->assertSame(2, $xp->query('//w:r/w:tab')->length);
+    }
+
+    public function test_chapter_titles_inside_toc_are_not_split_or_matched_to_body_chapter_titles(): void
+    {
+        $toc = '<w:p><w:r><w:t>TABLE OF CONTENTS</w:t></w:r></w:p>';
+        $chapterEntry = '<w:p><w:pPr><w:spacing w:before="0"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Chapter 3: Methodology</w:t></w:r></w:p>';
+        $realChapter = '<w:p><w:pPr><w:pageBreakBefore/><w:jc w:val="center"/></w:pPr><w:r><w:t>CHAPTER 3</w:t><w:br/><w:t>METHODOLOGY</w:t></w:r></w:p>';
+        $reference = $this->paper($toc.$chapterEntry.$realChapter);
+        $student = $this->paper($toc.$chapterEntry);
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        $this->assertSame('left', $xp->evaluate('string(/w:document/w:body/w:p[2]/w:pPr/w:jc/@w:val)'));
+        $this->assertSame(0, $xp->query('//w:r/w:br')->length);
+        $this->assertSame('Chapter 3: Methodology', $xp->evaluate('string(/w:document/w:body/w:p[2])'));
+    }
+
     public function test_checklist_and_explicit_template_values_are_parsed(): void
     {
         $service = new PaperFormatter; $cfg = $service->settings($this->rules());
