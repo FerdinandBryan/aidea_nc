@@ -386,6 +386,59 @@ class PaperFormatterTest extends TestCase
         $this->assertNotContains('[Leave one (1) blank line before the next section heading.]', $service->referenceHeadings($reference));
     }
 
+    public function test_chapter_number_variants_follow_each_admin_template_without_cross_chapter_styles(): void
+    {
+        $labels = [['1','2','3','4','5'], ['I','II','III','IV','V'], ['ONE','TWO','THREE','FOUR','FIVE']];
+        $chapter = fn ($number) => '<w:p><w:r><w:t>CHAPTER '.$number.'</w:t></w:r></w:p>';
+        $heading = fn ($gap, $font) => '<w:p><w:pPr><w:spacing w:before="'.$gap.'"/></w:pPr><w:r><w:rPr><w:b/><w:rFonts w:ascii="'.$font.'"/></w:rPr><w:t>Shared heading</w:t></w:r></w:p>';
+        foreach (['Arial' => 200, 'Verdana' => 350] as $font => $base) foreach ($labels as $referenceLabels) foreach ($labels as $studentLabels) {
+            $referenceBody = ''; $studentBody = '';
+            for ($i = 0; $i < 5; $i++) {
+                $referenceBody .= $chapter($referenceLabels[$i]).$heading($base * ($i + 1), $font);
+                $studentBody .= $chapter($studentLabels[$i]).$heading(50, 'Old font');
+            }
+            $reference = $this->paper($referenceBody); $student = $this->paper($studentBody);
+            (new PaperFormatter)->formatUsingReference($student, $reference);
+            $xp = $this->xml($student);
+            foreach ($xp->query('//w:p[w:r/w:t="Shared heading"]') as $i => $node) {
+                $this->assertSame((string) ($base * ($i + 1)), $xp->evaluate('string(./w:pPr/w:spacing/@w:before)', $node));
+                $this->assertSame($font, $xp->evaluate('string(./w:r/w:rPr/w:rFonts/@w:ascii)', $node));
+            }
+            foreach ($studentLabels as $number) $this->assertSame(1, $xp->query('//w:p[w:r/w:t="CHAPTER '.$number.'"]')->length);
+        }
+    }
+
+    public function test_body_paragraphs_and_chapter_titles_use_their_local_template_examples(): void
+    {
+        $chapter = fn ($number, $size) => '<w:p><w:pPr><w:spacing w:before="'.$size.'"/></w:pPr><w:r><w:rPr><w:sz w:val="'.$size.'"/></w:rPr><w:t>CHAPTER '.$number.'</w:t></w:r></w:p>';
+        $heading = '<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Shared heading</w:t></w:r></w:p>';
+        $body = fn ($size) => '<w:p><w:pPr><w:spacing w:line="'.$size.'" w:lineRule="auto"/></w:pPr><w:r><w:rPr><w:sz w:val="'.$size.'"/></w:rPr><w:t>'.str_repeat('This is ordinary example body content for a paragraph. ', 4).'</w:t></w:r></w:p>';
+        $referenceBody = ''; $studentBody = '';
+        foreach (['I','II','III','IV','V'] as $i => $roman) {
+            $referenceBody .= $chapter($i + 1, 24 + $i).$heading.$body(30 + $i);
+            $studentBody .= $chapter($roman, 10).$heading.$body(10);
+        }
+        $reference = $this->paper($referenceBody); $student = $this->paper($studentBody);
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        foreach (['I','II','III','IV','V'] as $i => $roman) {
+            $this->assertSame((string) (24 + $i), $xp->evaluate('string(//w:p[w:r/w:t="CHAPTER '.$roman.'"]/w:r/w:rPr/w:sz/@w:val)'));
+        }
+        foreach ($xp->query('//w:p[starts-with(w:r/w:t,"This is ordinary")]') as $i => $paragraph) {
+            $this->assertSame((string) (30 + $i), $xp->evaluate('string(./w:r/w:rPr/w:sz/@w:val)', $paragraph));
+            $this->assertSame((string) (30 + $i), $xp->evaluate('string(./w:pPr/w:spacing/@w:line)', $paragraph));
+        }
+    }
+
+    public function test_missing_template_chapter_does_not_borrow_another_chapters_heading(): void
+    {
+        $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:before="800"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Shared heading</w:t></w:r></w:p>');
+        $student = $this->paper('<w:p><w:r><w:t>CHAPTER II</w:t></w:r></w:p><w:p><w:pPr><w:spacing w:before="50"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Shared heading</w:t></w:r></w:p>');
+        $report = (new PaperFormatter)->formatUsingReference($student, $reference);
+        $this->assertSame('50', $this->xml($student)->evaluate('string(//w:p[w:r/w:t="Shared heading"]/w:pPr/w:spacing/@w:before)'));
+        $this->assertContains('No template paragraph matched: Shared heading', $report['manual_review_rules']);
+    }
+
     public function test_same_heading_in_different_chapters_uses_its_local_template_style(): void
     {
         $heading = static fn ($gap) => '<w:p><w:pPr><w:spacing w:before="'.$gap.'"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Shared heading</w:t></w:r></w:p>';
