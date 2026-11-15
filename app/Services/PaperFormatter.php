@@ -401,7 +401,18 @@ class PaperFormatter
                     // Citation emphasis identifies titles within an entry, not the whole entry.
                     $entryRunProperties = $role === 'references:entry' ? array_values(array_diff($runProperties, ['b', 'bCs', 'i', 'iCs', 'u'])) : $runProperties;
                     $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $entryRunProperties, $referenceStylesXp);
-                    if ($indexEntry) $this->normalizeIndexLeader($source, $target, $referenceXp, $studentXp);
+                    if ($indexEntry) {
+                        // TOC properties often live in TOC1/TOC2 styles, not document.xml.
+                        foreach (['tabs', 'spacing', 'ind', 'jc'] as $name) {
+                            if ($referenceXp->query('./w:pPr/w:'.$name, $source)->length) continue;
+                            $inherited = $this->inheritedParagraphProperty($source, $referenceXp, $referenceStylesXp, $name);
+                            if ($inherited) {
+                                $pr = $this->ensure($target, 'pPr', true);
+                                $pr->replaceChild($studentDoc->importNode($inherited, true), $this->ensure($pr, $name));
+                            }
+                        }
+                        $this->normalizeIndexLeader($source, $target, $referenceXp, $studentXp, $referenceStylesXp);
+                    }
                     // Column labels can use a sequence of default tabs rather than
                     // explicit tab stops. Copy that sequence only for identical,
                     // plain-text labels; never replace entry titles or page values.
@@ -444,7 +455,7 @@ class PaperFormatter
                     }
                     $before = $studentXp->query('./w:pPr/w:pageBreakBefore', $target)->item(0);
                     if ($before && !in_array(strtolower($before->getAttributeNS(self::W, 'val')), ['0', 'false', 'off'], true)) $this->materializePageStart($target, $studentXp);
-                    if (!($footer['continuation'] ?? false)) $this->copyReferenceHeadingGap($source, $target, $referenceXp, $studentXp, $referenceStylesXp);
+                    if (!$indexEntry && !($footer['continuation'] ?? false)) $this->copyReferenceHeadingGap($source, $target, $referenceXp, $studentXp, $referenceStylesXp);
                     $mapping[] = ['paragraph' => $this->text($target), 'template_paragraph' => $this->text($source), 'match' => $matchedText ? 'heading-text' : ($matchedWords ? 'heading-words' : ($matchedExample ? 'chapter-heading-example' : 'structure'))];
                     $sourceSpacing = $referenceXp->query('./w:pPr/w:spacing', $source)->item(0) ?? $this->inheritedParagraphProperty($source, $referenceXp, $referenceStylesXp, 'spacing');
                     if ($sourceSpacing && in_array($sourceSpacing->getAttributeNS(self::W, 'lineRule'), ['', 'auto'], true) && is_numeric($sourceSpacing->getAttributeNS(self::W, 'line'))) $mapping[count($mapping) - 1]['expected_spacing'] = (float) $sourceSpacing->getAttributeNS(self::W, 'line') / 240;
@@ -602,7 +613,7 @@ class PaperFormatter
                 $role = 'section:'.$upper;
                 $zone = match ($upper) { 'ABSTRACT' => 'abstract', 'REFERENCES' => 'references', 'APPENDICES' => 'appendices', 'TABLE OF CONTENTS', 'LIST OF TABLES', 'LIST OF FIGURES', 'LIST OF APPENDICES' => 'index:'.$upper, default => 'body' };
                 $appendixTitlePending = false;
-            } elseif (str_starts_with($zone, 'index:') && (preg_match('/^(?:(?:Table|Figure|Appendix)\s*)?Page$/iu', preg_replace('/\s+/u', ' ', $text)) || preg_match('/^(?:\d+|[A-Z])(?:[\s.]|$)|\.{3,}/u', $text) || !$this->isReferenceTopicHeading($paragraph, $xp))) {
+            } elseif (str_starts_with($zone, 'index:') && ($xp->query('.//w:tab', $paragraph)->length || preg_match('/^TOC[ _-]?\d*$/i', $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph)) || preg_match('/^(?:(?:Table|Figure|Appendix)\s*)?Page$/iu', preg_replace('/\s+/u', ' ', $text)) || preg_match('/^(?:\d+|[A-Z])(?:[\s.]|$)|\.{3,}/u', $text) || !$this->isReferenceTopicHeading($paragraph, $xp))) {
                 // Each index has its own template column headings and entry layout.
                 $isColumnHeader = (bool) preg_match('/^(?:(?:Table|Figure|Appendix)\s*)?Page$/iu', preg_replace('/\s+/u', ' ', $text));
                 $role = $zone.($isColumnHeader ? ':columns' : ':entry');
@@ -1126,16 +1137,19 @@ class PaperFormatter
         return mb_strtolower(trim(preg_replace('/[\s.]+/u', ' ', $text)));
     }
 
-    private function normalizeIndexLeader(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp): void
+    private function normalizeIndexLeader(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp, ?DOMXPath $referenceStyles = null): void
     {
         // Replace typed dots only where the selected template supplies a real
         // right-aligned dotted tab. Field-based indexes remain untouched.
-        if (!$referenceXp->query('./w:pPr/w:tabs/w:tab[@w:val="right" and @w:leader="dot"]', $source)->length
+        $tabs = $referenceXp->query('./w:pPr/w:tabs', $source)->item(0) ?? $this->inheritedParagraphProperty($source, $referenceXp, $referenceStyles, 'tabs');
+        $dottedRight = false;
+        if ($tabs) foreach ($tabs->childNodes as $tab) if ($tab instanceof DOMElement && $tab->localName === 'tab' && $tab->getAttributeNS(self::W, 'val') === 'right' && $tab->getAttributeNS(self::W, 'leader') === 'dot') $dottedRight = true;
+        if (!$dottedRight
             || $studentXp->query('./*[not(self::w:pPr or self::w:r)] | ./w:r/*[not(self::w:rPr or self::w:t or self::w:tab or self::w:br)]', $target)->length
             || $studentXp->query('.//w:br[@w:type="page" or @w:type="column"]', $target)->length) return;
         $text = '';
-        foreach ($studentXp->query('./w:r/w:t | ./w:r/w:tab | ./w:r/w:br', $target) as $node) $text .= $node->localName === 't' ? $node->textContent : ' ';
-        if (!preg_match('/^(.+?)\s*\.{3,}\s*(\d+|[ivxlcdm]+)\s*$/iu', $text, $parts)) return;
+        foreach ($studentXp->query('./w:r/w:t | ./w:r/w:tab | ./w:r/w:br', $target) as $node) $text .= $node->localName === 't' ? $node->textContent : ($node->localName === 'tab' ? "\t" : "\n");
+        if (!preg_match('/^(.+?)(?:\.{3,}|[\t\n])\s*(\d+|[ivxlcdm]+)\s*$/isu', $text, $parts)) return;
         $title = trim(preg_replace('/\s+/u', ' ', $parts[1]));
         $style = $studentXp->query('./w:r[w:t][1]/w:rPr', $target)->item(0);
         $run = $target->ownerDocument->createElementNS(self::W, 'w:r');
@@ -1167,9 +1181,9 @@ class PaperFormatter
                 }
             }
         }
-        $sourceRun = $referenceXp->query('./w:r[.//w:t][1]', $source)->item(0);
+        $sourceRun = $referenceXp->query('(./w:r[.//w:t] | ./w:hyperlink/w:r[w:t])[1]', $source)->item(0);
         $sourceRunPr = $sourceRun instanceof DOMElement ? $referenceXp->query('./w:rPr', $sourceRun)->item(0) : null;
-        foreach ($studentXp->query('./w:r[.//w:t]', $target) as $run) {
+        foreach ($studentXp->query('./w:r[.//w:t] | ./w:hyperlink/w:r[w:t]', $target) as $run) {
             if (!$run instanceof DOMElement) continue;
             $targetRunPr = $studentXp->query('./w:rPr', $run)->item(0);
             if (!$sourceRunPr && !$targetRunPr && !in_array('i', $runProperties, true)) continue;

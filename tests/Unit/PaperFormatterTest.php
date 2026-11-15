@@ -220,6 +220,38 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('Chapter 3: Methodology', $xp->evaluate('string(/w:document/w:body/w:p[2])'));
     }
 
+    public function test_toc_uses_inherited_template_tabs_and_removes_manual_entry_breaks(): void
+    {
+        foreach ([7000, 8200] as $position) {
+            $heading = '<w:p><w:r><w:t>TABLE OF CONTENTS</w:t></w:r></w:p>';
+            $reference = $this->paper($heading.'<w:p><w:pPr><w:pStyle w:val="TOC2"/></w:pPr><w:r><w:t>Numeracy Skills in Division</w:t><w:tab/><w:t>00</w:t></w:r></w:p>');
+            $zip = new ZipArchive; $zip->open($reference);
+            $zip->addFromString('word/styles.xml', '<w:styles xmlns:w="'.self::W.'"><w:style w:type="paragraph" w:styleId="TOC2"><w:pPr><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="'.$position.'"/></w:tabs><w:spacing w:before="0" w:after="0" w:line="240"/><w:ind w:left="360" w:firstLine="0"/><w:jc w:val="left"/></w:pPr></w:style></w:styles>'); $zip->close();
+            $student = $this->paper($heading.'<w:p><w:pPr><w:pStyle w:val="TOC2"/><w:spacing w:before="900"/><w:jc w:val="both"/></w:pPr><w:r><w:t>Numeracy Skills in Division........</w:t><w:br/><w:t>10</w:t></w:r></w:p>');
+            (new PaperFormatter)->formatUsingReference($student, $reference);
+            $xp = $this->xml($student);
+            $this->assertSame((string) $position, $xp->evaluate('string(//w:p[w:pPr/w:pStyle/@w:val="TOC2"]/w:pPr/w:tabs/w:tab/@w:pos)'));
+            $this->assertSame('0', $xp->evaluate('string(//w:p[w:pPr/w:pStyle/@w:val="TOC2"]/w:pPr/w:spacing/@w:before)'));
+            $this->assertSame('left', $xp->evaluate('string(//w:p[w:pPr/w:pStyle/@w:val="TOC2"]/w:pPr/w:jc/@w:val)'));
+            $this->assertSame(0, $xp->query('//w:br')->length);
+            $this->assertSame('10', $xp->evaluate('string(//w:p[w:pPr/w:pStyle/@w:val="TOC2"]/w:r/w:t[2])'));
+        }
+    }
+
+    public function test_toc_hyperlink_runs_receive_template_font_without_losing_the_link(): void
+    {
+        $heading = '<w:p><w:r><w:t>TABLE OF CONTENTS</w:t></w:r></w:p>';
+        $pr = '<w:pPr><w:pStyle w:val="TOC2"/><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="8000"/></w:tabs></w:pPr>';
+        $reference = $this->paper($heading.'<w:p>'.$pr.'<w:r><w:rPr><w:rFonts w:ascii="Arial"/></w:rPr><w:t>Scope</w:t><w:tab/><w:t>00</w:t></w:r></w:p>');
+        $student = $this->paper($heading.'<w:p>'.$pr.'<w:hyperlink w:anchor="chapter_scope"><w:r><w:rPr><w:i/><w:rFonts w:ascii="Old font"/></w:rPr><w:t>Scope</w:t><w:tab/><w:t>8</w:t></w:r></w:hyperlink></w:p>');
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        $this->assertSame('chapter_scope', $xp->evaluate('string(//w:hyperlink/@w:anchor)'));
+        $this->assertSame('Arial', $xp->evaluate('string(//w:hyperlink/w:r/w:rPr/w:rFonts/@w:ascii)'));
+        $this->assertSame('0', $xp->evaluate('string(//w:hyperlink/w:r/w:rPr/w:i/@w:val)'));
+        $this->assertSame('8', $xp->evaluate('string(//w:hyperlink/w:r/w:t[2])'));
+    }
+
     public function test_checklist_and_explicit_template_values_are_parsed(): void
     {
         $service = new PaperFormatter; $cfg = $service->settings($this->rules());
