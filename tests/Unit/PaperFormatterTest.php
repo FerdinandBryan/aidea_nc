@@ -156,6 +156,25 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('Arial', $xp->evaluate('string(./w:r/w:rPr/w:rFonts/@w:ascii)', $node));
     }
 
+    public function test_inline_chapter_title_follows_the_templates_line_structure_and_alignment(): void
+    {
+        foreach (['combined', 'separate', 'inline'] as $layout) {
+            $pr = '<w:pPr><w:jc w:val="center"/><w:ind w:firstLine="0"/></w:pPr>';
+            $referenceBody = $layout === 'combined' ? '<w:p>'.$pr.'<w:r><w:rPr><w:b/></w:rPr><w:t>CHAPTER 3</w:t><w:br/><w:t>METHODOLOGY</w:t></w:r></w:p>' : ($layout === 'inline' ? '<w:p>'.$pr.'<w:r><w:t>CHAPTER 3 METHODOLOGY</w:t></w:r></w:p>' : '<w:p>'.$pr.'<w:r><w:t>CHAPTER 3</w:t></w:r></w:p><w:p>'.$pr.'<w:r><w:t>METHODOLOGY</w:t></w:r></w:p>');
+            $reference = $this->paper($referenceBody);
+            $student = $this->paper('<w:p><w:pPr><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:i/></w:rPr><w:t>CHAPTER III METHODOLOGY</w:t></w:r></w:p>');
+            $formatter = new PaperFormatter; $formatter->formatUsingReference($student, $reference);
+            $xp = $this->xml($student);
+            $this->assertSame('center', $xp->evaluate('string(/w:document/w:body/w:p[1]/w:pPr/w:jc/@w:val)'));
+            $this->assertSame($layout === 'combined' ? 1 : 0, $xp->query('//w:r/w:br[not(@w:type)]')->length);
+            $this->assertSame($layout === 'separate' ? 2 : 1, $xp->query('/w:document/w:body/w:p')->length);
+            $this->assertStringContainsString('METHODOLOGY', $xp->document->textContent);
+            $this->assertStringContainsString('CHAPTER III', $xp->document->textContent);
+            $formatter->formatUsingReference($student, $reference);
+            $this->assertSame($layout === 'separate' ? 2 : 1, $this->xml($student)->query('/w:document/w:body/w:p')->length);
+        }
+    }
+
     public function test_checklist_and_explicit_template_values_are_parsed(): void
     {
         $service = new PaperFormatter; $cfg = $service->settings($this->rules());

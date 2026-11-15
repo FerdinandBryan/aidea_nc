@@ -267,6 +267,7 @@ class PaperFormatter
             $referenceXp = new DOMXPath($referenceDoc); $referenceXp->registerNamespace('w', self::W);
             $referenceStylesXp = $this->packageStyles($referenceZip);
             $referenceRoles = $this->referenceParagraphRoles($referenceXp, $referenceStylesXp);
+            $this->normalizeCombinedChapterTitles($studentXp, $referenceXp, $referenceRoles['chapter'] ?? []);
             $studentRoles = $this->referenceParagraphRoles($studentXp, $this->packageStyles($studentZip));
             // Matching supplies formatting, never missing content or appendix pages.
             $appendixLabels = $this->alignAppendixLabels($referenceRoles, $studentRoles, $referenceXp, $studentXp);
@@ -974,8 +975,55 @@ class PaperFormatter
         return null;
     }
 
+    private function normalizeCombinedChapterTitles(DOMXPath $student, DOMXPath $reference, array $chapters): void
+    {
+        $sources = [];
+        foreach ($chapters as $chapter) $sources[$this->chapterKey($this->paragraphFirstLine($chapter))][] = $chapter;
+        foreach (iterator_to_array($student->query('/w:document/w:body/w:p')) as $target) {
+            $text = $this->text($target);
+            if (!$this->isChapter($text) || $student->query('.//w:tab | .//w:br | .//w:cr | .//w:fldChar | .//w:fldSimple | .//w:drawing | .//w:pict | .//w:hyperlink | .//w:bookmarkStart', $target)->length
+                || !preg_match('/^(CHAPTER\s+(?:[0-9]+|[A-Z]+))\s*[:.\-]?\s+(.+)$/iu', $text, $parts)) continue;
+            $matches = $sources[$this->chapterKey($parts[1])] ?? [];
+            if (count($matches) !== 1) continue;
+            $source = $matches[0];
+            $sourceLine = $this->paragraphFirstLine($source);
+            $broken = $reference->query('.//w:br | .//w:cr', $source)->length && $this->chapterKey($sourceLine) !== '' && $this->text($source) !== $sourceLine;
+            $separate = false;
+            if (!$broken && preg_match('/^CHAPTER\s+(?:[0-9]+|[A-Z]+)\s*[:.\-]?$/i', $sourceLine)) {
+                for ($next = $source->nextSibling; $next; $next = $next->nextSibling) {
+                    if (!$next instanceof DOMElement) continue;
+                    if ($next->localName !== 'p') break;
+                    if ($this->text($next) === '') continue;
+                    $separate = $this->isReferenceTopicHeading($next, $reference) && !$this->isChapterParagraph($next);
+                    break;
+                }
+            }
+            if (!$broken && !$separate) continue;
+            // Only plain chapter-label/title runs are rebuilt. Complex fields stay intact.
+            if ($student->query('./*[not(self::w:pPr or self::w:r)] | ./w:r/*[not(self::w:rPr or self::w:t)]', $target)->length) continue;
+            $runProperties = $student->query('./w:r[w:t][1]/w:rPr', $target)->item(0);
+            $makeRun = function ($value) use ($target, $runProperties) {
+                $run = $target->ownerDocument->createElementNS(self::W, 'w:r');
+                if ($runProperties) $run->appendChild($runProperties->cloneNode(true));
+                $t = $target->ownerDocument->createElementNS(self::W, 'w:t'); $t->appendChild($target->ownerDocument->createTextNode($value)); $run->appendChild($t); return $run;
+            };
+            foreach (iterator_to_array($student->query('./w:r', $target)) as $run) $target->removeChild($run);
+            $target->appendChild($makeRun($parts[1]));
+            if ($separate) {
+                $title = $target->ownerDocument->createElementNS(self::W, 'w:p');
+                $pr = $student->query('./w:pPr', $target)->item(0); if ($pr) $title->appendChild($pr->cloneNode(true));
+                foreach (iterator_to_array($student->query('./w:pPr/w:sectPr', $target)) as $section) $section->parentNode->removeChild($section);
+                $title->appendChild($makeRun($parts[2])); $target->parentNode->insertBefore($title, $target->nextSibling);
+            } else {
+                $run = $target->ownerDocument->createElementNS(self::W, 'w:r'); $run->appendChild($target->ownerDocument->createElementNS(self::W, 'w:br')); $target->appendChild($run); $target->appendChild($makeRun($parts[2]));
+            }
+        }
+    }
+
     private function isChapterParagraph(DOMElement $paragraph): bool
     {
+        if ($paragraph->getElementsByTagNameNS(self::W, 'tab')->length) return false;
+        foreach ($paragraph->getElementsByTagNameNS(self::W, 'pStyle') as $style) if (preg_match('/^TOC/i', $style->getAttributeNS(self::W, 'val'))) return false;
         if ($this->isChapter($this->text($paragraph))) return true;
         return $this->isChapter($this->paragraphFirstLine($paragraph));
     }
@@ -1784,7 +1832,7 @@ class PaperFormatter
 
     private function chapterKey(string $text): string
     {
-        if (!preg_match('/^CHAPTER\s+([0-9]+|[A-Z]+)\s*[:.\-]?$/i', trim($text), $match)) return '';
+        if (mb_strlen($text) > 180 || preg_match('/\.{3,}|[!?;]/u', $text) || !preg_match('/^CHAPTER\s+([0-9]+|[A-Z]+)(?:\s*[:.\-]?\s+[^\r\n]+)?\s*[:.\-]?$/i', trim($text), $match)) return '';
         $value = strtoupper($match[1]);
         $words = ['ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN','ELEVEN','TWELVE','THIRTEEN','FOURTEEN','FIFTEEN','SIXTEEN','SEVENTEEN','EIGHTEEN','NINETEEN','TWENTY'];
         if (ctype_digit($value)) $number = (int) $value;
