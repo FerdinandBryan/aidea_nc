@@ -1740,6 +1740,24 @@ async function _dvGenerateFixedPdf() {
             return n.nodeType === 1 && n.namespaceURI === W && (n.localName === 'p' || n.localName === 'tbl');
         });
 
+        // docx-preview groups same-sized Word sections on one sheet even when
+        // the following section uses Word's default next-page boundary.
+        // Materialize those boundaries only in the preview package.
+        kids.forEach(function (block) {
+            var properties = block.localName === 'p' && kid(block, 'pPr');
+            var ending = properties && kid(properties, 'sectPr');
+            if (!ending) return;
+            var sectionIndex = Array.from(sects).indexOf(ending);
+            var following = sects[sectionIndex + 1];
+            if (!following || ['continuous', 'nextColumn'].includes(wAttr(kid(following, 'type'), 'val'))) return;
+            if (Array.from(block.getElementsByTagNameNS(W, 'br')).some(function (br) { return wAttr(br, 'type') === 'page'; })) return;
+            var run = doc.createElementNS(W, 'w:r');
+            var br = doc.createElementNS(W, 'w:br');
+            br.setAttributeNS(W, 'w:type', 'page');
+            run.appendChild(br); block.appendChild(run);
+            normalizedLineGaps = true;
+        });
+
         /* measure: render without page breaks in a hidden box */
         var tmpBlob = new Blob([await (async function () {
             zip.file('word/document.xml', new XMLSerializer().serializeToString(doc));
