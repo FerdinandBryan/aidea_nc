@@ -50,6 +50,20 @@ class PaperFormatterTest extends TestCase
         $xp = new DOMXPath($doc); $xp->registerNamespace('w', self::W); return $xp;
     }
 
+    public function test_typed_index_dots_use_template_tab_without_changing_title_or_page(): void
+    {
+        $heading = '<w:p><w:r><w:t>LIST OF TABLES</w:t></w:r></w:p>';
+        $reference = $this->paper($heading.'<w:p><w:pPr><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="8000"/></w:tabs></w:pPr><w:r><w:t>1 [Title]</w:t><w:tab/><w:t>00</w:t></w:r></w:p>');
+        $student = $this->paper($heading.'<w:p><w:r><w:t>2 Long title before</w:t><w:br/><w:t>and after the activity ................ 22</w:t></w:r></w:p>');
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        $this->assertSame('2 Long title before and after the activity', $xp->evaluate('string(//w:p[2]/w:r/w:t[1])'));
+        $this->assertSame('22', $xp->evaluate('string(//w:p[2]/w:r/w:t[2])'));
+        $this->assertSame(1, $xp->query('//w:p[2]/w:r/w:tab')->length);
+        $this->assertSame(0, $xp->query('//w:p[2]/w:r/w:br')->length);
+        $this->assertSame('8000', $xp->evaluate('string(//w:p[2]/w:pPr/w:tabs/w:tab/@w:pos)'));
+    }
+
     public function test_index_column_header_copies_template_default_tab_sequence(): void
     {
         $heading = '<w:p><w:r><w:t>LIST OF FIGURES</w:t></w:r></w:p>';

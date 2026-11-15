@@ -381,6 +381,7 @@ class PaperFormatter
                     // Citation emphasis identifies titles within an entry, not the whole entry.
                     $entryRunProperties = $role === 'references:entry' ? array_values(array_diff($runProperties, ['b', 'bCs', 'i', 'iCs', 'u'])) : $runProperties;
                     $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $entryRunProperties);
+                    if (str_starts_with($role, 'index:') && str_ends_with($role, ':entry')) $this->normalizeIndexLeader($source, $target, $referenceXp, $studentXp);
                     // Column labels can use a sequence of default tabs rather than
                     // explicit tab stops. Copy that sequence only for identical,
                     // plain-text labels; never replace entry titles or page values.
@@ -565,7 +566,7 @@ class PaperFormatter
                 $role = 'section:'.$upper;
                 $zone = match ($upper) { 'ABSTRACT' => 'abstract', 'REFERENCES' => 'references', 'APPENDICES' => 'appendices', 'TABLE OF CONTENTS', 'LIST OF TABLES', 'LIST OF FIGURES', 'LIST OF APPENDICES' => 'index:'.$upper, default => 'body' };
                 $appendixTitlePending = false;
-            } elseif (str_starts_with($zone, 'index:') && (preg_match('/^(?:(?:Table|Figure|Appendix)\s*)?Page$/iu', preg_replace('/\s+/u', ' ', $text)) || !$this->isReferenceTopicHeading($paragraph, $xp))) {
+            } elseif (str_starts_with($zone, 'index:') && (preg_match('/^(?:(?:Table|Figure|Appendix)\s*)?Page$/iu', preg_replace('/\s+/u', ' ', $text)) || preg_match('/^(?:\d+|[A-Z])(?:[\s.]|$)|\.{3,}/u', $text) || !$this->isReferenceTopicHeading($paragraph, $xp))) {
                 // Each index has its own template column headings and entry layout.
                 $isColumnHeader = (bool) preg_match('/^(?:(?:Table|Figure|Appendix)\s*)?Page$/iu', preg_replace('/\s+/u', ' ', $text));
                 $role = $zone.($isColumnHeader ? ':columns' : ':entry');
@@ -1026,6 +1027,29 @@ class PaperFormatter
         if (str_starts_with($text, '[')) return false;
         if ($text === '' || mb_strlen($text) > 140 || preg_match('/[.!?;:]$/u', $text) || $xp->query('./w:pPr/w:numPr', $paragraph)->length) return false;
         return (bool) preg_match('/\p{L}/u', $text);
+    }
+
+    private function normalizeIndexLeader(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp): void
+    {
+        // Replace typed dots only where the selected template supplies a real
+        // right-aligned dotted tab. Field-based indexes remain untouched.
+        if (!$referenceXp->query('./w:pPr/w:tabs/w:tab[@w:val="right" and @w:leader="dot"]', $source)->length
+            || $studentXp->query('./*[not(self::w:pPr or self::w:r)] | ./w:r/*[not(self::w:rPr or self::w:t or self::w:tab or self::w:br)]', $target)->length
+            || $studentXp->query('.//w:br[@w:type="page" or @w:type="column"]', $target)->length) return;
+        $text = '';
+        foreach ($studentXp->query('./w:r/w:t | ./w:r/w:tab | ./w:r/w:br', $target) as $node) $text .= $node->localName === 't' ? $node->textContent : ' ';
+        if (!preg_match('/^(.+?)\s*\.{3,}\s*(\d+|[ivxlcdm]+)\s*$/iu', $text, $parts)) return;
+        $title = trim(preg_replace('/\s+/u', ' ', $parts[1]));
+        $style = $studentXp->query('./w:r[w:t][1]/w:rPr', $target)->item(0);
+        $run = $target->ownerDocument->createElementNS(self::W, 'w:r');
+        if ($style) $run->appendChild($style->cloneNode(true));
+        foreach ([$title, null, $parts[2]] as $value) {
+            $node = $target->ownerDocument->createElementNS(self::W, $value === null ? 'w:tab' : 'w:t');
+            if ($value !== null) $node->appendChild($target->ownerDocument->createTextNode($value));
+            $run->appendChild($node);
+        }
+        foreach (iterator_to_array($studentXp->query('./w:r', $target)) as $old) $target->removeChild($old);
+        $target->appendChild($run);
     }
 
     private function copyReferenceParagraph(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp, array $paragraphProperties, array $runProperties): void
