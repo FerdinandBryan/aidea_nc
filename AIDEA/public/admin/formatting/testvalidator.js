@@ -1705,6 +1705,24 @@ async function _dvGenerateFixedPdf() {
         var body = doc.getElementsByTagNameNS(W, 'body')[0];
         if (!body) return blob;
         var normalizedLineGaps = false;
+        // Word content controls and custom XML can wrap whole document sections.
+        // Flatten block wrappers only in the preview copy so measurement and
+        // source blocks agree. Keep their paragraphs, tables and page properties.
+        function unwrapBlocks(parent) {
+            Array.from(parent.children).forEach(function (node) {
+                if (node.namespaceURI !== W || !['sdt', 'customXml'].includes(node.localName)) return;
+                var content = node.localName === 'sdt' ? kid(node, 'sdtContent') : node;
+                if (!content) return;
+                unwrapBlocks(content);
+                Array.from(content.childNodes).forEach(function (child) {
+                    if (child.nodeType === 1 && child.namespaceURI === W && child.localName === 'customXmlPr') return;
+                    parent.insertBefore(child, node);
+                });
+                parent.removeChild(node);
+                normalizedLineGaps = true;
+            });
+        }
+        unwrapBlocks(body);
 
         /* drop Word's old page markers; we compute our own */
         Array.from(doc.getElementsByTagNameNS(W, 'lastRenderedPageBreak')).forEach(function (n) { n.parentNode.removeChild(n); });
