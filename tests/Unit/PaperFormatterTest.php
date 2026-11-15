@@ -252,6 +252,21 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('8', $xp->evaluate('string(//w:hyperlink/w:r/w:t[2])'));
     }
 
+    public function test_reused_toc_example_does_not_start_every_student_entry_on_a_new_page(): void
+    {
+        $heading = '<w:p><w:r><w:t>TABLE OF CONTENTS</w:t></w:r></w:p>';
+        $reference = $this->paper($heading.'<w:p><w:pPr><w:pStyle w:val="TOC2"/><w:pageBreakBefore/><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="8000"/></w:tabs></w:pPr><w:r><w:t>[Example topic]</w:t><w:tab/><w:t>00</w:t></w:r></w:p>');
+        $entries = '';
+        foreach (['First topic','Second topic','Third topic'] as $i => $title) $entries .= '<w:p><w:pPr><w:pStyle w:val="TOC2"/></w:pPr><w:r><w:t>'.$title.' .... '.($i + 5).'</w:t></w:r></w:p>';
+        $student = $this->paper($heading.$entries);
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        $this->assertSame(0, $xp->query('/w:document/w:body/w:p[position()>2]//w:br[@w:type="page"]')->length);
+        $this->assertSame(0, $xp->query('/w:document/w:body/w:p[position()>2]/w:pPr/w:pageBreakBefore[not(@w:val="0")]')->length);
+        $this->assertSame(3, $xp->query('//w:r/w:tab')->length);
+        $this->assertSame(3, $xp->query('//w:p[w:pPr/w:pStyle/@w:val="TOC2"]')->length);
+    }
+
     public function test_checklist_and_explicit_template_values_are_parsed(): void
     {
         $service = new PaperFormatter; $cfg = $service->settings($this->rules());

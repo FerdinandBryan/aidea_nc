@@ -431,7 +431,14 @@ class PaperFormatter
                         }
                     }
                     $reusedFirstEntry = $role === 'references:entry' && $index > 0 && $source === ($sources[0] ?? null) && !$matchedText;
-                    $startsPage = !$reusedFirstEntry && $this->referenceStartsPage($source, $referenceXp);
+                    $reusedIndexExample = $indexEntry && $index > 0 && !$matchedText;
+                    $startsPage = !$reusedFirstEntry && !$reusedIndexExample && $this->referenceStartsPage($source, $referenceXp);
+                    if ($reusedIndexExample) {
+                        // A template's sample entry can begin a TOC page. Reusing
+                        // its appearance must not repeat that boundary for every row.
+                        $this->attr($this->ensure($this->ensure($target, 'pPr', true), 'pageBreakBefore'), 'val', 0);
+                        foreach (iterator_to_array($studentXp->query('.//w:br[@w:type="page"] | .//w:lastRenderedPageBreak', $target)) as $marker) $marker->parentNode->removeChild($marker);
+                    }
                     if ($index > 0 && isset($formStarts[$role]) && count($sources) === 1) $startsPage = true;
                     if ($role === 'references:entry' && $index > 0 && !$startsPage) {
                         // A template's first entry may follow its own divider page.
