@@ -50,6 +50,18 @@ class PaperFormatterTest extends TestCase
         $xp = new DOMXPath($doc); $xp->registerNamespace('w', self::W); return $xp;
     }
 
+    public function test_index_columns_use_the_selected_template_tabs(): void
+    {
+        $paragraph = fn ($text, $pos) => '<w:p><w:pPr><w:tabs><w:tab w:val="right" w:pos="'.$pos.'" w:leader="dot"/></w:tabs></w:pPr><w:r><w:t>'.$text.'</w:t></w:r></w:p>';
+        $heading = '<w:p><w:r><w:t>LIST OF FIGURES</w:t></w:r></w:p>';
+        $reference = $this->paper($heading.$paragraph('Figure Page', 8000).$paragraph('1 [Figure title] 00', 8100));
+        $student = $this->paper($heading.$paragraph('Figure Page', 3000).$paragraph('1 Actual figure 5', 3100));
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        $this->assertSame('8000', $xp->evaluate('string(//w:p[w:r/w:t="Figure Page"]/w:pPr/w:tabs/w:tab/@w:pos)'));
+        $this->assertSame('8100', $xp->evaluate('string(//w:p[w:r/w:t="1 Actual figure 5"]/w:pPr/w:tabs/w:tab/@w:pos)'));
+    }
+
     public function test_checklist_and_explicit_template_values_are_parsed(): void
     {
         $service = new PaperFormatter; $cfg = $service->settings($this->rules());

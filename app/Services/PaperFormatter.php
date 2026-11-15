@@ -554,8 +554,12 @@ class PaperFormatter
             if ($this->isChapterParagraph($paragraph)) { $role = 'chapter'; $zone = 'body'; }
             elseif (in_array($upper, ['ABSTRACT', 'APPROVAL SHEET', 'ACKNOWLEDGEMENT', 'ACKNOWLEDGEMENTS', 'TABLE OF CONTENTS', 'LIST OF TABLES', 'LIST OF FIGURES', 'LIST OF APPENDICES', 'REFERENCES', 'APPENDICES'], true)) {
                 $role = 'section:'.$upper;
-                $zone = match ($upper) { 'ABSTRACT' => 'abstract', 'REFERENCES' => 'references', 'APPENDICES' => 'appendices', default => 'body' };
+                $zone = match ($upper) { 'ABSTRACT' => 'abstract', 'REFERENCES' => 'references', 'APPENDICES' => 'appendices', 'TABLE OF CONTENTS', 'LIST OF TABLES', 'LIST OF FIGURES', 'LIST OF APPENDICES' => 'index:'.$upper, default => 'body' };
                 $appendixTitlePending = false;
+            } elseif (str_starts_with($zone, 'index:') && (preg_match('/^(?:(?:Table|Figure|Appendix)\s*)?Page$/iu', preg_replace('/\s+/u', ' ', $text)) || !$this->isReferenceTopicHeading($paragraph, $xp))) {
+                // Each index has its own template column headings and entry layout.
+                $isColumnHeader = (bool) preg_match('/^(?:(?:Table|Figure|Appendix)\s*)?Page$/iu', preg_replace('/\s+/u', ' ', $text));
+                $role = $zone.($isColumnHeader ? ':columns' : ':entry');
             } elseif ($xp->query('./w:pPr/w:tabs/w:tab[@w:leader="dot"]', $paragraph)->length || preg_match('/^TOC\d*$/i', $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph))) {
                 $role = 'contents:entry';
             } elseif ($this->isAppendixHeader($paragraph, $xp)) {
