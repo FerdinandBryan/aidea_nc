@@ -323,7 +323,7 @@ class PaperFormatter
                 }
                 if (count($examples) >= 2 && count(array_unique(array_map(fn ($example) => $this->referenceFormatSignature($example, $referenceXp), $examples))) === 1) $repeatedHeadings[$chapter] = reset($examples);
             }
-            $paragraphProperties = ['pStyle', 'keepNext', 'keepLines', 'pageBreakBefore', 'widowControl', 'pBdr', 'shd', 'tabs', 'bidi', 'snapToGrid', 'spacing', 'ind', 'contextualSpacing', 'jc', 'textDirection', 'outlineLvl'];
+            $paragraphProperties = ['pStyle', 'keepNext', 'keepLines', 'pageBreakBefore', 'widowControl', 'pBdr', 'shd', 'tabs', 'bidi', 'snapToGrid', 'spacing', 'ind', 'contextualSpacing', 'jc', 'textDirection', 'outlineLvl', 'rPr'];
             $runProperties = ['rStyle', 'rFonts', 'b', 'bCs', 'i', 'iCs', 'caps', 'smallCaps', 'color', 'spacing', 'sz', 'szCs', 'u', 'vertAlign', 'lang'];
             $referenceIndent = $this->settings($referenceRules)['indentation'];
             $processed = $cover['processed']; $warnings = $cover['warnings']; $mapping = $cover['mapping']; $sectionMatches = [];
@@ -366,7 +366,7 @@ class PaperFormatter
                         $source = $this->similarReferenceHeading($targetText, $matchingProfiles);
                         $matchedWords = $source !== null;
                     }
-                    if (!$source && str_starts_with($role, 'topic') && $this->isTopicHeading($target, $studentXp) && isset($repeatedHeadings[$chapter])) {
+                    if (!$source && str_starts_with($role, 'topic') && $this->isReferenceTopicHeading($target, $studentXp) && isset($repeatedHeadings[$chapter])) {
                         $source = $repeatedHeadings[$chapter]; $matchedExample = true;
                     }
                     if (!$source && $role === 'body') $source = $this->sectionBodySource($target, $scopedBodies[$chapter] ?? ($chapter === '' ? $sectionBodies : []), $matchingProfiles);

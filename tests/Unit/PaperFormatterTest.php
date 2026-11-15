@@ -140,6 +140,22 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('2000', $xp->evaluate('string(/w:document/w:body/w:sectPr/w:pgMar/@w:left)'));
     }
 
+    public function test_all_italic_student_paper_uses_template_placeholder_heading_format(): void
+    {
+        $chapter = '<w:p><w:r><w:t>CHAPTER 2</w:t></w:r></w:p>';
+        $example = fn ($title) => '<w:p><w:pPr><w:jc w:val="left"/><w:ind w:firstLine="0"/><w:spacing w:before="240"/></w:pPr><w:r><w:rPr><w:b/><w:rFonts w:ascii="Arial"/></w:rPr><w:t>'.$title.'</w:t></w:r></w:p>';
+        $reference = $this->paper($chapter.$example('[First literature topic]').$example('[Second literature topic]').'<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>Synthesis</w:t></w:r></w:p>');
+        $student = $this->paper($chapter.'<w:p><w:pPr><w:ind w:firstLine="720"/><w:rPr><w:i/><w:iCs/></w:rPr></w:pPr><w:r><w:rPr><w:i/><w:iCs/></w:rPr><w:t>Emotional Engagement</w:t></w:r></w:p>');
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        $node = $xp->query('//w:p[w:r/w:t="Emotional Engagement"]')->item(0);
+        $this->assertSame('left', $xp->evaluate('string(./w:pPr/w:jc/@w:val)', $node));
+        $this->assertSame('0', $xp->evaluate('string(./w:pPr/w:ind/@w:firstLine)', $node));
+        $this->assertSame(1, $xp->query('./w:r/w:rPr/w:b', $node)->length);
+        $this->assertSame(0, $xp->query('./w:pPr/w:rPr/w:i | ./w:r/w:rPr/w:i | ./w:pPr/w:rPr/w:iCs | ./w:r/w:rPr/w:iCs', $node)->length);
+        $this->assertSame('Arial', $xp->evaluate('string(./w:r/w:rPr/w:rFonts/@w:ascii)', $node));
+    }
+
     public function test_checklist_and_explicit_template_values_are_parsed(): void
     {
         $service = new PaperFormatter; $cfg = $service->settings($this->rules());
