@@ -152,7 +152,7 @@ class PaperFormatterTest extends TestCase
         $this->assertSame('left', $xp->evaluate('string(./w:pPr/w:jc/@w:val)', $node));
         $this->assertSame('0', $xp->evaluate('string(./w:pPr/w:ind/@w:firstLine)', $node));
         $this->assertSame(1, $xp->query('./w:r/w:rPr/w:b', $node)->length);
-        $this->assertSame(0, $xp->query('./w:pPr/w:rPr/w:i | ./w:r/w:rPr/w:i | ./w:pPr/w:rPr/w:iCs | ./w:r/w:rPr/w:iCs', $node)->length);
+        $this->assertSame(0, $xp->query('./w:pPr/w:rPr/w:i[not(@w:val="0")] | ./w:r/w:rPr/w:i[not(@w:val="0")] | ./w:pPr/w:rPr/w:iCs[not(@w:val="0")] | ./w:r/w:rPr/w:iCs[not(@w:val="0")]', $node)->length);
         $this->assertSame('Arial', $xp->evaluate('string(./w:r/w:rPr/w:rFonts/@w:ascii)', $node));
     }
 
@@ -172,6 +172,22 @@ class PaperFormatterTest extends TestCase
             $this->assertStringContainsString('CHAPTER III', $xp->document->textContent);
             $formatter->formatUsingReference($student, $reference);
             $this->assertSame($layout === 'separate' ? 2 : 1, $this->xml($student)->query('/w:document/w:body/w:p')->length);
+        }
+    }
+
+    public function test_template_italics_override_retained_student_defaults_and_keep_template_italic_styles(): void
+    {
+        foreach ([false, true] as $italic) {
+            $chapter = '<w:p><w:r><w:t>CHAPTER 3</w:t></w:r></w:p>';
+            $reference = $this->paper($chapter.'<w:p><w:pPr><w:pStyle w:val="TemplateBody"/></w:pPr><w:r><w:t>Example template body paragraph.</w:t></w:r></w:p>');
+            $zip = new ZipArchive; $zip->open($reference);
+            $zip->addFromString('word/styles.xml', '<w:styles xmlns:w="'.self::W.'"><w:style w:type="paragraph" w:styleId="TemplateBody"><w:rPr>'.($italic ? '<w:i/>' : '').'</w:rPr></w:style></w:styles>'); $zip->close();
+            $student = $this->paper($chapter.'<w:p><w:r><w:t>Student opening paragraph stays unchanged.</w:t></w:r></w:p>');
+            $zip->open($student); $zip->addFromString('word/styles.xml', '<w:styles xmlns:w="'.self::W.'"><w:docDefaults><w:rPrDefault><w:rPr><w:i/><w:iCs/></w:rPr></w:rPrDefault></w:docDefaults></w:styles>'); $zip->close();
+            (new PaperFormatter)->formatUsingReference($student, $reference);
+            $xp = $this->xml($student);
+            $this->assertSame($italic ? '1' : '0', $xp->evaluate('string(//w:p[w:r/w:t="Student opening paragraph stays unchanged."]/w:r/w:rPr/w:i/@w:val)'));
+            $this->assertSame('0', $xp->evaluate('string(//w:p[w:r/w:t="CHAPTER 3"]/w:r/w:rPr/w:i/@w:val)'));
         }
     }
 

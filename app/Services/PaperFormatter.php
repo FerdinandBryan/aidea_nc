@@ -387,7 +387,7 @@ class PaperFormatter
                     }
                     // Citation emphasis identifies titles within an entry, not the whole entry.
                     $entryRunProperties = $role === 'references:entry' ? array_values(array_diff($runProperties, ['b', 'bCs', 'i', 'iCs', 'u'])) : $runProperties;
-                    $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $entryRunProperties);
+                    $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $entryRunProperties, $referenceStylesXp);
                     if (str_starts_with($role, 'index:') && str_ends_with($role, ':entry')) $this->normalizeIndexLeader($source, $target, $referenceXp, $studentXp);
                     // Column labels can use a sequence of default tabs rather than
                     // explicit tab stops. Copy that sequence only for identical,
@@ -1120,7 +1120,7 @@ class PaperFormatter
         $target->appendChild($run);
     }
 
-    private function copyReferenceParagraph(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp, array $paragraphProperties, array $runProperties): void
+    private function copyReferenceParagraph(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp, array $paragraphProperties, array $runProperties, ?DOMXPath $referenceStyles = null): void
     {
         $sourcePr = $referenceXp->query('./w:pPr', $source)->item(0);
         $targetPr = $studentXp->query('./w:pPr', $target)->item(0);
@@ -1143,7 +1143,7 @@ class PaperFormatter
         foreach ($studentXp->query('./w:r[.//w:t]', $target) as $run) {
             if (!$run instanceof DOMElement) continue;
             $targetRunPr = $studentXp->query('./w:rPr', $run)->item(0);
-            if (!$sourceRunPr && !$targetRunPr) continue;
+            if (!$sourceRunPr && !$targetRunPr && !in_array('i', $runProperties, true)) continue;
             $targetRunPr ??= $this->ensure($run, 'rPr', true);
             foreach ($runProperties as $name) {
                 foreach (iterator_to_array($studentXp->query('./w:'.$name, $targetRunPr)) as $old) $old->parentNode->removeChild($old);
@@ -1156,7 +1156,44 @@ class PaperFormatter
                     $targetRunPr->removeChild($targetProperty);
                 }
             }
+            // Absence of w:i does not cancel an italic inherited from a retained
+            // student default style. Materialize the template's effective value.
+            foreach (['i', 'iCs'] as $toggle) if (in_array($toggle, $runProperties, true)) {
+                $value = $this->referenceRunToggle($source, $sourceRun instanceof DOMElement ? $sourceRun : null, $referenceXp, $referenceStyles, $toggle);
+                $this->attr($this->ensure($targetRunPr, $toggle), 'val', $value ? 1 : 0);
+            }
         }
+    }
+
+    private function referenceRunToggle(DOMElement $paragraph, ?DOMElement $run, DOMXPath $xp, ?DOMXPath $styles, string $name): bool
+    {
+        $enabled = false;
+        $on = static fn ($node) => !in_array(strtolower($node->getAttributeNS(self::W, 'val')), ['0', 'false', 'off'], true);
+        if ($styles) {
+            $default = $styles->query('/w:styles/w:docDefaults/w:rPrDefault/w:rPr/w:'.$name)->item(0);
+            if ($default) $enabled = $on($default);
+            $paragraphStyle = $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph);
+            if ($paragraphStyle === '') $paragraphStyle = $styles->evaluate('string(/w:styles/w:style[@w:type="paragraph" and (@w:default="1" or @w:default="true")]/@w:styleId)');
+            $runStyle = $run ? $xp->evaluate('string(./w:rPr/w:rStyle/@w:val)', $run) : '';
+            foreach ([$paragraphStyle, $runStyle] as $id) {
+                $chain = []; $seen = [];
+                while ($id !== '' && !isset($seen[$id])) {
+                    $seen[$id] = true; $style = null;
+                    foreach ($styles->query('/w:styles/w:style') as $candidate) if ($candidate->getAttributeNS(self::W, 'styleId') === $id) { $style = $candidate; break; }
+                    if (!$style) break;
+                    $chain[] = $style;
+                    $id = $styles->evaluate('string(./w:basedOn/@w:val)', $style);
+                }
+                // In a style hierarchy italic is a toggle; direct run formatting
+                // below is an absolute on/off value.
+                foreach (array_reverse($chain) as $style) {
+                    $property = $styles->query('./w:rPr/w:'.$name, $style)->item(0);
+                    if ($property && $on($property)) $enabled = !$enabled;
+                }
+            }
+        }
+        $direct = $run ? $xp->query('./w:rPr/w:'.$name, $run)->item(0) : null;
+        return $direct ? $on($direct) : $enabled;
     }
 
     private function referenceRules(string $path): array
