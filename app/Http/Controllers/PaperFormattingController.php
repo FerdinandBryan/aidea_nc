@@ -57,8 +57,6 @@ class PaperFormattingController extends Controller
             $report = $reference
                 ? $formatter->formatUsingReference($path, $reference, $template['effective_rules'])
                 : $formatter->formatFromTemplateRules($path, $template['effective_rules']);
-            $report['page_numbers'] = app(\App\Services\PaperPageNumbers::class)->apply($path);
-            foreach ($report['page_numbers']['warnings'] ?? [] as $warning) $report['manual_review_rules'][] = $warning;
             $report['pagination'] = app(\App\Services\PaperPagination::class)->apply($path);
             foreach ($report['pagination']['warnings'] ?? [] as $warning) $report['manual_review_rules'][] = $warning;
             $original = $marker->mark($request->file('file')->getRealPath(), $report['settings'], [], false);
