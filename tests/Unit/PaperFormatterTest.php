@@ -288,6 +288,77 @@ class PaperFormatterTest extends TestCase
         }
     }
 
+    public function test_unicode_toc_leaders_and_unstyled_custom_topics_follow_template_examples(): void
+    {
+        foreach ([str_repeat("\u{2026}", 5), '.'.str_repeat("\u{2026}", 4).'..', str_repeat("\u{2024}", 6)] as $leader) {
+            $heading = '<w:p><w:r><w:t>TABLE OF CONTENTS</w:t></w:r></w:p>';
+            $pr = '<w:pPr><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="8000"/></w:tabs><w:spacing w:before="0" w:line="240"/><w:jc w:val="left"/></w:pPr>';
+            $reference = $this->paper($heading.'<w:p>'.$pr.'<w:r><w:t>[Topic heading]</w:t><w:tab/><w:t>00</w:t></w:r></w:p>');
+            $student = $this->paper($heading.'<w:p><w:pPr><w:spacing w:before="900"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Numeracy Skills '.$leader.' 10</w:t></w:r></w:p>');
+            (new PaperFormatter)->formatUsingReference($student, $reference);
+            $xp = $this->xml($student);
+            $this->assertSame('left', $xp->evaluate('string(/w:document/w:body/w:p[2]/w:pPr/w:jc/@w:val)'));
+            $this->assertSame('0', $xp->evaluate('string(/w:document/w:body/w:p[2]/w:pPr/w:spacing/@w:before)'));
+            $this->assertSame('Numeracy Skills', $xp->evaluate('string(/w:document/w:body/w:p[2]/w:r/w:t[1])'));
+            $this->assertSame('10', $xp->evaluate('string(/w:document/w:body/w:p[2]/w:r/w:t[2])'));
+            $this->assertSame(1, $xp->query('/w:document/w:body/w:p[2]/w:r/w:tab')->length);
+        }
+    }
+
+    public function test_false_page_break_flags_keep_contents_chapter_titles_inside_the_toc(): void
+    {
+        $heading = '<w:p><w:r><w:t>TABLE OF CONTENTS</w:t></w:r></w:p>';
+        $entry = '<w:p><w:pPr><w:pageBreakBefore w:val="0"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Chapter 3: Methodology</w:t></w:r></w:p>';
+        $real = '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>CHAPTER 3</w:t><w:br/><w:t>METHODOLOGY</w:t></w:r></w:p>';
+        $reference = $this->paper($heading.$entry.$real); $student = $this->paper($heading.$entry);
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        $this->assertSame(0, $xp->query('//w:br')->length);
+        $this->assertSame('left', $xp->evaluate('string(/w:document/w:body/w:p[2]/w:pPr/w:jc/@w:val)'));
+    }
+
+    public function test_split_list_title_and_toc_page_number_are_joined_without_losing_words(): void
+    {
+        $pr = '<w:pPr><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="8000"/></w:tabs></w:pPr>';
+        $toc = '<w:p><w:r><w:t>TABLE OF CONTENTS</w:t></w:r></w:p>';
+        $list = '<w:p><w:r><w:t>LIST OF TABLES</w:t></w:r></w:p>';
+        $reference = $this->paper($toc.'<w:p>'.$pr.'<w:r><w:t>[Topic]</w:t><w:tab/><w:t>00</w:t></w:r></w:p>'.$list.'<w:p>'.$pr.'<w:r><w:t>[Table title]</w:t><w:tab/><w:t>00</w:t></w:r></w:p>');
+        $student = $this->paper($toc.'<w:p><w:r><w:t>Numeracy Skills ........</w:t></w:r></w:p><w:p><w:r><w:t>10</w:t></w:r></w:p>'.$list.'<w:p><w:r><w:t>Level of numeracy before integrating</w:t></w:r></w:p><w:p><w:r><w:t>the learning activity sheet ........ 21</w:t></w:r></w:p>');
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        $this->assertSame(4, $xp->query('/w:document/w:body/w:p')->length);
+        $this->assertSame('Numeracy Skills', $xp->evaluate('string(/w:document/w:body/w:p[2]/w:r/w:t[1])'));
+        $this->assertSame('10', $xp->evaluate('string(/w:document/w:body/w:p[2]/w:r/w:t[2])'));
+        $this->assertSame('Level of numeracy before integrating the learning activity sheet', $xp->evaluate('string(/w:document/w:body/w:p[4]/w:r/w:t[1])'));
+        $this->assertSame('21', $xp->evaluate('string(/w:document/w:body/w:p[4]/w:r/w:t[2])'));
+    }
+
+    public function test_toc_placeholder_profiles_are_scoped_to_their_own_contents_chapter(): void
+    {
+        $heading = '<w:p><w:r><w:t>TABLE OF CONTENTS</w:t></w:r></w:p>';
+        $chapter = fn ($number) => '<w:p><w:pPr><w:pageBreakBefore w:val="0"/></w:pPr><w:r><w:t>Chapter '.$number.': Study heading</w:t></w:r></w:p>';
+        $entry = fn ($text, $indent, $page) => '<w:p><w:pPr><w:ind w:left="'.$indent.'"/><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="8000"/></w:tabs></w:pPr><w:r><w:t>'.$text.'</w:t><w:tab/><w:t>'.$page.'</w:t></w:r></w:p>';
+        $reference = $this->paper($heading.$chapter(2).$entry('[Custom topic]', 700, '00').$chapter(4).$entry('[Custom topic]', 900, '00'));
+        $student = $this->paper($heading.$chapter(2).$entry('My literature topic', 0, '10').$chapter(4).$entry('My results topic', 0, '20'));
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        $this->assertSame('700', $xp->evaluate('string(//w:p[w:r/w:t="My literature topic"]/w:pPr/w:ind/@w:left)'));
+        $this->assertSame('900', $xp->evaluate('string(//w:p[w:r/w:t="My results topic"]/w:pPr/w:ind/@w:left)'));
+        $this->assertSame('10', $xp->evaluate('string(//w:p[w:r/w:t="My literature topic"]/w:r/w:t[2])'));
+        $this->assertSame('20', $xp->evaluate('string(//w:p[w:r/w:t="My results topic"]/w:r/w:t[2])'));
+    }
+
+    public function test_new_toc_topic_uses_uniform_entries_from_the_same_template_chapter(): void
+    {
+        $heading = '<w:p><w:r><w:t>TABLE OF CONTENTS</w:t></w:r></w:p><w:p><w:r><w:t>Chapter 3: Methodology</w:t></w:r></w:p>';
+        $reference = $this->paper($heading.'<w:p><w:pPr><w:ind w:left="720"/><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="8000"/></w:tabs></w:pPr><w:r><w:t>Data Analysis</w:t><w:tab/><w:t>00</w:t></w:r></w:p>');
+        $student = $this->paper($heading.'<w:p><w:r><w:t>Statistical Treatment of Data ........ 18</w:t></w:r></w:p>');
+        (new PaperFormatter)->formatUsingReference($student, $reference);
+        $xp = $this->xml($student);
+        $this->assertSame('720', $xp->evaluate('string(/w:document/w:body/w:p[3]/w:pPr/w:ind/@w:left)'));
+        $this->assertSame('18', $xp->evaluate('string(/w:document/w:body/w:p[3]/w:r/w:t[2])'));
+    }
+
     public function test_checklist_and_explicit_template_values_are_parsed(): void
     {
         $service = new PaperFormatter; $cfg = $service->settings($this->rules());

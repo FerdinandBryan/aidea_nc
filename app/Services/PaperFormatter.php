@@ -12,6 +12,9 @@ use ZipArchive;
 class PaperFormatter
 {
     private const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    private array $referenceToggleCache = [];
+    private array $sectionBodyCache = [];
+    private array $referenceSignatureCache = [];
 
 
     public function missingExtensions(): array
@@ -201,6 +204,9 @@ class PaperFormatter
 
     public function formatUsingReference(string $path, string $referencePath, array $rules = []): array
     {
+        $this->referenceToggleCache = [];
+        $this->sectionBodyCache = [];
+        $this->referenceSignatureCache = [];
         $referenceRules = $this->referenceRules($referencePath);
         // A reference document must not pass through the checklist-only layout,
         // which imposes chapter breaks, cover positioning and appendix typography.
@@ -269,6 +275,7 @@ class PaperFormatter
             $referenceRoles = $this->referenceParagraphRoles($referenceXp, $referenceStylesXp);
             $this->normalizeCombinedChapterTitles($studentXp, $referenceXp, $referenceRoles['chapter'] ?? []);
             $studentRoles = $this->referenceParagraphRoles($studentXp, $this->packageStyles($studentZip));
+            if ($this->joinSplitIndexEntries($studentXp, $studentRoles)) $studentRoles = $this->referenceParagraphRoles($studentXp, $this->packageStyles($studentZip));
             // Matching supplies formatting, never missing content or appendix pages.
             $appendixLabels = $this->alignAppendixLabels($referenceRoles, $studentRoles, $referenceXp, $studentXp);
             $formFooters = $this->appendixFormFooters($referenceRoles, $studentRoles, $referenceXp, $studentXp);
@@ -336,15 +343,21 @@ class PaperFormatter
                     $warnings[] = 'Missing template section: '.substr($role, strlen('section:')).'. Add its content to the paper; formatting does not invent missing sections.';
                 }
             }
+            $roleSourceCache = [];
             foreach ($studentRoles as $role => $paragraphs) {
                 $roleSources = $referenceRoles[$role] ?? [];
                 foreach ($paragraphs as $index => $target) {
                     $chapter = $studentContexts[spl_object_id($target)] ?? '';
                     $matchingHeadings = $scopedHeadings[$chapter] ?? ($chapter === '' ? $referenceHeadings : []);
                     $matchingProfiles = $scopedProfiles[$chapter] ?? ($chapter === '' ? $headingProfiles : []);
-                    $sources = $roleSources;
-                    if ($chapter !== '' && ($role === 'chapter' || $role === 'body' || str_starts_with($role, 'topic'))) $sources = array_values(array_filter($sources, fn ($candidate) => ($referenceContexts[spl_object_id($candidate)] ?? '') === $chapter));
-                    $uniformSources = $sources && count(array_unique(array_map(fn ($candidate) => $this->referenceFormatSignature($candidate, $referenceXp), $sources))) === 1;
+                    $sourceCacheKey = $role.':'.$chapter;
+                    if (!isset($roleSourceCache[$sourceCacheKey])) {
+                        $sources = $roleSources;
+                        if ($chapter !== '' && ($role === 'chapter' || $role === 'body' || str_starts_with($role, 'topic'))) $sources = array_values(array_filter($sources, fn ($candidate) => ($referenceContexts[spl_object_id($candidate)] ?? '') === $chapter));
+                        $uniform = $sources && count(array_unique(array_map(fn ($candidate) => $this->referenceFormatSignature($candidate, $referenceXp), $sources))) === 1;
+                        $roleSourceCache[$sourceCacheKey] = [$sources, $uniform];
+                    }
+                    [$sources, $uniformSources] = $roleSourceCache[$sourceCacheKey];
                     $appendixHeading = $role === 'appendix:title' || str_starts_with($role, 'appendix:heading:');
                     if ($studentXp->query('ancestor::w:tbl', $target)->length) continue; // Table formatting has its own matcher.
                     if ((!$appendixHeading && $studentXp->query('.//w:drawing | .//w:pict | .//w:object', $target)->length)) {
@@ -366,6 +379,23 @@ class PaperFormatter
                                 if ($sameLevel && count(array_unique(array_map(fn ($candidate) => $this->referenceFormatSignature($candidate, $referenceXp), $sameLevel))) === 1) $source = $sameLevel[0];
                             }
                         }
+                        if (!$source) {
+                            $sameWords = array_values(array_filter($sources, fn ($candidate) => $this->headingWords($this->indexEntryKey($candidate)) === $this->headingWords($key)));
+                            if ($sameWords && count(array_unique(array_map(fn ($candidate) => $this->referenceFormatSignature($candidate, $referenceXp), $sameWords))) === 1) $source = $sameWords[0];
+                        }
+                        if (!$source) {
+                            $entryHeadings = [];
+                            foreach ($sources as $candidate) $entryHeadings[$this->indexEntryKey($candidate)] = $candidate;
+                            $source = $this->similarReferenceHeading($key, $this->headingProfiles($entryHeadings));
+                        }
+                        if (!$source) {
+                            $examples = array_values(array_filter($sources, fn ($candidate) => (bool) preg_match('/\[[^\]]+\]/u', $this->indexEntryKey($candidate))));
+                            if ($examples && count(array_unique(array_map(fn ($candidate) => $this->referenceFormatSignature($candidate, $referenceXp), $examples))) === 1) $source = $examples[0];
+                        }
+                        if (!$source && str_contains($role, ':chapter:')) {
+                            $ordinaryEntries = array_values(array_filter($sources, fn ($candidate) => $this->chapterKey($this->indexEntryKey($candidate)) === ''));
+                            if ($ordinaryEntries && count(array_unique(array_map(fn ($candidate) => $this->referenceFormatSignature($candidate, $referenceXp), $ordinaryEntries))) === 1) $source = $ordinaryEntries[0];
+                        }
                     }
                     if (!$source && $role === 'chapter') $source = $matchingHeadings[$chapter] ?? null;
                     if (!$source && !$indexEntry && isset($matchingHeadings[$targetText])) {
@@ -384,7 +414,7 @@ class PaperFormatter
                     if (!$source && str_starts_with($role, 'topic') && $this->isReferenceTopicHeading($target, $studentXp) && isset($repeatedHeadings[$chapter])) {
                         $source = $repeatedHeadings[$chapter]; $matchedExample = true;
                     }
-                    if (!$source && $role === 'body') $source = $this->sectionBodySource($target, $scopedBodies[$chapter] ?? ($chapter === '' ? $sectionBodies : []), $matchingProfiles);
+                    if (!$source && $role === 'body') $source = $this->sectionBodySource($target, $scopedBodies[$chapter] ?? ($chapter === '' ? $sectionBodies : []), $matchingProfiles, $chapter);
                     if (!$source && $sources) {
                         if ($uniformSources) $source = $sources[0];
                     }
@@ -603,7 +633,7 @@ class PaperFormatter
 
     private function referenceParagraphRoles(DOMXPath $xp, ?DOMXPath $stylesXp = null): array
     {
-        $roles = []; $zone = 'cover'; $coverIndex = 0; $appendixTitlePending = false; $appendixSection = '';
+        $roles = []; $zone = 'cover'; $coverIndex = 0; $appendixTitlePending = false; $appendixSection = ''; $tocChapter = '';
         foreach ($xp->query('/w:document/w:body//w:p[not(ancestor::w:txbxContent)]') as $paragraph) {
             if (!$paragraph instanceof DOMElement) continue;
             $text = $this->text($paragraph);
@@ -612,19 +642,19 @@ class PaperFormatter
             $outline = $xp->query('./w:pPr/w:outlineLvl', $paragraph)->item(0) ?? $this->inheritedParagraphProperty($paragraph, $xp, $stylesXp, 'outlineLvl');
             $styleLevel = $outline instanceof DOMElement ? $outline->getAttributeNS(self::W, 'val') : null;
             $tocChapterEntry = $zone === 'index:TABLE OF CONTENTS' && $this->isChapterParagraph($paragraph)
-                && !preg_match('/^CHAPTER\s+(?:[0-9]+|[A-Z]+)\s*[:.\-]?$/i', $text)
-                && !$xp->query('./w:pPr/w:pageBreakBefore | .//w:lastRenderedPageBreak | .//w:br[@w:type="page"]', $paragraph)->length
-                && !$this->referenceStartsPage($paragraph, $xp);
-            if ($tocChapterEntry) $role = $zone.':entry';
+                && !preg_match('/^CHAPTER\s+(?:[0-9]+|[A-Z]+)\s*[:.\-]?$/i', $this->paragraphFirstLine($paragraph))
+                && !preg_match('/^Heading[ _-]?\d+$/i', $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph))
+                && !(is_numeric($styleLevel) && (int) $styleLevel < 9);
+            if ($tocChapterEntry) { $tocChapter = $this->chapterKey($this->paragraphFirstLine($paragraph)); $role = $zone.':'.$tocChapter.':entry'; }
             elseif ($this->isChapterParagraph($paragraph)) { $role = 'chapter'; $zone = 'body'; }
             elseif (in_array($upper, ['ABSTRACT', 'APPROVAL SHEET', 'ACKNOWLEDGEMENT', 'ACKNOWLEDGEMENTS', 'TABLE OF CONTENTS', 'LIST OF TABLES', 'LIST OF FIGURES', 'LIST OF APPENDICES', 'REFERENCES', 'APPENDICES'], true)) {
                 $role = 'section:'.$upper;
                 $zone = match ($upper) { 'ABSTRACT' => 'abstract', 'REFERENCES' => 'references', 'APPENDICES' => 'appendices', 'TABLE OF CONTENTS', 'LIST OF TABLES', 'LIST OF FIGURES', 'LIST OF APPENDICES' => 'index:'.$upper, default => 'body' };
-                $appendixTitlePending = false;
-            } elseif (str_starts_with($zone, 'index:') && ($xp->query('.//w:tab', $paragraph)->length || preg_match('/^TOC[ _-]?\d*$/i', $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph)) || preg_match('/^(?:(?:Table|Figure|Appendix)\s*)?Page$/iu', preg_replace('/\s+/u', ' ', $text)) || preg_match('/^(?:\d+|[A-Z])(?:[\s.]|$)|\.{3,}/u', $text) || !$this->isReferenceTopicHeading($paragraph, $xp))) {
+                $appendixTitlePending = false; $tocChapter = '';
+            } elseif (str_starts_with($zone, 'index:')) {
                 // Each index has its own template column headings and entry layout.
                 $isColumnHeader = (bool) preg_match('/^(?:(?:Table|Figure|Appendix)\s*)?Page$/iu', preg_replace('/\s+/u', ' ', $text));
-                $role = $zone.($isColumnHeader ? ':columns' : ':entry');
+                $role = $zone.($isColumnHeader ? ':columns' : (($zone === 'index:TABLE OF CONTENTS' && $tocChapter !== '') ? ':'.$tocChapter.':entry' : ':entry'));
             } elseif ($xp->query('./w:pPr/w:tabs/w:tab[@w:leader="dot"]', $paragraph)->length || preg_match('/^TOC\d*$/i', $xp->evaluate('string(./w:pPr/w:pStyle/@w:val)', $paragraph))) {
                 $role = 'contents:entry';
             } elseif ($this->isAppendixHeader($paragraph, $xp)) {
@@ -981,9 +1011,11 @@ class PaperFormatter
 
     private function referenceFormatSignature(DOMElement $paragraph, DOMXPath $xp): string
     {
+        $id = spl_object_id($paragraph);
+        if (isset($this->referenceSignatureCache[$id])) return $this->referenceSignatureCache[$id];
         $parts = [];
         foreach ($xp->query('./w:pPr | ./w:r[.//w:t][1]/w:rPr', $paragraph) as $property) $parts[] = $property->C14N();
-        return implode('|', $parts);
+        return $this->referenceSignatureCache[$id] = implode('|', $parts);
     }
 
     private function inheritedParagraphProperty(DOMElement $paragraph, DOMXPath $xp, ?DOMXPath $styles, string $name): ?DOMElement
@@ -1022,20 +1054,23 @@ class PaperFormatter
         return $sources;
     }
 
-    private function sectionBodySource(DOMElement $target, array $sources, array $headingProfiles = []): ?DOMElement
+    private function sectionBodySource(DOMElement $target, array $sources, array $headingProfiles = [], string $context = ''): ?DOMElement
     {
+        $targetId = spl_object_id($target);
         for ($previous = $target->previousSibling; $previous; $previous = $previous->previousSibling) {
             if (!$previous instanceof DOMElement || $previous->localName !== 'p') continue;
+            $previousId = spl_object_id($previous);
+            if (array_key_exists($previousId, $this->sectionBodyCache[$context] ?? [])) return $this->sectionBodyCache[$context][$targetId] = $this->sectionBodyCache[$context][$previousId];
             $key = mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($previous)));
-            foreach ($this->referenceHeadingKeys($this->paragraphFirstLine($previous)) as $headingKey) if (isset($sources[$headingKey])) return $sources[$headingKey];
+            foreach ($this->referenceHeadingKeys($this->paragraphFirstLine($previous)) as $headingKey) if (isset($sources[$headingKey])) return $this->sectionBodyCache[$context][$targetId] = $sources[$headingKey];
             if ($this->isChapterParagraph($previous)) break;
             $heading = $this->similarReferenceHeading($key, $headingProfiles);
             if ($heading) {
                 $sourceKey = mb_strtolower(preg_replace('/\s+/u', ' ', $this->text($heading)));
-                return $sources[$sourceKey] ?? null;
+                return $this->sectionBodyCache[$context][$targetId] = $sources[$sourceKey] ?? null;
             }
         }
-        return null;
+        return $this->sectionBodyCache[$context][$targetId] = null;
     }
 
     private function normalizeCombinedChapterTitles(DOMXPath $student, DOMXPath $reference, array $chapters): void
@@ -1160,13 +1195,41 @@ class PaperFormatter
         return (bool) preg_match('/\p{L}/u', $text);
     }
 
+    private function joinSplitIndexEntries(DOMXPath $xp, array $roles): bool
+    {
+        $changed = false;
+        $leader = '/(?:\.{2,}|[\x{2024}-\x{2026}])/u';
+        foreach ($roles as $role => $paragraphs) {
+            if (!str_starts_with($role, 'index:') || !str_ends_with($role, ':entry')) continue;
+            foreach ($paragraphs as $first) {
+                if (!$first->parentNode || $this->isChapterParagraph($first)) continue;
+                $text = trim($this->text($first));
+                $next = $first->nextSibling;
+                while ($next && !$next instanceof DOMElement) $next = $next->nextSibling;
+                if (!$next instanceof DOMElement || $next->localName !== 'p' || !in_array($next, $paragraphs, true)) continue;
+                $nextText = trim($this->text($next));
+                $pageOnly = preg_match('/^(?:[0-9]+|[ivxlcdm]+)$/iu', $nextText);
+                $splitPage = preg_match($leader, $text) && !preg_match('/(?:[0-9]+|[ivxlcdm]+)$/iu', $text) && $pageOnly;
+                $splitTitle = in_array($role, ['index:LIST OF TABLES:entry', 'index:LIST OF FIGURES:entry'], true) && !preg_match($leader, $text) && preg_match('/^(?:\p{Ll}|[0-9])/u', $nextText) && preg_match($leader, $nextText) && preg_match('/(?:[0-9]+|[ivxlcdm]+)$/iu', $nextText);
+                if (!$splitPage && !$splitTitle) continue;
+                foreach ([$first, $next] as $node) if ($xp->query('./*[not(self::w:pPr or self::w:r)] | ./w:r/*[not(self::w:rPr or self::w:t or self::w:tab or self::w:br)] | ./w:pPr/w:sectPr', $node)->length) continue 2;
+                $space = $first->ownerDocument->createElementNS(self::W, 'w:r');
+                $t = $first->ownerDocument->createElementNS(self::W, 'w:t'); $t->setAttributeNS('http://www.w3.org/XML/1998/namespace', 'xml:space', 'preserve'); $t->appendChild($first->ownerDocument->createTextNode(' ')); $space->appendChild($t); $first->appendChild($space);
+                foreach (iterator_to_array($xp->query('./w:r', $next)) as $run) $first->appendChild($run);
+                $next->parentNode->removeChild($next); $changed = true;
+            }
+        }
+        return $changed;
+    }
+
     private function indexEntryKey(DOMElement $paragraph): string
     {
         $xp = new DOMXPath($paragraph->ownerDocument); $xp->registerNamespace('w', self::W);
         $text = '';
         foreach ($xp->query('.//w:t | .//w:tab | .//w:br', $paragraph) as $node) $text .= $node->localName === 't' ? $node->textContent : ' ';
+        $text = str_replace(["\u{2026}", "\u{2025}", "\u{2024}"], ['...', '..', '.'], $text);
         $text = preg_replace('/(?:\.{2,}|\s)\s*(?:[0-9]+|[ivxlcdm]+)\s*$/iu', '', $text);
-        return mb_strtolower(trim(preg_replace('/[\s.]+/u', ' ', $text)));
+        return mb_strtolower(trim(preg_replace('/[^\p{L}\p{N}\[\]]+/u', ' ', $text)));
     }
 
     private function normalizeIndexLeader(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp, ?DOMXPath $referenceStyles = null): void
@@ -1181,6 +1244,7 @@ class PaperFormatter
             || $studentXp->query('.//w:br[@w:type="page" or @w:type="column"]', $target)->length) return;
         $text = '';
         foreach ($studentXp->query('./w:r/w:t | ./w:r/w:tab | ./w:r/w:br', $target) as $node) $text .= $node->localName === 't' ? $node->textContent : ($node->localName === 'tab' ? "\t" : "\n");
+        $text = str_replace(["\u{2026}", "\u{2025}", "\u{2024}"], ['...', '..', '.'], $text);
         if (!preg_match('/^(.+?)(?:\.{3,}|[\t\n])\s*(\d+|[ivxlcdm]+)\s*$/isu', $text, $parts)) return;
         $title = trim(preg_replace('/\s+/u', ' ', $parts[1]));
         $style = $studentXp->query('./w:r[w:t][1]/w:rPr', $target)->item(0);
@@ -1242,6 +1306,8 @@ class PaperFormatter
 
     private function referenceRunToggle(DOMElement $paragraph, ?DOMElement $run, DOMXPath $xp, ?DOMXPath $styles, string $name): bool
     {
+        $cacheKey = spl_object_id($paragraph).':'.($run ? $run->getNodePath() : '').':'.$name;
+        if (array_key_exists($cacheKey, $this->referenceToggleCache)) return $this->referenceToggleCache[$cacheKey];
         $enabled = false;
         $on = static fn ($node) => !in_array(strtolower($node->getAttributeNS(self::W, 'val')), ['0', 'false', 'off'], true);
         if ($styles) {
@@ -1268,7 +1334,7 @@ class PaperFormatter
             }
         }
         $direct = $run ? $xp->query('./w:rPr/w:'.$name, $run)->item(0) : null;
-        return $direct ? $on($direct) : $enabled;
+        return $this->referenceToggleCache[$cacheKey] = $direct ? $on($direct) : $enabled;
     }
 
     private function referenceRules(string $path): array
@@ -1944,7 +2010,7 @@ class PaperFormatter
 
     private function chapterKey(string $text): string
     {
-        if (mb_strlen($text) > 180 || preg_match('/\.{3,}|[!?;]/u', $text) || !preg_match('/^CHAPTER\s+([0-9]+|[A-Z]+)(?:\s*[:.\-]?\s+[^\r\n]+)?\s*[:.\-]?$/i', trim($text), $match)) return '';
+        if (mb_strlen($text) > 180 || preg_match('/\.{3,}|[\x{2024}-\x{2026}]|[!?;]/u', $text) || !preg_match('/^CHAPTER\s+([0-9]+|[A-Z]+)(?:\s*[:.\-]?\s+[^\r\n]+)?\s*[:.\-]?$/i', trim($text), $match)) return '';
         $value = strtoupper($match[1]);
         $words = ['ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN','ELEVEN','TWELVE','THIRTEEN','FOURTEEN','FIFTEEN','SIXTEEN','SEVENTEEN','EIGHTEEN','NINETEEN','TWENTY'];
         if (ctype_digit($value)) $number = (int) $value;
