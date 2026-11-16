@@ -267,6 +267,27 @@ class PaperFormatterTest extends TestCase
         $this->assertSame(3, $xp->query('//w:p[w:pPr/w:pStyle/@w:val="TOC2"]')->length);
     }
 
+    public function test_damaged_student_styles_do_not_override_template_heading_and_body_roles(): void
+    {
+        $chapter = '<w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p>';
+        $bodyText = str_repeat('This paragraph contains the actual research discussion and should remain ordinary body text. ', 3);
+        foreach (['bold', 'italic', 'wrong-heading-style'] as $damage) foreach (['Arial', 'Verdana'] as $font) {
+            $reference = $this->paper($chapter.'<w:p><w:pPr><w:pStyle w:val="Heading2"/><w:jc w:val="left"/><w:ind w:firstLine="0"/></w:pPr><w:r><w:rPr><w:b/><w:rFonts w:ascii="'.$font.'"/></w:rPr><w:t>Research Design</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val="both"/><w:ind w:firstLine="540"/><w:spacing w:line="360"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="'.$font.'"/></w:rPr><w:t>'.$bodyText.'</w:t></w:r></w:p>');
+            $pr = $damage === 'wrong-heading-style' ? '<w:pPr><w:pStyle w:val="Heading1"/><w:jc w:val="center"/></w:pPr>' : '';
+            $rPr = '<w:rPr>'.($damage === 'italic' ? '<w:i/>' : '<w:b/>').'</w:rPr>';
+            $student = $this->paper($chapter.'<w:p>'.$pr.'<w:r>'.$rPr.'<w:t>Research Design</w:t></w:r></w:p><w:p>'.$pr.'<w:r>'.$rPr.'<w:t>'.$bodyText.'</w:t></w:r></w:p>');
+            (new PaperFormatter)->formatUsingReference($student, $reference);
+            $xp = $this->xml($student);
+            $this->assertSame('Heading2', $xp->evaluate('string(/w:document/w:body/w:p[2]/w:pPr/w:pStyle/@w:val)'));
+            $this->assertSame('both', $xp->evaluate('string(/w:document/w:body/w:p[3]/w:pPr/w:jc/@w:val)'));
+            $this->assertSame('540', $xp->evaluate('string(/w:document/w:body/w:p[3]/w:pPr/w:ind/@w:firstLine)'));
+            $this->assertSame('360', $xp->evaluate('string(/w:document/w:body/w:p[3]/w:pPr/w:spacing/@w:line)'));
+            $this->assertSame($font, $xp->evaluate('string(/w:document/w:body/w:p[3]/w:r/w:rPr/w:rFonts/@w:ascii)'));
+            $this->assertSame($bodyText, $xp->evaluate('string(/w:document/w:body/w:p[3]/w:r/w:t)'));
+            $this->assertSame(0, $xp->query('/w:document/w:body/w:p[3]/w:r/w:rPr/w:b[not(@w:val="0")]')->length);
+        }
+    }
+
     public function test_checklist_and_explicit_template_values_are_parsed(): void
     {
         $service = new PaperFormatter; $cfg = $service->settings($this->rules());

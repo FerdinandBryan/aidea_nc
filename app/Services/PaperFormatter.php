@@ -311,6 +311,7 @@ class PaperFormatter
                     }
                 }
             }
+            $studentRoles = $this->templateDrivenStudentRoles($studentRoles, $referenceRoles, $scopedHeadings, $studentContexts, $referenceContexts);
             $sectionBodies = $this->referenceSectionBodies($referenceXp, $referenceHeadings, $referenceRoles['body'] ?? []);
             $scopedBodies = [];
             foreach ($scopedHeadings as $context => $headings) $scopedBodies[$context] = $this->referenceSectionBodies($referenceXp, $headings, array_values(array_filter($referenceRoles['body'] ?? [], fn ($p) => ($referenceContexts[spl_object_id($p)] ?? '') === $context)));
@@ -870,6 +871,30 @@ class PaperFormatter
             }
         }
         return $matches;
+    }
+
+    /** Student font, bold, italic and Heading styles are not evidence of template roles. */
+    private function templateDrivenStudentRoles(array $studentRoles, array $referenceRoles, array $headings, array $studentContexts, array $referenceContexts): array
+    {
+        $result = []; $referenceRoleByNode = [];
+        foreach ($referenceRoles as $role => $nodes) foreach ($nodes as $node) $referenceRoleByNode[spl_object_id($node)] = $role;
+        foreach ($studentRoles as $role => $nodes) foreach ($nodes as $node) {
+            $chosen = $role;
+            // Cover, indexes, bibliography and appendix form fields have their own
+            // template matchers. Reclassify only chapter prose and topic headings.
+            if ($role === 'body' || str_starts_with($role, 'topic')) {
+                $context = $studentContexts[spl_object_id($node)] ?? '';
+                $text = trim(preg_replace('/\s+/u', ' ', $this->text($node)));
+                $source = $headings[$context][mb_strtolower($text)] ?? null;
+                if ($source) $chosen = $referenceRoleByNode[spl_object_id($source)] ?? $role;
+                elseif (str_starts_with($role, 'topic') && (mb_strlen($text) > 140 || preg_match('/[.!?;]$/u', $text))) {
+                    $bodyExamples = array_filter($referenceRoles['body'] ?? [], fn ($candidate) => ($referenceContexts[spl_object_id($candidate)] ?? '') === $context);
+                    if ($bodyExamples) $chosen = 'body';
+                }
+            }
+            $result[$chosen][] = $node;
+        }
+        return $result;
     }
 
     private function referenceHeadingKeys(string $text): array

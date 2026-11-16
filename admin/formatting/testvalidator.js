@@ -1947,7 +1947,7 @@ async function _dvGenerateFixedPdf() {
     }
 
     window._dvPreviewFixed = async function () {
-        var body = openOverlay('Preview: Fix paper (aligned to the template)');
+        var body = openOverlay('Preview: Fix paper (using selected template)');
         var renderLoading=null;
         window._dvShowPreviewLoading(body, 'Preparing fixed paper...');
         try {
