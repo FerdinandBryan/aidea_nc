@@ -2085,6 +2085,32 @@ async function _dvGenerateFixedPdf() {
             // Show one rendered paper page at a time.
             var pages = Array.from(holder.querySelectorAll('.docx-wrapper > section.docx'));
             if (!pages.length) throw new Error('The document renderer did not produce any pages.');
+            var numbering = blob.formattingReport && blob.formattingReport.page_numbers;
+            if (numbering && numbering.status === 'added') {
+                var chapterStart = pages.findIndex(function (page) {
+                    return Array.from(page.querySelectorAll('article p')).some(function (p) {
+                        if (/\btoc\d*\b|\bdocx_toc\d*\b/i.test(p.className)) return false;
+                        var text = (p.innerText || p.textContent || '').trim();
+                        return /^CHAPTER\s+(?:1|I|ONE)\s*$/i.test(text) ||
+                            (/^CHAPTER\s+(?:1|I|ONE)(?:\s|[:.\-])/i.test(text) && !/(?:\.{2,}|[\u2024-\u2026])/.test(text) && !/\d\s*$/.test(text));
+                    });
+                });
+                if (chapterStart >= 0) pages.forEach(function (page, index) {
+                    var fields = Array.from(page.querySelectorAll('footer p, header p')).filter(function (p) {
+                        return /aideapagenumber/i.test(p.className) || /^\s*\d+\s*$/.test(p.textContent || '');
+                    });
+                    if (index < chapterStart) return;
+                    var number = String(index - chapterStart + 1);
+                    if (fields.length) fields.forEach(function (p) { p.textContent = number; });
+                    else {
+                        page.style.position = 'relative';
+                        var label = document.createElement('div');
+                        label.className = 'dv-inside-page-number'; label.textContent = number;
+                        label.style.cssText = 'position:absolute;bottom:24px;left:0;right:0;text-align:center;font:12pt "Times New Roman",serif;color:#000;';
+                        page.appendChild(label);
+                    }
+                });
+            }
             // Keep all page boxes in the CSS counter tree. display:none on
             // earlier pages makes visible lists start again at one.
             var wrapper = holder.querySelector('.docx-wrapper');
