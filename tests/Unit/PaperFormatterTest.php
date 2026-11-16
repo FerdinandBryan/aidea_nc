@@ -39,6 +39,26 @@ class PaperFormatterTest extends TestCase
         }
     }
 
+    public function test_divider_copies_template_page_padding_without_decorative_objects(): void
+    {
+        foreach (['REFERENCES', 'APPENDICES'] as $heading) {
+            $next = $heading === 'REFERENCES' ? 'Author citation.' : 'Appendix A';
+            $reference = $this->paper('<w:p><w:r><w:t>CHAPTER 5</w:t></w:r></w:p><w:p><w:r><w:br w:type="page"/></w:r></w:p><w:p><w:pPr><w:spacing w:line="720"/></w:pPr><w:r><w:rPr><w:sz w:val="100"/></w:rPr><w:pict/></w:r></w:p><w:p><w:pPr><w:spacing w:line="600"/></w:pPr></w:p><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>'.$heading.'</w:t></w:r></w:p><w:p><w:r><w:br w:type="page"/></w:r></w:p><w:p><w:r><w:t>'.$next.'</w:t></w:r></w:p>');
+            $student = $this->paper('<w:p><w:r><w:t>CHAPTER 5</w:t></w:r></w:p><w:p><w:r><w:t>'.$heading.'</w:t></w:r></w:p><w:p><w:r><w:t>'.$next.'</w:t></w:r></w:p>');
+            foreach ([1, 2] as $pass) {
+                (new PaperFormatter)->formatUsingReference($student, $reference);
+                $xp = $this->xml($student);
+                $divider = '//w:p[w:r/w:t="'.$heading.'"]';
+                $this->assertSame('600', $xp->evaluate('string('.$divider.'/preceding-sibling::w:p[1]/w:pPr/w:spacing/@w:line)'));
+                $this->assertSame('720', $xp->evaluate('string('.$divider.'/preceding-sibling::w:p[2]/w:pPr/w:spacing/@w:line)'));
+                $this->assertSame(1, $xp->query($divider.'/preceding-sibling::w:p[2]//w:br[@w:type="page"]')->length);
+                $this->assertSame(1, $xp->query('//w:p[w:r/w:t="'.$next.'"]//w:br[@w:type="page"]')->length);
+                $this->assertSame(0, $xp->query('//w:pict')->length);
+                $this->assertSame(5, $xp->query('/w:document/w:body/w:p')->length);
+            }
+        }
+    }
+
     private function rules(): array
     {
         return array_map(fn ($detail) => ['detail' => $detail], [

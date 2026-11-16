@@ -516,7 +516,8 @@ class PaperFormatter
                     }
                     $before = $studentXp->query('./w:pPr/w:pageBreakBefore', $target)->item(0);
                     if ($before && !in_array(strtolower($before->getAttributeNS(self::W, 'val')), ['0', 'false', 'off'], true)) $this->materializePageStart($target, $studentXp);
-                    if (!$indexEntry && !($footer['continuation'] ?? false)) $this->copyReferenceHeadingGap($source, $target, $referenceXp, $studentXp, $referenceStylesXp);
+                    if (in_array($role, ['section:REFERENCES', 'section:APPENDICES'], true)) $this->copyTemplateDividerLayout($source, $target, $referenceXp, $studentXp);
+                    elseif (!$indexEntry && !($footer['continuation'] ?? false)) $this->copyReferenceHeadingGap($source, $target, $referenceXp, $studentXp, $referenceStylesXp);
                     $mapping[] = ['paragraph' => $this->text($target), 'template_paragraph' => $this->text($source), 'match' => $matchedText ? 'heading-text' : ($matchedWords ? 'heading-words' : ($matchedExample ? 'chapter-heading-example' : 'structure'))];
                     $sourceSpacing = $referenceXp->query('./w:pPr/w:spacing', $source)->item(0) ?? $this->inheritedParagraphProperty($source, $referenceXp, $referenceStylesXp, 'spacing');
                     if ($sourceSpacing && in_array($sourceSpacing->getAttributeNS(self::W, 'lineRule'), ['', 'auto'], true) && is_numeric($sourceSpacing->getAttributeNS(self::W, 'line'))) $mapping[count($mapping) - 1]['expected_spacing'] = (float) $sourceSpacing->getAttributeNS(self::W, 'line') / 240;
@@ -609,6 +610,47 @@ class PaperFormatter
             return ['processed' => $processed, 'warnings' => array_values(array_unique($warnings)), 'mapping' => $mapping, 'multiple_sections' => $referenceXp->query('//w:sectPr')->length > 1];
         } finally { $studentZip->close(); $referenceZip->close(); }
     }
+    /** Preserve page padding without importing decorative shapes or their relationships. */
+    private function copyTemplateDividerLayout(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp): void
+    {
+        $padding = []; $boundary = false;
+        for ($node = $source->previousSibling; $node; $node = $node->previousSibling) {
+            if (!$node instanceof DOMElement) continue;
+            if ($node->localName !== 'p' || $this->text($node) !== '' || $referenceXp->query('.//w:sectPr | .//w:fldChar', $node)->length) break;
+            if ($referenceXp->query('.//w:br[@w:type="page"]', $node)->length) { $boundary = true; break; }
+            array_unshift($padding, $node);
+        }
+        if ($boundary) {
+            // Replace existing empty padding, never a user's image or section.
+            for ($node = $target->previousSibling; $node;) {
+                $previous = $node->previousSibling;
+                if ($node instanceof DOMElement) {
+                    if ($node->localName !== 'p' || $this->text($node) !== '' || $studentXp->query('.//w:drawing | .//w:pict | .//w:object | .//w:sectPr | .//w:fldChar', $node)->length) break;
+                    $node->parentNode->removeChild($node);
+                }
+                $node = $previous;
+            }
+            foreach (iterator_to_array($studentXp->query('./w:r/w:br[@w:type="page"]', $target)) as $br) $br->parentNode->removeChild($br);
+            $first = null;
+            foreach ($padding as $blank) {
+                $copy = $target->ownerDocument->importNode($blank, true);
+                foreach (iterator_to_array($studentXp->query('.//*[local-name()="AlternateContent"] | .//w:drawing | .//w:pict | .//w:object | .//w:lastRenderedPageBreak', $copy)) as $object) if ($object->parentNode) $object->parentNode->removeChild($object);
+                $target->parentNode->insertBefore($copy, $target); $first ??= $copy;
+            }
+            $this->materializePageStart($first ?? $target, $studentXp);
+        }
+        $nextSource = $source->nextSibling;
+        while ($nextSource instanceof DOMElement && $nextSource->localName === 'p' && $this->text($nextSource) === '') $nextSource = $nextSource->nextSibling;
+        if ($nextSource instanceof DOMElement && $nextSource->localName === 'p' && $this->referenceStartsPage($nextSource, $referenceXp)) {
+            for ($next = $target->nextSibling; $next; $next = $next->nextSibling) {
+                if (!$next instanceof DOMElement) continue;
+                if ($next->localName !== 'p') break;
+                if ($this->text($next) === '') continue;
+                $this->materializePageStart($next, $studentXp); break;
+            }
+        }
+    }
+
     /** Blank paragraphs are layout in a Word template, outside the heading's pPr. */
     private function copyReferenceHeadingGap(DOMElement $source, DOMElement $target, DOMXPath $referenceXp, DOMXPath $studentXp, ?DOMXPath $stylesXp = null): void
     {
