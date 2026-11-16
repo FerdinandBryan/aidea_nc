@@ -431,7 +431,30 @@ class PaperFormatter
                     }
                     // Citation emphasis identifies titles within an entry, not the whole entry.
                     $entryRunProperties = $role === 'references:entry' ? array_values(array_diff($runProperties, ['b', 'bCs', 'i', 'iCs', 'u'])) : $runProperties;
+                    if ($role === 'references:entry') {
+                        // Preserve emphasis inside citations, but not accidental
+                        // formatting applied to every text run in the entry.
+                        foreach (['b', 'bCs', 'i', 'iCs'] as $toggle) {
+                            $runs = $studentXp->query('./w:r[w:t[normalize-space(.) != ""]] | ./w:hyperlink/w:r[w:t[normalize-space(.) != ""]]', $target);
+                            $allEnabled = $runs->length > 0;
+                            foreach ($runs as $run) {
+                                $flag = $studentXp->query('./w:rPr/w:'.$toggle, $run)->item(0);
+                                if (!$flag || in_array(strtolower($flag->getAttributeNS(self::W, 'val')), ['0', 'false', 'off'], true)) { $allEnabled = false; break; }
+                            }
+                            if ($allEnabled) $entryRunProperties[] = $toggle;
+                        }
+                    }
                     $this->copyReferenceParagraph($source, $target, $referenceXp, $studentXp, $paragraphProperties, $entryRunProperties, $referenceStylesXp);
+                    if ($role === 'references:entry' || str_starts_with($role, 'appendix:') || in_array($role, ['section:REFERENCES', 'section:APPENDICES'], true)) {
+                        foreach (['tabs', 'spacing', 'ind', 'jc'] as $name) {
+                            if ($referenceXp->query('./w:pPr/w:'.$name, $source)->length) continue;
+                            $inherited = $this->inheritedParagraphProperty($source, $referenceXp, $referenceStylesXp, $name);
+                            if ($inherited) {
+                                $pr = $this->ensure($target, 'pPr', true);
+                                $pr->replaceChild($studentDoc->importNode($inherited, true), $this->ensure($pr, $name));
+                            }
+                        }
+                    }
                     if ($indexEntry) {
                         // TOC properties often live in TOC1/TOC2 styles, not document.xml.
                         foreach (['tabs', 'spacing', 'ind', 'jc'] as $name) {

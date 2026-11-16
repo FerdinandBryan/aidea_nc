@@ -21,6 +21,24 @@ class PaperFormatterTest extends TestCase
         parent::tearDown();
     }
 
+    public function test_reference_emphasis_and_appendix_inherited_layout_follow_selected_template(): void
+    {
+        foreach (['center', 'left'] as $alignment) {
+            $reference = $this->paper('<w:p><w:r><w:t>REFERENCES</w:t></w:r></w:p><w:p><w:r><w:t>Sample citation.</w:t></w:r></w:p><w:p><w:r><w:t>APPENDICES</w:t></w:r></w:p><w:p><w:r><w:t>Appendix A</w:t></w:r></w:p><w:p><w:r><w:t>Research Instrument</w:t></w:r></w:p>');
+            $zip = new ZipArchive; $zip->open($reference);
+            $zip->addFromString('word/styles.xml', '<w:styles xmlns:w="'.self::W.'"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:pPr><w:jc w:val="'.$alignment.'"/><w:spacing w:line="300"/><w:ind w:left="600" w:hanging="600"/></w:pPr></w:style></w:styles>'); $zip->close();
+            $student = $this->paper('<w:p><w:r><w:t>REFERENCES</w:t></w:r></w:p><w:p><w:r><w:rPr><w:i/></w:rPr><w:t>Author. Entire entry italic.</w:t></w:r></w:p><w:p><w:r><w:t>Another author. </w:t></w:r><w:r><w:rPr><w:i/></w:rPr><w:t>Book title.</w:t></w:r></w:p><w:p><w:r><w:t>APPENDICES</w:t></w:r></w:p><w:p><w:r><w:t>Appendix A</w:t></w:r></w:p><w:p><w:r><w:t>Research Instrument</w:t></w:r></w:p>');
+            (new PaperFormatter)->formatUsingReference($student, $reference);
+            $xp = $this->xml($student);
+            $this->assertSame('0', $xp->evaluate('string(//w:p[w:r/w:t="Author. Entire entry italic."]/w:r/w:rPr/w:i/@w:val)'));
+            $this->assertSame(1, $xp->query('//w:r[w:t="Book title."]/w:rPr/w:i')->length);
+            foreach (['REFERENCES', 'Author. Entire entry italic.', 'APPENDICES', 'Appendix A', 'Research Instrument'] as $text) {
+                $this->assertSame($alignment, $xp->evaluate('string(//w:p[w:r/w:t="'.$text.'"]/w:pPr/w:jc/@w:val)'));
+                $this->assertSame('300', $xp->evaluate('string(//w:p[w:r/w:t="'.$text.'"]/w:pPr/w:spacing/@w:line)'));
+            }
+        }
+    }
+
     private function rules(): array
     {
         return array_map(fn ($detail) => ['detail' => $detail], [
