@@ -635,6 +635,16 @@ class PaperFormatter
             foreach ($padding as $blank) {
                 $copy = $target->ownerDocument->importNode($blank, true);
                 foreach (iterator_to_array($studentXp->query('.//*[local-name()="AlternateContent"] | .//w:drawing | .//w:pict | .//w:object | .//w:lastRenderedPageBreak', $copy)) as $object) if ($object->parentNode) $object->parentNode->removeChild($object);
+                // Empty paragraphs take their line height from the paragraph
+                // mark in Word. Browser renderers need a real formatted run.
+                foreach (iterator_to_array($studentXp->query('./w:r', $copy)) as $emptyRun) $copy->removeChild($emptyRun);
+                $run = $target->ownerDocument->createElementNS(self::W, 'w:r');
+                $mark = $studentXp->query('./w:pPr/w:rPr', $copy)->item(0);
+                if ($mark) $run->appendChild($mark->cloneNode(true));
+                $space = $target->ownerDocument->createElementNS(self::W, 'w:t');
+                $space->setAttributeNS('http://www.w3.org/XML/1998/namespace', 'xml:space', 'preserve');
+                $space->appendChild($target->ownerDocument->createTextNode(' '));
+                $run->appendChild($space); $copy->appendChild($run);
                 $target->parentNode->insertBefore($copy, $target); $first ??= $copy;
             }
             $this->materializePageStart($first ?? $target, $studentXp);
