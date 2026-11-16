@@ -87,7 +87,7 @@
 
         const color = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
         const line = view.value === 'line';
-        find('trendPlot').style.height = selected.length === 1 ? '210px' : '260px';
+        find('trendPlot').style.height = '240px';
         find('trendPlotInner').style.minWidth = Math.max(280, selected.length * 82) + 'px';
         canvas.setAttribute('aria-label', 'Thesis submissions: ' + selected.map(row => row.year + ': ' + row.total).join(', '));
         chart = new Chart(canvas.getContext('2d'), {
@@ -96,11 +96,19 @@
                 labels: selected.map(row => row.year),
                 datasets: [{
                     label: 'Submissions', data: selected.map(row => row.total),
-                    backgroundColor: line ? color('--chart-fill') : color('--chart-line'),
-                    borderColor: color('--chart-line'), borderWidth: line ? 2 : 0,
+                    backgroundColor: line ? context => {
+                        const area = context.chart.chartArea;
+                        if (!area) return 'rgba(197, 27, 75, 0.15)';
+                        const gradient = context.chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+                        gradient.addColorStop(0, 'rgba(197, 27, 75, 0.38)');
+                        gradient.addColorStop(1, 'rgba(197, 27, 75, 0)');
+                        return gradient;
+                    } : color('--trend-accent') || '#c51b4b',
+                    borderColor: '#c51b4b', borderWidth: line ? 2 : 0,
                     borderRadius: 6, borderSkipped: false, maxBarThickness: 40,
-                    pointRadius: 5, pointHoverRadius: 7, fill: false,
-                    tension: 0,
+                    pointRadius: 3.5, pointHoverRadius: 6,
+                    pointBackgroundColor: '#c51b4b', pointBorderColor: color('--surface') || '#fff', pointBorderWidth: 2,
+                    fill: line, tension: 0.4, cubicInterpolationMode: 'monotone',
                 }],
             },
             options: {
@@ -112,10 +120,10 @@
                     tooltip: { displayColors: false, callbacks: { label: context => context.parsed.y.toLocaleString() + ' submissions' } },
                 },
                 scales: {
-                    x: { grid: { display: false }, ticks: { color: color('--chart-text'), maxRotation: 0, autoSkip: false } },
+                    x: { border: { display: false }, grid: { display: false }, ticks: { color: color('--chart-text'), maxRotation: 0, autoSkip: false } },
                     y: { beginAtZero: true, grace: '20%', suggestedMax: 1,
-                        grid: { color: color('--chart-grid') },
-                        ticks: { color: color('--chart-text'), precision: 0, maxTicksLimit: 5 } },
+                        border: { display: false }, grid: { color: color('--chart-grid'), drawTicks: false },
+                        ticks: { color: color('--chart-text'), precision: 0, maxTicksLimit: 6, padding: 8 } },
                 },
             },
             plugins: [{
