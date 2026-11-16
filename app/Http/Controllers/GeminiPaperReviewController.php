@@ -42,6 +42,8 @@ class GeminiPaperReviewController extends Controller
             $report = $reference
                 ? $formatter->formatUsingReference($path, $reference, $plan['rules'])
                 : $formatter->formatFromTemplateRules($path, $plan['rules']);
+            $report['pagination'] = app(\App\Services\PaperPagination::class)->apply($path);
+            foreach ($report['pagination']['warnings'] ?? [] as $warning) $report['manual_review_rules'][] = $warning;
             $report['gemini_formatting'] = ['requested' => $plan['requested'], 'validated_rules' => $plan['accepted'], 'warnings' => $plan['warnings']];
             foreach ($plan['warnings'] as $warning) $report['manual_review_rules'][] = $warning;
             $report['manual_review_required'] = !empty($report['manual_review_rules']);

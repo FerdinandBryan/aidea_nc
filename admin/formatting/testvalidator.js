@@ -2058,6 +2058,23 @@ async function _dvGenerateFixedPdf() {
             holder.style.cssText = 'background:#6b7280;color:#000;border-radius:6px;overflow:auto;';
             body.appendChild(bar);
             body.appendChild(holder);
+            var pagination = blob.formattingReport && blob.formattingReport.pagination;
+            if (pagination && pagination.status === 'complete' && pagination.pdf_base64) {
+                // Display the renderer's actual pages, not a second browser
+                // pagination that could disagree with the updated Word TOC.
+                var pdfBytes = Uint8Array.from(atob(pagination.pdf_base64), function (c) { return c.charCodeAt(0); });
+                var pdfUrl = URL.createObjectURL(new Blob([pdfBytes], { type: 'application/pdf' }));
+                var frame = document.createElement('iframe');
+                frame.title = 'Fixed paper with synchronized Table of Contents and page numbers';
+                frame.style.cssText = 'display:block;width:100%;height:75vh;border:0;background:#fff;';
+                frame.src = pdfUrl;
+                holder.appendChild(frame);
+                var pdfObserver = new MutationObserver(function () {
+                    if (!holder.isConnected) { URL.revokeObjectURL(pdfUrl); pdfObserver.disconnect(); }
+                });
+                pdfObserver.observe(document.body, { childList: true, subtree: true });
+                return;
+            }
             var _dvPrevPg = window._dvPaginateOn; window._dvPaginateOn = true;
             try { await window.docx.renderAsync(blob, holder, null, { className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: false, renderHeaders: true, renderFooters: true }); }
             finally { window._dvPaginateOn = _dvPrevPg; }
